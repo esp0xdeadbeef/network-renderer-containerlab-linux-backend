@@ -10,6 +10,7 @@ RUN apk add --no-cache \
         procps \
         curl \
         vim \
+        nftables \
         less
 
 #USER frr

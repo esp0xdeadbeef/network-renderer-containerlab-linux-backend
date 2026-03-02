@@ -1,3 +1,4 @@
+# ./clabgen/interfaces.py
 from typing import Dict, Any, List
 
 
@@ -12,7 +13,7 @@ def render_interfaces(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str
 
         eth = f"eth{eth_map[logical_if]}"
 
+        # bring interface up (no per-if sysctl; global rp_filter loop already rendered)
         cmds.append(f"ip link set {eth} up")
-        cmds.append(f"sysctl -w net.ipv4.conf.{eth}.rp_filter=0")
 
     return cmds

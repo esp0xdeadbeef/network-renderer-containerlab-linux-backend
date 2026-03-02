@@ -30,7 +30,8 @@ BRIDGES_FILE="${FLAKE_DIR}/vm-bridges-generated.nix"
 
 if [ ! -f "${SOLVER_JSON}" ] || [ ! -f "${BRIDGES_FILE}" ]; then
   echo "[*] Generating solver JSON, topology and bridges..."
-  nix run .#generate-clab-config "${SOLVER_INPUT}" "${TOPO_FILE}" "${BRIDGES_FILE}"
+  #nix run .#generate-clab-config "${SOLVER_INPUT}" "${TOPO_FILE}" "${BRIDGES_FILE}"
+  ./run-clab-generator.sh
 fi
 
 echo "[*] Starting VM via nixos-shell (preserving custom options)..."
