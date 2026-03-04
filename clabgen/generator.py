@@ -9,6 +9,7 @@ from .models import SiteModel
 from .linux_router import render_linux_router
 from .links import build_eth_index, short_bridge
 from .isp import ensure_isp_node
+from .sysctls_catalog import default_sysctls
 
 
 ROLE_ORDER = [
@@ -40,13 +41,6 @@ def _load_raw_site(site: SiteModel) -> Dict:
     )
 
 
-def _derive_policy_owner(raw_site: Dict) -> str:
-    owner = raw_site.get("_enforcement", {}).get("owner")
-    if not owner:
-        return ""
-    return owner
-
-
 def _role_rank(role: str) -> int:
     for idx, r in enumerate(ROLE_ORDER):
         if r in role:
@@ -57,50 +51,26 @@ def _role_rank(role: str) -> int:
 def generate_topology(site: SiteModel) -> Dict:
     site = copy.deepcopy(site)
 
+    defaults = {
+        "kind": "linux",
+        "image": "clab-frr-plus-tooling:latest",
+        "sysctls": default_sysctls(),
+    }
+
     if not site.nodes or not site.links:
         return {
             "name": f"{site.enterprise}-{site.site}",
             "topology": {
-                "defaults": {
-                    "kind": "linux",
-                    "image": "clab-frr-plus-tooling:latest",
-                },
+                "defaults": defaults,
                 "nodes": {},
                 "links": [],
             },
             "bridges": [],
         }
 
-    raw_site = _load_raw_site(site)
-
     rendered_nodes: Dict[str, Dict] = {}
     rendered_links: List[Dict] = []
     bridges: Set[str] = set()
-
-    policy_owner = _derive_policy_owner(raw_site)
-
-    rename_map: Dict[str, str] = {}
-
-    attachments = (
-        raw_site
-        .get("_debug", {})
-        .get("compilerIR", {})
-        .get("attachment", [])
-    )
-    for att in attachments:
-        if att.get("segment") == "tenants:mgmt":
-            unit = att.get("unit")
-            if unit in site.nodes and policy_owner:
-                rename_map[unit] = f"{unit}-{policy_owner}"
-
-    for old, new in rename_map.items():
-        site.nodes[new] = site.nodes.pop(old)
-
-    for link in site.links.values():
-        updated = {}
-        for unit, data in link.endpoints.items():
-            updated[rename_map.get(unit, unit)] = data
-        link.endpoints = updated
 
     eth_index = build_eth_index(site)
 
@@ -170,16 +140,7 @@ def generate_topology(site: SiteModel) -> Dict:
     return {
         "name": f"{site.enterprise}-{site.site}",
         "topology": {
-            "defaults": {
-                "kind": "linux",
-                "image": "clab-frr-plus-tooling:latest",
-                "sysctls": {
-                    "net.ipv4.ip_forward": "1",
-                    "net.ipv6.conf.all.forwarding": "1",
-                    "net.ipv4.conf.all.rp_filter": "0",
-                    "net.ipv4.conf.default.rp_filter": "0",
-                },
-            },
+            "defaults": defaults,
             "nodes": rendered_nodes,
             "links": rendered_links,
         },
