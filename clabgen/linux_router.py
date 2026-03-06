@@ -1,24 +1,19 @@
-# FILE: ./clabgen/linux_router.py
+# ./clabgen/linux_router.py
+from __future__ import annotations
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 
-from .sysctl import render_sysctls
-from .interfaces import render_interfaces
-from .addressing import render_addressing
-from .connected_routes import render_connected_routes
-from .static_routes import render_static_routes
-from .default_routes import render_default_routes
+from .s88.engine import render_node_s88
 
 
 def render_linux_router(node: Dict[str, Any], eth_map: Dict[str, int]) -> Dict[str, Any]:
-    exec_cmds: List[str] = []
-
-    exec_cmds += render_sysctls()
-    exec_cmds += render_interfaces(node, eth_map)
-    exec_cmds += render_addressing(node, eth_map)
-    exec_cmds += render_connected_routes(node, eth_map)
-    exec_cmds += render_static_routes(node, eth_map)
-    exec_cmds += render_default_routes(node, eth_map)
+    exec_cmds = render_node_s88(
+        node_name=str(node.get("name", "")),
+        node_data=node,
+        eth_map=eth_map,
+        routing_mode="static",
+        disable_dynamic=True,
+    )
 
     return {
         "exec": exec_cmds,

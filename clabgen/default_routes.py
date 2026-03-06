@@ -1,6 +1,21 @@
+# ./clabgen/default_routes.py
 from __future__ import annotations
 
 from typing import Dict, Any, List
+import ipaddress
+
+
+def _route_lists(iface: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+    routes = iface.get("routes")
+    if isinstance(routes, dict):
+        return {
+            "ipv4": list(routes.get("ipv4", [])),
+            "ipv6": list(routes.get("ipv6", [])),
+        }
+    return {
+        "ipv4": list(iface.get("routes4", [])),
+        "ipv6": list(iface.get("routes6", [])),
+    }
 
 
 def _dst(r: Dict[str, Any]) -> str | None:
@@ -15,28 +30,56 @@ def _via6(r: Dict[str, Any]) -> str | None:
     return r.get("via6") or r.get("via")
 
 
-def render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
-    role = node.get("role", "")
-    if role != "s-router-core":
-        return []
+def _peer_in_subnet(cidr: str | None) -> str | None:
+    if not isinstance(cidr, str) or not cidr:
+        return None
 
+    iface = ipaddress.ip_interface(cidr)
+    current = iface.ip
+
+    if isinstance(iface.network, ipaddress.IPv4Network):
+        candidates = list(iface.network.hosts())
+        if not candidates and iface.network.prefixlen == 31:
+            candidates = list(iface.network)
+    else:
+        candidates = list(iface.network.hosts())
+        if not candidates and iface.network.prefixlen == 127:
+            candidates = list(iface.network)
+
+    for cand in candidates:
+        if cand != current:
+            return str(cand)
+
+    return None
+
+
+def render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
     cmds: List[str] = []
 
-    for ifname, iface in node.get("interfaces", {}).items():
+    for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
+        iface = node["interfaces"][ifname]
         eth = eth_map.get(ifname)
         if eth is None:
             continue
 
-        for r in iface.get("routes4", []):
-            if _dst(r) == "0.0.0.0/0":
-                via = _via4(r)
-                if via:
-                    cmds.append(f"ip route replace default via {via} dev eth{eth}")
+        routes = _route_lists(iface)
 
-        for r in iface.get("routes6", []):
-            if _dst(r) == "::/0":
-                via = _via6(r)
-                if via:
-                    cmds.append(f"ip -6 route replace default via {via} dev eth{eth}")
+        for r in routes["ipv4"]:
+            if _dst(r) != "0.0.0.0/0":
+                continue
+            via = _via4(r)
+            if not via and r.get("proto") == "uplink":
+                via = _peer_in_subnet(iface.get("addr4"))
+            if via:
+                cmds.append(f"ip route replace default via {via} dev eth{eth} onlink")
+
+        for r in routes["ipv6"]:
+            if _dst(r) != "::/0":
+                continue
+            via = _via6(r)
+            if not via and r.get("proto") == "uplink":
+                via = _peer_in_subnet(iface.get("addr6"))
+            if via:
+                cmds.append(f"ip -6 route replace default via {via} dev eth{eth} onlink")
 
     return cmds

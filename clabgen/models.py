@@ -10,8 +10,9 @@ class InterfaceModel:
     addr4: Optional[str] = None
     addr6: Optional[str] = None
     ll6: Optional[str] = None
-    routes4: List[Dict] = field(default_factory=list)
-    routes6: List[Dict] = field(default_factory=list)
+    routes: Dict[str, List[Dict[str, Any]]] = field(
+        default_factory=lambda: {"ipv4": [], "ipv6": []}
+    )
     kind: Optional[str] = None
     upstream: Optional[str] = None
 
