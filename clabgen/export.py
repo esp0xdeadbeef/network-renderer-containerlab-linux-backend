@@ -111,7 +111,6 @@ def write_outputs(
     }
 
     provenance = {
-        "solver": solver_meta,
         "renderer": renderer_meta,
     }
 
