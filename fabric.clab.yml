@@ -1,14 +1,14 @@
 # --- provenance ---
 # {
 #   "renderer": {
-#     "gitDirty": true,
-#     "gitRev": "a3e8dad729b73f903074583b484dfc05221d7701",
+#     "gitDirty": false,
+#     "gitRev": "e0bb87ab6e071269c4181c74ce6bccaca6a198e4",
 #     "name": "network-renderer-containerlab-linux-backend",
 #     "schemaVersion": 1
 #   },
 #   "solver": {
-#     "gitDirty": true,
-#     "gitRev": "a3e8dad729b73f903074583b484dfc05221d7701"
+#     "gitDirty": false,
+#     "gitRev": "e0bb87ab6e071269c4181c74ce6bccaca6a198e4"
 #   }
 # }
 # --- end provenance ---
