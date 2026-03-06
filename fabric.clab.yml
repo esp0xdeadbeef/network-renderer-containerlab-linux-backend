@@ -1,3 +1,17 @@
+# --- provenance ---
+# {
+#   "renderer": {
+#     "gitDirty": true,
+#     "gitRev": "a3e8dad729b73f903074583b484dfc05221d7701",
+#     "name": "network-renderer-containerlab-linux-backend",
+#     "schemaVersion": 1
+#   },
+#   "solver": {
+#     "gitDirty": true,
+#     "gitRev": "a3e8dad729b73f903074583b484dfc05221d7701"
+#   }
+# }
+# --- end provenance ---
 # fabric.clab.yml
 name: fabric
 topology:

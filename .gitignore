@@ -20,3 +20,7 @@ clab-*/
 # Security hygiene: never commit private keys
 clab-fabric/.tls/**/*.key
 **/*.key
+
+# signing the clab generated output now:
+output-compiler-signed.json
+output-solver-signed.json

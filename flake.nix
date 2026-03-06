@@ -49,7 +49,7 @@
             fi
 
             INPUT_NIX="$1"
-            OUTPUT_JSON="output-network-solver.json"
+            OUTPUT_JSON="output-solver-signed.json"
             TOPO_OUT="''${2:-fabric.clab.yml}"
             BRIDGES_OUT="''${3:-vm-bridges-generated.nix}"
 
