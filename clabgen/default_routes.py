@@ -1,7 +1,6 @@
-# ./clabgen/default_routes.py
 from __future__ import annotations
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
 import ipaddress
 
 
@@ -55,6 +54,7 @@ def _peer_in_subnet(cidr: str | None) -> str | None:
 
 def render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
     cmds: List[str] = []
+    seen: Set[str] = set()
 
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
         iface = node["interfaces"][ifname]
@@ -71,7 +71,10 @@ def render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
             if not via and r.get("proto") == "uplink":
                 via = _peer_in_subnet(iface.get("addr4"))
             if via:
-                cmds.append(f"ip route replace default via {via} dev eth{eth} onlink")
+                cmd = f"ip route replace default via {via} dev eth{eth} onlink"
+                if cmd not in seen:
+                    seen.add(cmd)
+                    cmds.append(cmd)
 
         for r in routes["ipv6"]:
             if _dst(r) != "::/0":
@@ -80,6 +83,9 @@ def render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
             if not via and r.get("proto") == "uplink":
                 via = _peer_in_subnet(iface.get("addr6"))
             if via:
-                cmds.append(f"ip -6 route replace default via {via} dev eth{eth} onlink")
+                cmd = f"ip -6 route replace default via {via} dev eth{eth} onlink"
+                if cmd not in seen:
+                    seen.add(cmd)
+                    cmds.append(cmd)
 
     return cmds

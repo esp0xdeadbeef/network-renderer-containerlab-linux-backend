@@ -1,6 +1,7 @@
+# ./clabgen/generator.py
 from __future__ import annotations
 
-from typing import Dict, List, Set, Any
+from typing import Dict, List, Set, Any, Tuple
 import copy
 import ipaddress
 
@@ -76,7 +77,7 @@ def _augment_site(site: SiteModel) -> SiteModel:
 
         unit = eps[0]
         ep = link.endpoints[unit]
-        uplink = ep.get("uplink") or link.get("uplink") or link_name
+        uplink = ep.get("uplink") or getattr(link, "uplink", None) or link_name
         peer_name = f"wan-peer-{uplink}"
 
         if peer_name not in site.nodes:
@@ -137,22 +138,6 @@ def _augment_site(site: SiteModel) -> SiteModel:
                             }
                         )
 
-        if ep.get("addr4"):
-            peer_routes4 = [
-                r
-                for r in peer_routes4
-                if r.get("dst")
-                != str(ipaddress.ip_interface(ep["addr4"]).network)
-            ]
-
-        if ep.get("addr6"):
-            peer_routes6 = [
-                r
-                for r in peer_routes6
-                if r.get("dst")
-                != str(ipaddress.ip_interface(ep["addr6"]).network)
-            ]
-
         site.nodes[peer_name].interfaces[link_name] = InterfaceModel(
             name=link_name,
             addr4=peer_ep.get("addr4"),
@@ -203,6 +188,8 @@ def generate_topology(site: SiteModel) -> Dict[str, Any]:
     projected_nodes: Set[str] = set()
     projected_links: Set[str] = set()
 
+    tenant_groups: Dict[str, List[Tuple[str, int]]] = {}
+
     for unit, node in sorted_units:
         full_name = scoped_name(site, unit)
 
@@ -238,6 +225,15 @@ def generate_topology(site: SiteModel) -> Dict[str, Any]:
         rendered_nodes[full_name] = node_def
         projected_nodes.add(unit)
 
+        for ifname, iface in node.interfaces.items():
+            if iface.kind != "tenant":
+                continue
+            if unit not in eth_index or ifname not in eth_index[unit]:
+                continue
+
+            key = ifname
+            tenant_groups.setdefault(key, []).append((full_name, eth_index[unit][ifname]))
+
     for link_name in sorted(site.links.keys()):
         link = site.links[link_name]
         eps = sorted(link.endpoints.keys())
@@ -271,6 +267,25 @@ def generate_topology(site: SiteModel) -> Dict[str, Any]:
             }
         )
         projected_links.add(link_name)
+
+    for tenant, members in sorted(tenant_groups.items()):
+        if len(members) < 2:
+            continue
+
+        bridge = short_bridge(f"{site.enterprise}-{site.site}-tenant-{tenant}")
+        bridges.add(bridge)
+
+        endpoints = [f"{node}:eth{eth}" for node, eth in members]
+
+        rendered_links.append(
+            {
+                "endpoints": endpoints,
+                "labels": {
+                    "clab.link.type": "bridge",
+                    "clab.link.bridge": bridge,
+                },
+            }
+        )
 
     missing_nodes = sorted(set(site.nodes.keys()) - projected_nodes)
     missing_links = sorted(set(site.links.keys()) - projected_links)

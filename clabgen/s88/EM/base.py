@@ -1,14 +1,37 @@
-# ./clabgen/s88/EM/base.py
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from clabgen.interfaces import render_interfaces
-from clabgen.addressing import render_addressing
-from clabgen.connected_routes import render_connected_routes
-from clabgen.static_routes import render_static_routes
-from clabgen.default_routes import render_default_routes
-from clabgen.s88.CM.base import render as render_cm
+from .roles import (
+    parse_access,
+    parse_core,
+    parse_policy,
+    parse_upstream_selector,
+    parse_wan_peer,
+)
+
+from .default import render as render_default
+
+
+def _parse(role: str, node_name: str, node_data: Dict[str, Any], eth_map: Dict[str, int]) -> Dict[str, Any]:
+    r = str(role or "").strip()
+
+    if r == "access":
+        return parse_access(node_name, node_data, eth_map)
+
+    if r == "core":
+        return parse_core(node_name, node_data, eth_map)
+
+    if r == "policy":
+        return parse_policy(node_name, node_data, eth_map)
+
+    if r == "upstream-selector":
+        return parse_upstream_selector(node_name, node_data, eth_map)
+
+    if r == "wan-peer":
+        return parse_wan_peer(node_name, node_data, eth_map)
+
+    return {"node": node_name, "role": r, "links": {}}
 
 
 def render(
@@ -22,15 +45,7 @@ def render(
     _ = routing_mode
     _ = disable_dynamic
 
-    cmds: List[str] = [
-        "sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > \"$i\"; done'",
-    ]
+    parsed = _parse(role, node_name, node_data, eth_map)
+    node_data["_s88_links"] = parsed
 
-    cmds.extend(render_interfaces(node_data, eth_map))
-    cmds.extend(render_addressing(node_data, eth_map))
-    cmds.extend(render_connected_routes(node_data, eth_map))
-    cmds.extend(render_static_routes(node_data, eth_map))
-    cmds.extend(render_default_routes(node_data, eth_map))
-    cmds.extend(render_cm(role, node_name))
-
-    return cmds
+    return render_default(role, node_name, node_data, eth_map)
