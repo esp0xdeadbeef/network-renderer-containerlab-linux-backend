@@ -2,7 +2,7 @@
 # {
 #   "renderer": {
 #     "gitDirty": true,
-#     "gitRev": "e44c98a5656fbfab4f76685135293138df31b345",
+#     "gitRev": "68dae00f27d465e1fccf9349bb4d1ce714864f90",
 #     "name": "network-renderer-containerlab-linux-backend",
 #     "schemaVersion": 2
 #   }
@@ -453,20 +453,20 @@ topology:
       clab.link.type: bridge
       clab.link.bridge: br-e035268ceff9
   - endpoints:
+    - client-s-router-access-mgmt-tenant-mgmt:eth1
+    - s-router-access-mgmt:eth2
+    labels:
+      clab.link.type: bridge
+      clab.link.bridge: br-93d709323a57
+  - endpoints:
     - client-s-router-access-admin-tenant-admin:eth1
     - s-router-access-admin:eth2
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-17893598c586
+      clab.link.bridge: br-d915c87afd65
   - endpoints:
     - client-s-router-access-client-tenant-client:eth1
     - s-router-access-client:eth2
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-3fbc5b75dfbd
-  - endpoints:
-    - client-s-router-access-mgmt-tenant-mgmt:eth1
-    - s-router-access-mgmt:eth2
-    labels:
-      clab.link.type: bridge
-      clab.link.bridge: br-71ddb5e135c4
+      clab.link.bridge: br-8897a6fa9b88

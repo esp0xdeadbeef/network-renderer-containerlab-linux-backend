@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple, Any, Callable
 import hashlib
+import ipaddress
 
 from clabgen.models import SiteModel, NodeModel
 from clabgen.s88.Unit.access import render as render_access
@@ -24,6 +25,27 @@ def _short_bridge(name: str) -> str:
 def _host_ifname(bridge: str) -> str:
     h = hashlib.blake2s(bridge.encode(), digest_size=2).hexdigest()
     return f"veth-{bridge[:6]}-{h}"
+
+
+def _tenant_group_key(iface_name: str, node_name: str, iface: Any) -> str:
+    prefixes: List[str] = []
+
+    for addr in (iface.addr4, iface.addr6):
+        if not isinstance(addr, str) or not addr:
+            continue
+        try:
+            prefixes.append(str(ipaddress.ip_interface(addr).network))
+        except ValueError:
+            continue
+
+    if prefixes:
+        # Prefer IPv4 when present, otherwise IPv6.
+        family_sorted = sorted(prefixes, key=lambda p: (":" in p, p))
+        return family_sorted[0]
+
+    raise ValueError(
+        f"tenant interface has no usable prefix for node={node_name!r} iface={iface_name!r}"
+    )
 
 
 def _build_eth_maps(site: SiteModel) -> Dict[str, Dict[str, int]]:
@@ -129,7 +151,8 @@ def render_units(site: SiteModel) -> Tuple[Dict[str, Any], List[Dict[str, Any]],
             if eth is None:
                 continue
 
-            tenant_groups.setdefault(ifname, []).append(f"{node_name}:eth{eth}")
+            tenant_key = _tenant_group_key(ifname, node_name, iface)
+            tenant_groups.setdefault(tenant_key, []).append(f"{node_name}:eth{eth}")
 
     for tenant in sorted(tenant_groups.keys()):
         bridge = _short_bridge(f"{site.enterprise}-{site.site}-tenant-{tenant}")
