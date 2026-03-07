@@ -1,8 +1,8 @@
 # --- provenance ---
 # {
 #   "renderer": {
-#     "gitDirty": true,
-#     "gitRev": "ccdf122993ef341caec47c5d306013b26577e6ed",
+#     "gitDirty": false,
+#     "gitRev": "e636e25d1b39fcef5dd91df290b72fa1a7ab36d5",
 #     "name": "network-renderer-containerlab-linux-backend",
 #     "schemaVersion": 2
 #   }
