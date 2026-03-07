@@ -1,68 +1,69 @@
 # ./clabgen/s88/enterprise/inject_clients.py
 from __future__ import annotations
 
-import hashlib
 import ipaddress
 
 from clabgen.models import SiteModel, NodeModel, InterfaceModel
 
 
-MAX_HOSTNAME = 63
+def _first_usable(network: ipaddress._BaseNetwork):
+    if network.prefixlen >= (31 if isinstance(network, ipaddress.IPv4Network) else 127):
+        return network.network_address
+    return network.network_address + 1
 
 
-def _short_name(node: str, iface: str) -> str:
-    base = f"client-{node}-{iface}"
-    if len(base) <= MAX_HOSTNAME:
-        return base
-
-    digest = hashlib.blake2s(
-        f"{node}:{iface}".encode(),
-        digest_size=4,
-    ).hexdigest()
-    keep = MAX_HOSTNAME - len(digest) - 1
-    return f"{base[:keep]}-{digest}"
+def _second_usable(network: ipaddress._BaseNetwork):
+    if network.prefixlen >= (31 if isinstance(network, ipaddress.IPv4Network) else 127):
+        return network.broadcast_address
+    return network.network_address + 2
 
 
-def _client_addr(router_cidr: str) -> str:
+def _derive_client(router_cidr: str) -> tuple[str, str]:
     iface = ipaddress.ip_interface(router_cidr)
     net = iface.network
     router_ip = iface.ip
 
-    for host in net.hosts():
-        if host != router_ip:
-            return f"{host}/{net.prefixlen}"
+    first = _first_usable(net)
+    second = _second_usable(net)
 
-    return router_cidr
+    client = second if router_ip == first else first
+
+    return str(router_ip), f"{client}/{net.prefixlen}"
 
 
 def inject_clients(site: SiteModel) -> None:
+    """
+    Explicitly inject tenant client nodes for every access router tenant interface.
+    """
+
     for node_name, node in list(site.nodes.items()):
         if node.role != "access":
             continue
 
-        for ifname, iface in list(node.interfaces.items()):
+        for ifname, iface in node.interfaces.items():
             if iface.kind != "tenant":
                 continue
 
             if not iface.addr4:
                 continue
 
-            network = ipaddress.ip_interface(iface.addr4).network
-            if not isinstance(network, ipaddress.IPv4Network):
-                continue
+            client_name = f"client-{node_name}-{ifname}"
 
-            if network.prefixlen != 24:
-                continue
-
-            link = site.links.get(ifname)
-            if not link:
-                continue
-
-            client_name = _short_name(node_name, ifname)
             if client_name in site.nodes:
                 continue
 
-            client_addr = _client_addr(iface.addr4)
+            router_v4, client_v4 = _derive_client(iface.addr4)
+
+            routes = {
+                "ipv4": [{"dst": "0.0.0.0/0", "via4": router_v4}],
+                "ipv6": [],
+            }
+
+            if iface.addr6:
+                router_v6, client_v6 = _derive_client(iface.addr6)
+                routes["ipv6"].append({"dst": "::/0", "via6": router_v6})
+            else:
+                client_v6 = None
 
             site.nodes[client_name] = NodeModel(
                 name=client_name,
@@ -71,24 +72,20 @@ def inject_clients(site: SiteModel) -> None:
                 interfaces={
                     ifname: InterfaceModel(
                         name=ifname,
-                        addr4=client_addr,
                         kind="tenant",
+                        addr4=client_v4,
+                        addr6=client_v6,
                         upstream=ifname,
-                        routes={
-                            "ipv4": [
-                                {
-                                    "dst": "0.0.0.0/0",
-                                    "via4": str(ipaddress.ip_interface(iface.addr4).ip),
-                                }
-                            ],
-                            "ipv6": [],
-                        },
+                        routes=routes,
                     )
                 },
             )
 
-            link.endpoints[client_name] = {
+            site.links[ifname].endpoints[client_name] = {
                 "node": client_name,
                 "interface": ifname,
-                "addr4": client_addr,
+                "addr4": client_v4,
+                "addr6": client_v6,
             }
+
+            print(f"WARNING {client_name} injected to the config.")
