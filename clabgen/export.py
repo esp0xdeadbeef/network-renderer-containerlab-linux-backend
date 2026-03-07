@@ -1,46 +1,14 @@
+# ./clabgen/export.py
 from __future__ import annotations
 
 import json
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import yaml
 
-from clabgen.generator import generate_topology
-from clabgen.parser import parse_solver
-
-
-def _combine_sites(sites: Dict[str, Any]) -> Dict[str, Any]:
-    merged_nodes: Dict[str, Any] = {}
-    merged_links: List[Dict[str, Any]] = []
-    merged_bridges: List[str] = []
-
-    defaults: Dict[str, Any] | None = None
-
-    for site_key in sorted(sites.keys()):
-        topo = generate_topology(sites[site_key])
-
-        if defaults is None:
-            defaults = topo["topology"]["defaults"]
-
-        for node_name, node_def in topo["topology"]["nodes"].items():
-            if node_name in merged_nodes:
-                raise ValueError(f"duplicate rendered node '{node_name}'")
-            merged_nodes[node_name] = node_def
-
-        merged_links.extend(topo["topology"]["links"])
-        merged_bridges.extend(topo["bridges"])
-
-    return {
-        "name": "fabric",
-        "topology": {
-            "defaults": defaults or {},
-            "nodes": merged_nodes,
-            "links": merged_links,
-        },
-        "bridges": sorted(set(merged_bridges)),
-    }
+from clabgen.s88.enterprise.enterprise import Enterprise
 
 
 def _git_rev(repo: Path) -> str:
@@ -88,8 +56,8 @@ def write_outputs(
     with solver_json.open() as f:
         solver = json.load(f)
 
-    parsed_sites = parse_solver(solver_json)
-    merged = _combine_sites(parsed_sites)
+    enterprise = Enterprise.from_solver_json(solver_json)
+    merged = enterprise.render()
 
     topo_yaml = yaml.safe_dump(
         {
@@ -98,8 +66,6 @@ def write_outputs(
         },
         sort_keys=False,
     )
-
-    solver_meta = solver.get("meta", {}).get("solver", {})
 
     repo_root = Path(__file__).resolve().parents[1]
 

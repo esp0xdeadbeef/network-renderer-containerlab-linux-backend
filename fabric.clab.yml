@@ -1,8 +1,8 @@
 # --- provenance ---
 # {
 #   "renderer": {
-#     "gitDirty": false,
-#     "gitRev": "47aee8f350385192478ebbb4a7cffb186f501255",
+#     "gitDirty": true,
+#     "gitRev": "393d460f302e9788e5426759a208a95595c811d6",
 #     "name": "network-renderer-containerlab-linux-backend",
 #     "schemaVersion": 1
 #   }
@@ -39,6 +39,7 @@ topology:
       - ip route replace 10.10.0.8/31 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.20.10.0/24 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.20.20.0/24 via 10.10.0.1 dev eth1 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:1 dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:1
@@ -73,6 +74,7 @@ topology:
       - ip route replace 10.10.0.8/31 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.20.10.0/24 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.20.15.0/24 via 10.10.0.3 dev eth1 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:3 dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:3
@@ -107,6 +109,7 @@ topology:
       - ip route replace 10.10.0.8/31 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.20.15.0/24 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.20.20.0/24 via 10.10.0.5 dev eth1 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:5 dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:5
@@ -154,6 +157,7 @@ topology:
         dev eth3 onlink
       - ip route replace 10.10.0.6/31 via 10.10.0.11 dev eth4 onlink
       - ip route replace 10.10.0.8/31 via 10.10.0.11 dev eth4 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:b dev eth4 onlink
       - ip -6 route replace fd42:dead:beef:1000::6/127 via fd42:dead:beef:1000:0:0:0:b
         dev eth4 onlink
       - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:b
@@ -178,6 +182,7 @@ topology:
       - ip addr replace 10.10.0.11/31 peer 10.10.0.10/31 dev eth3
       - ip -6 addr replace fd42:dead:beef:1000::b/127 peer fd42:dead:beef:1000::a/127
         dev eth3
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:6 dev eth1 onlink
       - ip route replace 10.10.0.0/31 via 10.10.0.10 dev eth3 onlink
       - ip route replace 10.10.0.2/31 via 10.10.0.10 dev eth3 onlink
       - ip route replace 10.10.0.4/31 via 10.10.0.10 dev eth3 onlink
@@ -237,6 +242,7 @@ topology:
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:7
         dev eth1 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1900:0:0:0:1 dev eth2 onlink
       - ip route replace default via 10.19.0.1 dev eth2 onlink
       - sysctl -w net.ipv4.ip_forward=1
       - sysctl -w net.ipv6.conf.all.forwarding=1
@@ -278,6 +284,7 @@ topology:
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:9
         dev eth1 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1900:0:0:0:3 dev eth2 onlink
       - ip route replace default via 10.19.0.3 dev eth2 onlink
       - sysctl -w net.ipv4.ip_forward=1
       - sysctl -w net.ipv6.conf.all.forwarding=1
@@ -377,64 +384,64 @@ topology:
     - esp0xdeadbeef-site-a-s-router-policy:eth1
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-c1fd7a0c5441
+      clab.link.bridge: br-1ae349e25379
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-access-client:eth1
     - esp0xdeadbeef-site-a-s-router-policy:eth2
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-7a6911ef69d3
+      clab.link.bridge: br-5980f0dc953e
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-access-mgmt:eth1
     - esp0xdeadbeef-site-a-s-router-policy:eth3
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-b5ead8f8b026
+      clab.link.bridge: br-6fff74cec0ec
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-core-nebula:eth1
     - esp0xdeadbeef-site-a-s-router-upstream-selector:eth1
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-b5f8209cfb53
+      clab.link.bridge: br-9137ba2a7571
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-core-wan:eth1
     - esp0xdeadbeef-site-a-s-router-upstream-selector:eth2
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-bee28c3a69aa
+      clab.link.bridge: br-8240a4b630f9
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-policy:eth4
     - esp0xdeadbeef-site-a-s-router-upstream-selector:eth3
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-26ec11ee8593
+      clab.link.bridge: br-4743c4e638ef
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-core-nebula:eth2
     - esp0xdeadbeef-site-a-wan-peer-nebula:eth1
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-2a03feb124d0
+      clab.link.bridge: br-1dec167e9f83
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-core-wan:eth2
     - esp0xdeadbeef-site-a-wan-peer-wan:eth1
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-69ff5b3358e0
+      clab.link.bridge: br-e035268ceff9
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-access-admin:eth2
-    - host:veth-br-a8b6012b6649
+    - host:veth-br-17893598c586
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-a8b6012b6649
+      clab.link.bridge: br-17893598c586
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-access-client:eth2
-    - host:veth-br-fe2753047a57
+    - host:veth-br-3fbc5b75dfbd
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-fe2753047a57
+      clab.link.bridge: br-3fbc5b75dfbd
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-access-mgmt:eth2
-    - host:veth-br-eb50c632fa00
+    - host:veth-br-71ddb5e135c4
     labels:
       clab.link.type: bridge
-      clab.link.bridge: br-eb50c632fa00
+      clab.link.bridge: br-71ddb5e135c4
