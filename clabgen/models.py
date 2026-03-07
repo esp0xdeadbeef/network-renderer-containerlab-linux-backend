@@ -1,7 +1,23 @@
+# ./clabgen/models.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
+
+
+@dataclass
+class ControlModuleModel:
+    name: str
+    logical_id: str
+    kind: str
+    spec: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class EquipmentModuleModel:
+    name: str
+    kind: str
+    spec: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -24,6 +40,12 @@ class NodeModel:
     routing_domain: str
     interfaces: Dict[str, InterfaceModel]
     containers: List[str] = field(default_factory=list)
+    isolated: bool = False
+    control_modules: Dict[str, ControlModuleModel] = field(default_factory=dict)
+    equipment_modules: Dict[str, EquipmentModuleModel] = field(default_factory=dict)
+    route_intents: List[Dict[str, Any]] = field(default_factory=list)
+    policy_intents: List[Dict[str, Any]] = field(default_factory=list)
+    nat_intents: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -41,3 +63,8 @@ class SiteModel:
     links: Dict[str, LinkModel]
     single_access: str
     domains: Dict[str, Any]
+    raw_policy: Dict[str, Any] = field(default_factory=dict)
+    raw_nat: Dict[str, Any] = field(default_factory=dict)
+    raw_links: Dict[str, Any] = field(default_factory=dict)
+    solver_meta: Dict[str, Any] = field(default_factory=dict)
+    bridge_control_modules: Dict[str, ControlModuleModel] = field(default_factory=dict)

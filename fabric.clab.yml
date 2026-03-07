@@ -2,9 +2,15 @@
 # {
 #   "renderer": {
 #     "gitDirty": true,
-#     "gitRev": "393d460f302e9788e5426759a208a95595c811d6",
+#     "gitRev": "6668095816c9a66a07d262d691e832f5776abc97",
 #     "name": "network-renderer-containerlab-linux-backend",
-#     "schemaVersion": 1
+#     "schemaVersion": 2
+#   },
+#   "solver": {
+#     "solver": {
+#       "gitDirty": true,
+#       "gitRev": "6668095816c9a66a07d262d691e832f5776abc97"
+#     }
 #   }
 # }
 # --- end provenance ---
@@ -416,6 +422,24 @@ topology:
       clab.link.type: bridge
       clab.link.bridge: br-4743c4e638ef
   - endpoints:
+    - esp0xdeadbeef-site-a-s-router-access-admin:eth2
+    - host:veth-br-17-5f0d
+    labels:
+      clab.link.type: bridge
+      clab.link.bridge: br-17893598c586
+  - endpoints:
+    - esp0xdeadbeef-site-a-s-router-access-client:eth2
+    - host:veth-br-3f-e537
+    labels:
+      clab.link.type: bridge
+      clab.link.bridge: br-3fbc5b75dfbd
+  - endpoints:
+    - esp0xdeadbeef-site-a-s-router-access-mgmt:eth2
+    - host:veth-br-71-b969
+    labels:
+      clab.link.type: bridge
+      clab.link.bridge: br-71ddb5e135c4
+  - endpoints:
     - esp0xdeadbeef-site-a-s-router-core-nebula:eth2
     - esp0xdeadbeef-site-a-wan-peer-nebula:eth1
     labels:
@@ -427,21 +451,3 @@ topology:
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-e035268ceff9
-  - endpoints:
-    - esp0xdeadbeef-site-a-s-router-access-admin:eth2
-    - host:veth-br-17893598c586
-    labels:
-      clab.link.type: bridge
-      clab.link.bridge: br-17893598c586
-  - endpoints:
-    - esp0xdeadbeef-site-a-s-router-access-client:eth2
-    - host:veth-br-3fbc5b75dfbd
-    labels:
-      clab.link.type: bridge
-      clab.link.bridge: br-3fbc5b75dfbd
-  - endpoints:
-    - esp0xdeadbeef-site-a-s-router-access-mgmt:eth2
-    - host:veth-br-71ddb5e135c4
-    labels:
-      clab.link.type: bridge
-      clab.link.bridge: br-71ddb5e135c4

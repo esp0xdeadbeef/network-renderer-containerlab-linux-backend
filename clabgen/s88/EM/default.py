@@ -1,6 +1,4 @@
 # ./clabgen/s88/EM/default.py
-# (full replacement)
-
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -162,9 +160,15 @@ def _peer_in_subnet(cidr: str | None) -> str | None:
     return None
 
 
+def _normalized_route_intents(node: Dict[str, Any]) -> List[Dict[str, Any]]:
+    intents = node.get("route_intents")
+    if isinstance(intents, list):
+        return [r for r in intents if isinstance(r, dict)]
+    return []
+
+
 def _render_interfaces(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
     cmds: List[str] = []
-
     interfaces = node.get("interfaces", {})
 
     for logical_if in sorted(interfaces.keys()):
@@ -228,7 +232,92 @@ def _render_addressing(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[st
     return cmds
 
 
-def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+def _render_static_routes_from_intents(node: Dict[str, Any]) -> List[str]:
+    cmds: List[str] = []
+    seen: set[str] = set()
+    connected4, connected6 = _connected_prefixes(node)
+
+    for route in _normalized_route_intents(node):
+        family = route.get("family")
+        dst = route.get("dst")
+        proto = route.get("proto")
+        dev = route.get("dev")
+        via4 = route.get("via4")
+        via6 = route.get("via6")
+
+        if not isinstance(dst, str) or not isinstance(dev, str):
+            continue
+
+        if family == "ipv4":
+            if dst == "0.0.0.0/0" or not via4 or proto == "connected":
+                continue
+            dst = _normalize_prefix(dst)
+            if dst in connected4:
+                continue
+            cmd = f"ip route replace {dst} via {via4} dev {dev} onlink"
+            if cmd not in seen:
+                seen.add(cmd)
+                cmds.append(cmd)
+
+        if family == "ipv6":
+            if dst == "::/0" or not via6 or proto == "connected":
+                continue
+            dst = _normalize_prefix(dst)
+            if dst in connected6:
+                continue
+            cmd = f"ip -6 route replace {dst} via {via6} dev {dev} onlink"
+            if cmd not in seen:
+                seen.add(cmd)
+                cmds.append(cmd)
+
+    return cmds
+
+
+def _render_default_routes_from_intents(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+    dev_to_iface: Dict[str, Dict[str, Any]] = {}
+    for ifname, eth in eth_map.items():
+        dev_to_iface[f"eth{eth}"] = node.get("interfaces", {}).get(ifname, {})
+
+    cmds: List[str] = []
+    seen: set[str] = set()
+
+    for route in _normalized_route_intents(node):
+        family = route.get("family")
+        dst = route.get("dst")
+        proto = route.get("proto")
+        dev = route.get("dev")
+        via4 = route.get("via4")
+        via6 = route.get("via6")
+
+        if not isinstance(dev, str):
+            continue
+
+        iface = dev_to_iface.get(dev, {})
+
+        if family == "ipv4" and dst == "0.0.0.0/0":
+            via = via4
+            if not via and proto == "uplink":
+                via = _peer_in_subnet(iface.get("addr4"))
+            if via:
+                cmd = f"ip route replace default via {via} dev {dev} onlink"
+                if cmd not in seen:
+                    seen.add(cmd)
+                    cmds.append(cmd)
+
+        if family == "ipv6" and dst == "::/0":
+            via = via6
+            if not via and proto == "uplink":
+                via = _peer_in_subnet(iface.get("addr6"))
+            if via:
+                cmd = f"ip -6 route replace default via {via} dev {dev} onlink"
+                if cmd not in seen:
+                    seen.add(cmd)
+                    cmds.append(cmd)
+
+    return cmds
+
+
+def _render_static_routes_legacy(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
     cmds: List[str] = []
     seen: set[str] = set()
 
@@ -277,7 +366,7 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
     return cmds
 
 
-def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+def _render_default_routes_legacy(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
     cmds: List[str] = []
     seen: set[str] = set()
 
@@ -314,6 +403,20 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> Lis
                     cmds.append(cmd)
 
     return cmds
+
+
+def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+    intents = _normalized_route_intents(node)
+    if intents:
+        return _render_static_routes_from_intents(node)
+    return _render_static_routes_legacy(node, eth_map)
+
+
+def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+    intents = _normalized_route_intents(node)
+    if intents:
+        return _render_default_routes_from_intents(node, eth_map)
+    return _render_default_routes_legacy(node, eth_map)
 
 
 def render(

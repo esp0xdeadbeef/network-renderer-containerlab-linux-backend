@@ -91,7 +91,8 @@ def _build_nodes(site: Dict[str, Any]) -> Dict[str, NodeModel]:
             role=node_obj.get("role", ""),
             routing_domain=node_obj.get("routingDomain", ""),
             interfaces=interfaces,
-            containers=node_obj.get("containers", []),
+            containers=list(node_obj.get("containers", [])),
+            isolated=bool(node_obj.get("isolated", False)),
         )
 
     return nodes
@@ -112,10 +113,10 @@ def _build_links(site: Dict[str, Any]) -> Dict[str, LinkModel]:
 
 def load_sites(path: str | Path) -> Dict[str, SiteModel]:
     solver_path = Path(path)
-
     data = load_solver(solver_path)
 
     result: Dict[str, SiteModel] = {}
+    solver_meta = dict(data.get("meta", {}) or {})
 
     for enterprise, site_name, site in extract_enterprise_sites(data):
         validate_site_invariants(
@@ -127,7 +128,7 @@ def load_sites(path: str | Path) -> Dict[str, SiteModel]:
 
         nodes = _build_nodes(site)
         links = _build_links(site)
-        domains = site.get("domains", {})
+        domains = dict(site.get("domains", {}) or {})
 
         key = f"{enterprise}-{site_name}"
 
@@ -138,6 +139,10 @@ def load_sites(path: str | Path) -> Dict[str, SiteModel]:
             links=links,
             single_access=assumptions.get("singleAccess", ""),
             domains=domains,
+            raw_policy=dict(site.get("policy", {}) or {}),
+            raw_nat=dict(site.get("nat", {}) or {}),
+            raw_links=dict(site.get("links", {}) or {}),
+            solver_meta=solver_meta,
         )
 
     return result

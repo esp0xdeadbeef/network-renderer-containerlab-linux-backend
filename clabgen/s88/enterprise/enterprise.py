@@ -1,4 +1,3 @@
-# ./clabgen/s88/enterprise/enterprise.py
 from __future__ import annotations
 
 from typing import Dict, Any, List
@@ -22,8 +21,10 @@ class Enterprise:
         merged_nodes: Dict[str, Any] = {}
         merged_links: List[Dict[str, Any]] = []
         merged_bridges: List[str] = []
+        merged_bridge_control_modules: Dict[str, Any] = {}
 
         defaults: Dict[str, Any] | None = None
+        solver_meta: Dict[str, Any] | None = None
 
         for site_key in sorted(self.sites.keys()):
             topo = generate_topology(self.sites[site_key])
@@ -31,10 +32,18 @@ class Enterprise:
             if defaults is None:
                 defaults = topo["topology"]["defaults"]
 
+            if solver_meta is None:
+                solver_meta = dict(topo.get("solver_meta", {}) or {})
+
             for node_name, node_def in topo["topology"]["nodes"].items():
                 if node_name in merged_nodes:
                     raise ValueError(f"duplicate rendered node '{node_name}'")
                 merged_nodes[node_name] = node_def
+
+            for logical_id, cm in (topo.get("bridge_control_modules", {}) or {}).items():
+                if logical_id in merged_bridge_control_modules:
+                    raise ValueError(f"duplicate bridge control module '{logical_id}'")
+                merged_bridge_control_modules[logical_id] = cm
 
             merged_links.extend(topo["topology"]["links"])
             merged_bridges.extend(topo["bridges"])
@@ -47,4 +56,6 @@ class Enterprise:
                 "links": merged_links,
             },
             "bridges": sorted(set(merged_bridges)),
+            "bridge_control_modules": merged_bridge_control_modules,
+            "solver_meta": solver_meta or {},
         }

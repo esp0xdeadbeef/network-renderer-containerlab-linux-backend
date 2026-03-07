@@ -8,25 +8,52 @@ from typing import Any, Dict, Iterable, Tuple
 
 def load_solver(path: Path) -> Dict[str, Any]:
     with path.open() as f:
-        return json.load(f)
+        data = json.load(f)
+
+    if not isinstance(data, dict):
+        raise ValueError("solver JSON top-level must be an object")
+
+    return data
 
 
 def extract_enterprise_sites(data: Dict[str, Any]) -> Iterable[Tuple[str, str, Dict[str, Any]]]:
     sites = data.get("sites", {})
+    if not isinstance(sites, dict):
+        raise ValueError("'sites' must be an object")
+
     for enterprise, site_map in sites.items():
+        if not isinstance(site_map, dict):
+            raise ValueError(f"sites.{enterprise} must be an object")
+
         for site_name, site_obj in site_map.items():
+            if not isinstance(site_obj, dict):
+                raise ValueError(f"sites.{enterprise}.{site_name} must be an object")
             yield enterprise, site_name, site_obj
 
 
 def validate_site_invariants(site: Dict[str, Any], context: Dict[str, str] | None = None) -> None:
+    ctx = context or {}
+
     if "nodes" not in site or "links" not in site:
         raise ValueError(
-            f"Invalid site schema for {context or {}}: missing 'nodes' or 'links'"
+            f"Invalid site schema for {ctx}: missing 'nodes' or 'links'"
         )
+
+    if not isinstance(site.get("nodes"), dict):
+        raise ValueError(f"Invalid site schema for {ctx}: 'nodes' must be an object")
+
+    if not isinstance(site.get("links"), dict):
+        raise ValueError(f"Invalid site schema for {ctx}: 'links' must be an object")
+
+    if "policy" in site and not isinstance(site.get("policy"), dict):
+        raise ValueError(f"Invalid site schema for {ctx}: 'policy' must be an object")
+
+    if "nat" in site and not isinstance(site.get("nat"), dict):
+        raise ValueError(f"Invalid site schema for {ctx}: 'nat' must be an object")
 
 
 def validate_routing_assumptions(site: Dict[str, Any]) -> Dict[str, Any]:
-    # Deterministic default: no synthetic assumptions.
+    _ = site
     return {
         "singleAccess": ""
     }
