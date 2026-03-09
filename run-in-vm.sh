@@ -52,4 +52,8 @@ do
   docker exec "$c" traceroute -I -n -w 1 -q 1 -m 8 1.1.1.1 || true
   echo
 
+  echo " [ FIREWALL - nft list ruleset]"
+  docker exec "$c" nft list ruleset || true
+  echo
+
 done
