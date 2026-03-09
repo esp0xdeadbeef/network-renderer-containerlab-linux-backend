@@ -1,4 +1,3 @@
-# ./clabgen/solver.py
 from __future__ import annotations
 
 import json
@@ -17,18 +16,24 @@ def load_solver(path: Path) -> Dict[str, Any]:
 
 
 def extract_enterprise_sites(data: Dict[str, Any]) -> Iterable[Tuple[str, str, Dict[str, Any]]]:
-    sites = data.get("sites", {})
-    if not isinstance(sites, dict):
-        raise ValueError("'sites' must be an object")
+    enterprise_root = data.get("enterprise")
+    if not isinstance(enterprise_root, dict):
+        raise ValueError("'enterprise' must be an object")
 
-    for enterprise, site_map in sites.items():
-        if not isinstance(site_map, dict):
-            raise ValueError(f"sites.{enterprise} must be an object")
+    for enterprise_name, enterprise_obj in enterprise_root.items():
+        if not isinstance(enterprise_obj, dict):
+            raise ValueError(f"enterprise.{enterprise_name} must be an object")
 
-        for site_name, site_obj in site_map.items():
+        site_root = enterprise_obj.get("site")
+        if not isinstance(site_root, dict):
+            raise ValueError(f"enterprise.{enterprise_name}.site must be an object")
+
+        for site_name, site_obj in site_root.items():
             if not isinstance(site_obj, dict):
-                raise ValueError(f"sites.{enterprise}.{site_name} must be an object")
-            yield enterprise, site_name, site_obj
+                raise ValueError(
+                    f"enterprise.{enterprise_name}.site.{site_name} must be an object"
+                )
+            yield enterprise_name, site_name, site_obj
 
 
 def validate_site_invariants(site: Dict[str, Any], context: Dict[str, str] | None = None) -> None:
@@ -45,11 +50,35 @@ def validate_site_invariants(site: Dict[str, Any], context: Dict[str, str] | Non
     if not isinstance(site.get("links"), dict):
         raise ValueError(f"Invalid site schema for {ctx}: 'links' must be an object")
 
-    if "policy" in site and not isinstance(site.get("policy"), dict):
-        raise ValueError(f"Invalid site schema for {ctx}: 'policy' must be an object")
+    if "coreNodeNames" in site and not isinstance(site.get("coreNodeNames"), list):
+        raise ValueError(
+            f"Invalid site schema for {ctx}: 'coreNodeNames' must be an array"
+        )
 
-    if "nat" in site and not isinstance(site.get("nat"), dict):
-        raise ValueError(f"Invalid site schema for {ctx}: 'nat' must be an object")
+    if "uplinkCoreNames" in site and not isinstance(site.get("uplinkCoreNames"), list):
+        raise ValueError(
+            f"Invalid site schema for {ctx}: 'uplinkCoreNames' must be an array"
+        )
+
+    if "uplinkNames" in site and not isinstance(site.get("uplinkNames"), list):
+        raise ValueError(
+            f"Invalid site schema for {ctx}: 'uplinkNames' must be an array"
+        )
+
+    if "tenantPrefixOwners" in site and not isinstance(site.get("tenantPrefixOwners"), dict):
+        raise ValueError(
+            f"Invalid site schema for {ctx}: 'tenantPrefixOwners' must be an object"
+        )
+
+    if "policyNodeName" in site and not isinstance(site.get("policyNodeName"), str):
+        raise ValueError(
+            f"Invalid site schema for {ctx}: 'policyNodeName' must be a string"
+        )
+
+    if "upstreamSelectorNodeName" in site and not isinstance(site.get("upstreamSelectorNodeName"), str):
+        raise ValueError(
+            f"Invalid site schema for {ctx}: 'upstreamSelectorNodeName' must be a string"
+        )
 
 
 def validate_routing_assumptions(site: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,4 +1,3 @@
-# ./clabgen/s88/enterprise/site_loader.py
 from __future__ import annotations
 
 from typing import Dict, List, Any
@@ -16,15 +15,21 @@ from clabgen.models import SiteModel, NodeModel, InterfaceModel, LinkModel
 
 def _route_lists(iface: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     routes = iface.get("routes")
-    if isinstance(routes, dict):
-        return {
-            "ipv4": list(routes.get("ipv4", [])),
-            "ipv6": list(routes.get("ipv6", [])),
-        }
+    if not isinstance(routes, dict):
+        raise ValueError("interface.routes must be an object")
+
+    ipv4 = routes.get("ipv4", [])
+    ipv6 = routes.get("ipv6", [])
+
+    if not isinstance(ipv4, list):
+        raise ValueError("interface.routes.ipv4 must be an array")
+
+    if not isinstance(ipv6, list):
+        raise ValueError("interface.routes.ipv6 must be an array")
 
     return {
-        "ipv4": list(iface.get("routes4", [])),
-        "ipv6": list(iface.get("routes6", [])),
+        "ipv4": list(ipv4),
+        "ipv6": list(ipv6),
     }
 
 
@@ -128,7 +133,6 @@ def load_sites(path: str | Path) -> Dict[str, SiteModel]:
 
         nodes = _build_nodes(site)
         links = _build_links(site)
-        domains = dict(site.get("domains", {}) or {})
 
         key = f"{enterprise}-{site_name}"
 
@@ -138,9 +142,9 @@ def load_sites(path: str | Path) -> Dict[str, SiteModel]:
             nodes=nodes,
             links=links,
             single_access=assumptions.get("singleAccess", ""),
-            domains=domains,
-            raw_policy=dict(site.get("policy", {}) or {}),
-            raw_nat=dict(site.get("nat", {}) or {}),
+            domains={},
+            raw_policy={},
+            raw_nat={},
             raw_links=dict(site.get("links", {}) or {}),
             solver_meta=solver_meta,
         )
