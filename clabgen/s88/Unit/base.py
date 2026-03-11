@@ -1,3 +1,4 @@
+# ./clabgen/s88/Unit/base.py
 from __future__ import annotations
 
 from typing import Dict, List, Tuple, Any, Callable
@@ -87,6 +88,38 @@ def _renderers() -> Dict[str, NodeRenderer]:
     }
 
 
+def _site_topology(site: SiteModel) -> Dict[str, Any]:
+    return {
+        "nodes": {
+            node_name: {
+                "role": node.role,
+                "routing_domain": node.routing_domain,
+                "interfaces": {
+                    ifname: {
+                        "kind": iface.kind,
+                        "upstream": iface.upstream,
+                        "addr4": iface.addr4,
+                        "addr6": iface.addr6,
+                        "ll6": iface.ll6,
+                    }
+                    for ifname, iface in sorted(node.interfaces.items())
+                },
+            }
+            for node_name, node in sorted(site.nodes.items())
+        },
+        "links": {
+            link_name: {
+                "kind": link.kind,
+                "endpoints": {
+                    ep_node: dict(ep_data)
+                    for ep_node, ep_data in sorted(link.endpoints.items())
+                },
+            }
+            for link_name, link in sorted(site.links.items())
+        },
+    }
+
+
 def _node_extra(site: SiteModel) -> Dict[str, Any]:
     return {
         "enterprise": {
@@ -103,6 +136,7 @@ def _node_extra(site: SiteModel) -> Dict[str, Any]:
         },
         "renderer_inventory": dict(site.renderer_inventory or {}),
         "provider_zone_map": dict(site.provider_zone_map or {}),
+        "site_topology": _site_topology(site),
     }
 
 

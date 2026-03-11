@@ -116,21 +116,6 @@ def _build_links(site: Dict[str, Any]) -> Dict[str, LinkModel]:
     return links
 
 
-def _zone_from_name(name: str) -> str | None:
-    n = str(name or "").strip().lower()
-
-    if n in {"admin", "tenant-admin"} or "admin" in n:
-        return "admin"
-    if n in {"client", "tenant-client"} or "client" in n:
-        return "client"
-    if n in {"mgmt", "management", "tenant-mgmt"} or "mgmt" in n:
-        return "mgmt"
-    if n in {"wan", "external", "internet", "upstream"} or "wan" in n:
-        return "wan"
-
-    return None
-
-
 def _ownership_endpoint_tenants(ownership: Dict[str, Any]) -> Dict[str, str]:
     result: Dict[str, str] = {}
 
@@ -253,29 +238,19 @@ def _validate_renderer_inventory_for_site(
                 f"attach_node {attach_node!r} in {enterprise}/{site_name}"
             )
 
-        attach_zone = _zone_from_name(str(attach_network))
-        if attach_zone is None:
+        if not isinstance(attach_network, str) or not attach_network:
             raise ValueError(
-                f"renderer inventory host {host_name!r} has unsupported "
-                f"attach_network {attach_network!r} in {enterprise}/{site_name}"
+                f"renderer inventory host {host_name!r} has invalid "
+                f"attach_network in {enterprise}/{site_name}"
             )
 
         ownership_tenant = endpoint_tenants.get(host_name)
-        if ownership_tenant is not None:
-            tenant_zone = _zone_from_name(str(ownership_tenant))
-
-            if tenant_zone is None:
-                raise ValueError(
-                    f"ownership endpoint {host_name!r} has unsupported tenant "
-                    f"{ownership_tenant!r} in {enterprise}/{site_name}"
-                )
-
-            if attach_zone != tenant_zone:
-                raise ValueError(
-                    f"renderer inventory tenant mismatch for endpoint {host_name!r} "
-                    f"in {enterprise}/{site_name}: attach_network={attach_network!r} "
-                    f"ownership.tenant={ownership_tenant!r}"
-                )
+        if ownership_tenant is not None and attach_network != ownership_tenant:
+            raise ValueError(
+                f"renderer inventory tenant mismatch for endpoint {host_name!r} "
+                f"in {enterprise}/{site_name}: attach_network={attach_network!r} "
+                f"ownership.tenant={ownership_tenant!r}"
+            )
 
     return normalized_inventory
 
@@ -334,29 +309,21 @@ def _provider_zone_map(
                 )
 
             attach_network = host.get("attach_network")
-            attach_zone = _zone_from_name(str(attach_network))
-            if attach_zone is None:
+            if not isinstance(attach_network, str) or not attach_network:
                 raise ValueError(
                     f"service provider {provider!r} for service {service_name!r} "
-                    f"has unsupported attach_network {attach_network!r}"
+                    f"has invalid attach_network"
                 )
 
             tenant = endpoint_tenants.get(provider)
-            if isinstance(tenant, str) and tenant:
-                tenant_zone = _zone_from_name(tenant)
-                if tenant_zone is None:
-                    raise ValueError(
-                        f"service provider {provider!r} for service {service_name!r} "
-                        f"has unsupported ownership tenant {tenant!r}"
-                    )
-                if attach_zone != tenant_zone:
-                    raise ValueError(
-                        f"service provider {provider!r} for service {service_name!r} "
-                        f"has tenant mismatch in {enterprise}/{site_name}: "
-                        f"attach_network={attach_network!r} tenant={tenant!r}"
-                    )
+            if isinstance(tenant, str) and tenant and attach_network != tenant:
+                raise ValueError(
+                    f"service provider {provider!r} for service {service_name!r} "
+                    f"has tenant mismatch in {enterprise}/{site_name}: "
+                    f"attach_network={attach_network!r} tenant={tenant!r}"
+                )
 
-            resolved_zone = attach_zone
+            resolved_zone = attach_network
             break
 
         if providers and resolved_zone is None:

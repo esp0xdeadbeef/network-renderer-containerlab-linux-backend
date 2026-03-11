@@ -2,7 +2,7 @@
 # {
 #   "renderer": {
 #     "gitDirty": true,
-#     "gitRev": "de5074b436ec88a5a5ead04bf6b21119dbb9229b",
+#     "gitRev": "45034c2d7eb84b7b8a1673c6ee85e27f0d22b71c",
 #     "name": "network-renderer-containerlab-linux-backend",
 #     "schemaVersion": 2
 #   }
@@ -344,24 +344,15 @@ topology:
       - nft add rule inet fw forward oifname "eth0" drop
       - nft add rule inet fw forward iifname "eth3" oifname "eth1" accept
       - nft add rule inet fw forward iifname "eth3" oifname "eth2" accept
-      - nft add rule inet fw forward iifname "eth3" oifname "eth1" meta l4proto icmp
-        accept
-      - nft add rule inet fw forward iifname "eth3" oifname "eth2" meta l4proto icmp
-        accept
-      - nft add rule inet fw forward iifname "eth3" oifname "eth4" meta l4proto icmp
-        accept
-      - nft add rule inet fw forward iifname "eth1" oifname "eth2" meta l4proto icmp
-        accept
-      - nft add rule inet fw forward iifname "eth1" oifname "eth3" meta l4proto icmp
-        accept
-      - nft add rule inet fw forward iifname "eth1" oifname "eth4" meta l4proto icmp
-        accept
-      - nft add rule inet fw forward iifname "eth2" oifname "eth1" meta l4proto icmp
-        accept
-      - nft add rule inet fw forward iifname "eth2" oifname "eth3" meta l4proto icmp
-        accept
-      - nft add rule inet fw forward iifname "eth2" oifname "eth4" meta l4proto icmp
-        accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth1" icmp accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth2" icmp accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth4" icmp accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth2" icmp accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth3" icmp accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth4" icmp accept
+      - nft add rule inet fw forward iifname "eth2" oifname "eth1" icmp accept
+      - nft add rule inet fw forward iifname "eth2" oifname "eth3" icmp accept
+      - nft add rule inet fw forward iifname "eth2" oifname "eth4" icmp accept
       - nft add rule inet fw forward iifname "eth3" oifname "eth4" tcp dport { 80,
         443 } drop
       - nft add rule inet fw forward iifname "eth1" oifname "eth4" tcp dport { 80,
@@ -371,12 +362,7 @@ topology:
       - nft add rule inet fw forward iifname "eth3" oifname "eth4" accept
       - nft add rule inet fw forward iifname "eth1" oifname "eth4" accept
       - nft add rule inet fw forward iifname "eth2" oifname "eth4" accept
-      - nft add rule inet fw forward iifname "eth4" oifname "eth3" tcp dport 22 accept
-      - nft add rule inet fw forward iifname "eth4" oifname "eth3" meta l4proto icmp
-        accept
-      - nft add rule inet fw forward iifname "eth4" oifname "eth1" tcp dport { 80,
-        443 } accept
-      - echo '[FW] resulting ruleset:'
+      - nft add rule inet fw forward iifname "eth4" oifname "eth3" icmp accept
       - nft list table inet fw
     s-router-upstream-selector:
       kind: linux

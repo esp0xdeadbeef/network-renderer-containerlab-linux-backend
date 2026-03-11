@@ -3,117 +3,6 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Tuple
 
 
-ZONES = ("admin", "client", "mgmt", "wan")
-TENANT_ZONES = ("admin", "client", "mgmt")
-
-
-
-
-def _zone_from_iface(name: str) -> str | None:
-    n = str(name or "").lower()
-
-    if "admin" in n:
-        return "admin"
-    if "client" in n:
-        return "client"
-    if "mgmt" in n:
-        return "mgmt"
-
-    return None
-
-
-def _zone_from_member_name(name: str) -> str | None:
-    n = str(name or "").strip().lower()
-
-    if n in {"admin", "tenant-admin"}:
-        return "admin"
-    if n in {"client", "tenant-client"}:
-        return "client"
-    if n in {"mgmt", "tenant-mgmt"}:
-        return "mgmt"
-    if n in {"wan", "external", "internet", "upstream"}:
-        return "wan"
-
-    return _zone_from_iface(n)
-
-
-def _build_zone_map(node_data: Dict[str, Any]) -> Dict[str, str]:
-    parsed = node_data.get("_s88_links")
-    if not isinstance(parsed, dict):
-        raise RuntimeError("missing _s88_links for policy firewall")
-
-    links = parsed.get("links")
-    if not isinstance(links, dict):
-        raise RuntimeError("missing _s88_links.links for policy firewall")
-
-    zones: Dict[str, str] = {}
-
-    accesses = links.get("accesses")
-    if not isinstance(accesses, list):
-        raise RuntimeError("missing _s88_links.links.accesses for policy firewall")
-
-    for link in accesses:
-        if not isinstance(link, dict):
-            continue
-
-        iface = link.get("ifname")
-        eth = link.get("eth")
-
-        if iface is None or eth is None:
-            continue
-
-        zone = _zone_from_iface(str(iface))
-        if zone is None:
-            continue
-
-        zones[zone] = f"eth{eth}"
-
-    wan_candidates: List[int] = []
-
-    upstream = links.get("upstream_selector")
-    if isinstance(upstream, dict):
-        eth = upstream.get("eth")
-        if isinstance(eth, int):
-            wan_candidates.append(eth)
-
-    for key, value in links.items():
-        if key == "accesses":
-            continue
-
-        if isinstance(value, dict):
-            eth = value.get("eth")
-            if isinstance(eth, int):
-                wan_candidates.append(eth)
-
-        if isinstance(value, list):
-            for entry in value:
-                if isinstance(entry, dict):
-                    eth = entry.get("eth")
-                    if isinstance(eth, int):
-                        wan_candidates.append(eth)
-
-    access_eth = {
-        int(zones[z].replace("eth", ""))
-        for z in zones
-        if z in TENANT_ZONES
-    }
-
-    filtered = [e for e in wan_candidates if e not in access_eth]
-
-    if not filtered:
-        raise RuntimeError("unable to determine WAN interface")
-
-    wan_eth = min(filtered)
-
-    zones["wan"] = f"eth{wan_eth}"
-
-    missing = [zone for zone in ZONES if zone not in zones]
-    if missing:
-        raise RuntimeError(f"missing required firewall zones: {', '.join(missing)}")
-
-    return zones
-
-
 def _iter_site_dicts(enterprise: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
     for enterprise_obj in enterprise.values():
         if not isinstance(enterprise_obj, dict):
@@ -145,51 +34,25 @@ def _load_contract(node_data: Dict[str, Any]) -> Dict[str, Any]:
     return contract
 
 
-def _load_ownership(node_data: Dict[str, Any]) -> Dict[str, Any]:
-    site_obj = _load_site_context(node_data)
-    ownership = site_obj.get("ownership", {})
-    if not isinstance(ownership, dict):
-        raise RuntimeError("ownership must be an object")
-    return ownership
+def _site_topology(node_data: Dict[str, Any]) -> Dict[str, Any]:
+    topology = node_data.get("site_topology")
+    if not isinstance(topology, dict):
+        raise RuntimeError("missing site_topology")
+    return topology
 
 
-def _load_provider_zone_map(node_data: Dict[str, Any]) -> Dict[str, str]:
-    direct = node_data.get("provider_zone_map")
-    if isinstance(direct, dict):
-        return {
-            str(k): str(v)
-            for k, v in direct.items()
-            if isinstance(k, str) and isinstance(v, str)
-        }
-
-    site_obj = _load_site_context(node_data)
-    from_site = site_obj.get("providerZoneMap", {})
-    if not isinstance(from_site, dict):
-        return {}
-
-    return {
-        str(k): str(v)
-        for k, v in from_site.items()
-        if isinstance(k, str) and isinstance(v, str)
-    }
+def _topology_nodes(node_data: Dict[str, Any]) -> Dict[str, Any]:
+    nodes = _site_topology(node_data).get("nodes")
+    if not isinstance(nodes, dict):
+        raise RuntimeError("site_topology.nodes must be an object")
+    return nodes
 
 
-def _traffic_map(contract: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
-    result: Dict[str, List[Dict[str, Any]]] = {}
-
-    traffic_types = contract.get("trafficTypes", [])
-    if not isinstance(traffic_types, list):
-        return result
-
-    for item in traffic_types:
-        if not isinstance(item, dict):
-            continue
-        name = item.get("name")
-        match = item.get("match", [])
-        if isinstance(name, str) and isinstance(match, list):
-            result[name] = [m for m in match if isinstance(m, dict)]
-
-    return result
+def _topology_links(node_data: Dict[str, Any]) -> Dict[str, Any]:
+    links = _site_topology(node_data).get("links")
+    if not isinstance(links, dict):
+        raise RuntimeError("site_topology.links must be an object")
+    return links
 
 
 def _members(obj: Any) -> List[str]:
@@ -207,124 +70,229 @@ def _members(obj: Any) -> List[str]:
 
     kind = obj.get("kind")
 
-    if kind == "tenant-set":
-        members = obj.get("members", [])
+    if kind in {"tenant", "tenant-set"}:
+        members = obj.get("members")
         if isinstance(members, list):
             return [str(m) for m in members if isinstance(m, str)]
-        return []
-
-    if kind in {"tenant", "external", "zone", "service"}:
         name = obj.get("name")
         if isinstance(name, str):
             return [name]
-        return []
 
-    if "members" in obj and isinstance(obj["members"], list):
-        return [str(m) for m in obj["members"] if isinstance(m, str)]
-
-    if "name" in obj and isinstance(obj["name"], str):
-        return [obj["name"]]
+    if kind in {"external", "service"}:
+        name = obj.get("name")
+        if isinstance(name, str):
+            return [name]
 
     return []
 
 
-def _endpoint_tenant_map(ownership: Dict[str, Any]) -> Dict[str, str]:
-    result: Dict[str, str] = {}
+def _relation_objects(contract: Dict[str, Any]) -> List[Dict[str, Any]]:
+    relations = contract.get("allowedRelations") or contract.get("relations")
+    if not isinstance(relations, list):
+        raise RuntimeError("communicationContract.allowedRelations must be array")
+    return [r for r in relations if isinstance(r, dict)]
 
-    endpoints = ownership.get("endpoints", [])
-    if not isinstance(endpoints, list):
-        return result
 
-    for endpoint in endpoints:
-        if not isinstance(endpoint, dict):
+def _contract_tenant_names(contract: Dict[str, Any]) -> List[str]:
+    result: set[str] = set()
+
+    for relation in _relation_objects(contract):
+        for side in ("from", "to"):
+            endpoint = relation.get(side)
+            if not isinstance(endpoint, dict):
+                continue
+            if endpoint.get("kind") in {"tenant", "tenant-set"}:
+                result.update(_members(endpoint))
+
+    return sorted(result)
+
+
+def _contract_external_names(contract: Dict[str, Any]) -> List[str]:
+    result: set[str] = set()
+
+    for relation in _relation_objects(contract):
+        for side in ("from", "to"):
+            endpoint = relation.get(side)
+            if not isinstance(endpoint, dict):
+                continue
+            if endpoint.get("kind") == "external":
+                result.update(_members(endpoint))
+
+    return sorted(result)
+
+
+def _s88_ifname_to_eth(node_data: Dict[str, Any]) -> Dict[str, int]:
+    parsed = node_data.get("_s88_links")
+    if not isinstance(parsed, dict):
+        raise RuntimeError("missing _s88_links")
+
+    links = parsed.get("links")
+    if not isinstance(links, dict):
+        raise RuntimeError("missing _s88_links.links")
+
+    all_links = links.get("all")
+    if not isinstance(all_links, list):
+        raise RuntimeError("missing _s88_links.links.all")
+
+    result: Dict[str, int] = {}
+    for item in all_links:
+        if not isinstance(item, dict):
             continue
-
-        name = endpoint.get("name")
-        tenant = endpoint.get("tenant")
-
-        if isinstance(name, str) and isinstance(tenant, str):
-            result[name] = tenant
+        ifname = item.get("ifname")
+        eth = item.get("eth")
+        if isinstance(ifname, str) and isinstance(eth, int):
+            result[ifname] = eth
 
     return result
 
 
-def _service_zone_map(contract: Dict[str, Any], ownership: Dict[str, Any], node_data: Dict[str, Any]) -> Dict[str, str]:
-    resolved = _load_provider_zone_map(node_data)
-    if resolved:
-        return resolved
+def _policy_link_peers(node_name: str, node_data: Dict[str, Any]) -> List[Tuple[int, str]]:
+    ifname_to_eth = _s88_ifname_to_eth(node_data)
+    results: List[Tuple[int, str]] = []
 
-    result: Dict[str, str] = {}
-    endpoint_tenants = _endpoint_tenant_map(ownership)
-
-    services = contract.get("services", [])
-    if not isinstance(services, list):
-        return result
-
-    for service in services:
-        if not isinstance(service, dict):
+    for _, link in sorted(_topology_links(node_data).items()):
+        if not isinstance(link, dict):
             continue
 
-        name = service.get("name")
-        providers = service.get("providers", [])
-
-        if not isinstance(name, str):
+        endpoints = link.get("endpoints")
+        if not isinstance(endpoints, dict):
             continue
 
-        resolved_zone: str | None = None
+        local = endpoints.get(node_name)
+        if not isinstance(local, dict):
+            continue
 
-        if isinstance(providers, list):
-            for provider in providers:
-                if not isinstance(provider, str):
-                    continue
+        local_ifname = local.get("interface")
+        if not isinstance(local_ifname, str):
+            raise RuntimeError("policy endpoint missing interface")
 
-                tenant = endpoint_tenants.get(provider)
-                if tenant:
-                    zone = _zone_from_member_name(tenant)
-                else:
-                    zone = _zone_from_member_name(provider)
+        eth = ifname_to_eth.get(local_ifname)
+        if eth is None:
+            raise RuntimeError(f"missing eth mapping for {local_ifname}")
 
-                if zone:
-                    resolved_zone = zone
-                    break
+        peers = [n for n in endpoints.keys() if n != node_name]
+        if len(peers) != 1:
+            raise RuntimeError("policy link must have exactly one peer")
 
-        if resolved_zone:
-            result[name] = resolved_zone
+        results.append((eth, peers[0]))
 
-    return result
+    return results
 
 
-def _relation_matches(contract: Dict[str, Any], relation: Dict[str, Any]) -> List[Dict[str, Any]]:
-    match = relation.get("match", [])
-    if isinstance(match, list) and match:
-        return [m for m in match if isinstance(m, dict)]
+def _access_node_tenant_zone(access_node_name: str, node_data: Dict[str, Any]) -> str:
+    topology_nodes = _topology_nodes(node_data)
+    access_node = topology_nodes.get(access_node_name)
+    if not isinstance(access_node, dict):
+        raise RuntimeError(f"missing topology node {access_node_name!r}")
 
-    traffic_type = relation.get("trafficType")
-    if not isinstance(traffic_type, str):
-        return []
+    if access_node.get("role") != "access":
+        raise RuntimeError(
+            f"policy access link peer {access_node_name!r} is not an access node"
+        )
 
-    return _traffic_map(contract).get(traffic_type, [])
+    interfaces = access_node.get("interfaces")
+    if not isinstance(interfaces, dict):
+        raise RuntimeError("access node interfaces missing")
+
+    tenant_zones: set[str] = set()
+
+    for ifname, iface in interfaces.items():
+        if not isinstance(iface, dict):
+            continue
+
+        if iface.get("kind") != "tenant":
+            continue
+
+        tenant_name = iface.get("tenant")
+
+        if not isinstance(tenant_name, str):
+            network = iface.get("network")
+            if isinstance(network, dict):
+                tenant_name = network.get("name")
+
+        if not isinstance(tenant_name, str) and isinstance(ifname, str):
+            if ifname.startswith("tenant-"):
+                tenant_name = ifname.split("tenant-")[1]
+
+        if isinstance(tenant_name, str):
+            tenant_zones.add(tenant_name)
+
+    if not tenant_zones:
+        raise RuntimeError(
+            f"tenant zone cannot be resolved for access node {access_node_name!r}. "
+            f"Interfaces seen: {list(interfaces.keys())}"
+        )
+
+    if len(tenant_zones) != 1:
+        raise RuntimeError(
+            f"multiple tenant zones on access node {access_node_name!r}: {sorted(tenant_zones)}"
+        )
+
+    return next(iter(tenant_zones))
 
 
-def _relation_endpoints(relation: Dict[str, Any]) -> Tuple[List[str], List[str]]:
-    src_obj = relation.get("from", relation.get("source"))
-    dst_obj = relation.get("to", relation.get("destination"))
-    return _members(src_obj), _members(dst_obj)
+def _build_zone_map(node_name: str, node_data: Dict[str, Any]) -> Dict[str, str]:
+    contract = _load_contract(node_data)
 
+    required_tenants = set(_contract_tenant_names(contract))
+    required_externals = set(_contract_external_names(contract))
 
-def _relation_action(relation: Dict[str, Any]) -> str:
-    action = str(relation.get("action", "allow")).lower()
-    if action in {"allow", "accept"}:
-        return "accept"
-    if action in {"deny", "drop"}:
-        return "drop"
-    raise RuntimeError(f"unsupported action {action}")
+    print("[FW DEBUG] tenants from contract:", sorted(required_tenants))
+    print("[FW DEBUG] externals from contract:", sorted(required_externals))
 
+    topology_nodes = _topology_nodes(node_data)
 
-def _relation_priority(relation: Dict[str, Any], index: int) -> Tuple[int, int]:
-    priority = relation.get("priority")
-    if isinstance(priority, int):
-        return priority, index
-    return 1_000_000, index
+    zones: Dict[str, str] = {}
+    wan_if: str | None = None
+
+    for eth, peer_name in _policy_link_peers(node_name, node_data):
+        peer = topology_nodes.get(peer_name)
+        if not isinstance(peer, dict):
+            raise RuntimeError(f"missing topology node {peer_name!r}")
+
+        role = peer.get("role")
+        iface = f"eth{eth}"
+
+        if role == "access":
+            tenant_zone = _access_node_tenant_zone(peer_name, node_data)
+            print(f"[FW DEBUG] access node {peer_name} → tenant {tenant_zone} → {iface}")
+
+            if tenant_zone in zones and zones[tenant_zone] != iface:
+                raise RuntimeError(
+                    f"multiple policy interfaces resolve to tenant zone {tenant_zone}"
+                )
+
+            zones[tenant_zone] = iface
+            continue
+
+        if role == "upstream-selector":
+            if wan_if is not None and wan_if != iface:
+                raise RuntimeError("multiple WAN interfaces detected")
+
+            wan_if = iface
+            print(f"[FW DEBUG] upstream-selector {peer_name} → wan → {iface}")
+            continue
+
+    if wan_if is None:
+        raise RuntimeError("wan cannot be resolved from topology")
+
+    zones["wan"] = wan_if
+
+    print("[FW DEBUG] final zone map:", zones)
+
+    for tenant in required_tenants:
+        if tenant not in zones:
+            raise RuntimeError(
+                f"tenant zone {tenant} cannot be mapped to a policy interface"
+            )
+
+    for external in required_externals:
+        if external != "wan":
+            raise RuntimeError(
+                f"external zone {external} cannot be mapped from topology"
+            )
+
+    return zones
 
 
 def _proto(match: Dict[str, Any]) -> str | None:
@@ -338,53 +306,17 @@ def _proto(match: Dict[str, Any]) -> str | None:
 
 
 def _dports(match: Dict[str, Any]) -> List[int]:
-    value = (
-        match.get("dports")
-        or match.get("destinationPorts")
-        or match.get("ports")
-        or match.get("dport")
-        or match.get("port")
-    )
-
+    value = match.get("dports")
     if value is None:
         return []
 
-    items = value if isinstance(value, list) else [value]
-    result: List[int] = []
+    if isinstance(value, int):
+        return [value]
 
-    for i in items:
-        if isinstance(i, int):
-            result.append(i)
-        elif isinstance(i, str) and i.isdigit():
-            result.append(int(i))
-        else:
-            raise RuntimeError(f"invalid port {i}")
+    if isinstance(value, list):
+        return [int(v) for v in value]
 
-    return result
-
-
-def _zones_for_member(
-    member: str,
-    zones: Dict[str, str],
-    service_zones: Dict[str, str],
-) -> List[str]:
-    raw = str(member or "").strip().lower()
-
-    if raw == "any":
-        return list(zones.keys())
-
-    if raw in {"tenants", "internal"}:
-        return [z for z in TENANT_ZONES if z in zones]
-
-    zone = service_zones.get(member) or _zone_from_member_name(member)
-
-    if zone is None:
-        raise RuntimeError(f"unable to determine zone for member {member}")
-
-    if zone not in zones:
-        raise RuntimeError(f"zone {zone} missing for {member}")
-
-    return [zone]
+    raise RuntimeError("invalid dports")
 
 
 def _rule_for_match(src_if: str, dst_if: str, match: Dict[str, Any], action: str) -> str:
@@ -393,9 +325,7 @@ def _rule_for_match(src_if: str, dst_if: str, match: Dict[str, Any], action: str
 
     rule = f'nft add rule inet fw forward iifname "{src_if}" oifname "{dst_if}"'
 
-    if proto == "icmp":
-        rule += " meta l4proto icmp"
-    elif proto:
+    if proto:
         rule += f" {proto}"
 
     if dports:
@@ -413,19 +343,9 @@ def render(role: str, node_name: str, node_data: Dict[str, Any]) -> List[str]:
     if role != "policy":
         return []
 
-
-    zones = _build_zone_map(node_data)
     contract = _load_contract(node_data)
-    ownership = _load_ownership(node_data)
-    service_zones = _service_zone_map(contract, ownership, node_data)
-
-    relations = contract.get("relations")
-    if not isinstance(relations, list):
-        legacy = contract.get("allowedRelations")
-        if isinstance(legacy, list):
-            relations = legacy
-        else:
-            raise RuntimeError("communicationContract.relations must be array")
+    zones = _build_zone_map(node_name, node_data)
+    relations = _relation_objects(contract)
 
     cmds: List[str] = [
         "echo '[FW] policy firewall starting'",
@@ -437,41 +357,38 @@ def render(role: str, node_name: str, node_data: Dict[str, Any]) -> List[str]:
         'nft add rule inet fw forward oifname "eth0" drop',
     ]
 
-    emitted_rules: set[str] = set()
+    emitted: set[str] = set()
 
-    ordered_relations = sorted(
-        [r for r in relations if isinstance(r, dict)],
-        key=lambda item: _relation_priority(item, relations.index(item)),
-    )
+    for relation in relations:
+        src_members = _members(relation.get("from"))
+        dst_obj = relation.get("to")
 
-    for relation in ordered_relations:
-        src_members, dst_members = _relation_endpoints(relation)
-        matches = _relation_matches(contract, relation)
-        action = _relation_action(relation)
+        # handle "any"
+        if dst_obj == "any":
+            dst_members = list(zones.keys())
+        else:
+            dst_members = _members(dst_obj)
+
+        matches = relation.get("match") or []
+        action = "accept" if relation.get("action") == "allow" else "drop"
 
         for s in src_members:
-            src_zones = _zones_for_member(s, zones, service_zones)
-
             for d in dst_members:
-                dst_zones = _zones_for_member(d, zones, service_zones)
+                if s == d:
+                    continue
 
-                for src_zone in src_zones:
-                    src_if = zones[src_zone]
+                src_if = zones.get(s)
+                dst_if = zones.get(d)
 
-                    for dst_zone in dst_zones:
-                        if src_zone == dst_zone:
-                            continue
+                if not src_if or not dst_if:
+                    continue
 
-                        dst_if = zones[dst_zone]
+                for m in matches:
+                    rule = _rule_for_match(src_if, dst_if, m, action)
+                    if rule not in emitted:
+                        emitted.add(rule)
+                        cmds.append(rule)
 
-                        for m in matches:
-                            rule = _rule_for_match(src_if, dst_if, m, action)
-                            if rule in emitted_rules:
-                                continue
-                            emitted_rules.add(rule)
-                            cmds.append(rule)
-
-    cmds.append("echo '[FW] resulting ruleset:'")
     cmds.append("nft list table inet fw")
 
     return cmds
