@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 import json
-import ipaddress
 
 from clabgen.models import SiteModel, NodeModel
 
@@ -107,34 +106,17 @@ def _policy_peer_map(site: SiteModel, policy_node_name: str, eth_map: Dict[str, 
     return results
 
 
-def _networks_for_iface(iface: Any) -> List[str]:
-    result: List[str] = []
+def _access_node_tenants(node: NodeModel) -> List[str]:
+    tenants: set[str] = set()
 
-    for addr in (getattr(iface, "addr4", None), getattr(iface, "addr6", None)):
-        if not isinstance(addr, str) or not addr:
-            continue
-        try:
-            result.append(str(ipaddress.ip_interface(addr).network))
-        except ValueError:
-            continue
-
-    return result
-
-
-def _access_node_tenant_zones(node: NodeModel, site: SiteModel) -> List[str]:
-    zones: set[str] = set()
-    prefix_zone_map = dict(site.tenant_prefix_owners or {})
-
-    for _, iface in node.interfaces.items():
+    for iface in node.interfaces.values():
         if getattr(iface, "kind", None) != "tenant":
             continue
+        tenant = getattr(iface, "tenant", None)
+        if isinstance(tenant, str) and tenant:
+            tenants.add(tenant)
 
-        for network in _networks_for_iface(iface):
-            zone = prefix_zone_map.get(network)
-            if isinstance(zone, str) and zone:
-                zones.add(zone)
-
-    if not zones:
+    if not tenants:
         debug = {
             "node": node.name,
             "role": node.role,
@@ -142,27 +124,24 @@ def _access_node_tenant_zones(node: NodeModel, site: SiteModel) -> List[str]:
                 name: getattr(iface, "__dict__", str(iface))
                 for name, iface in node.interfaces.items()
             },
-            "tenant_prefix_owners": prefix_zone_map,
         }
 
         raise RuntimeError(
-            "tenant zone cannot be resolved for access node\n"
+            "tenant cannot be resolved for access node\n"
             + json.dumps(debug, indent=2, default=str)
         )
 
-    return sorted(zones)
+    return sorted(tenants)
 
 
-def _build_policy_zone_interfaces(
+def _build_policy_interface_tags(
     site: SiteModel,
     policy_node_name: str,
     eth_map: Dict[str, int],
     required_tenants: set[str],
     required_externals: set[str],
-):
-    zones: Dict[str, str] = {}
-    external_interfaces: Dict[str, str] = {}
-
+) -> Dict[str, str]:
+    interface_tags: Dict[str, str] = {}
     peer_map = _policy_peer_map(site, policy_node_name, eth_map)
 
     for peer in peer_map:
@@ -174,45 +153,27 @@ def _build_policy_zone_interfaces(
                 + json.dumps(sorted(site.nodes.keys()), indent=2, default=str)
             )
 
-        iface = f"eth{peer['eth']}"
+        iface_name = f"eth{peer['eth']}"
 
         if peer_node.role == "access":
-            for zone in _access_node_tenant_zones(peer_node, site):
-                if zone in zones and zones[zone] != iface:
-                    raise RuntimeError(
-                        "tenant zone resolved to multiple policy interfaces\n"
-                        + json.dumps(
-                            {
-                                "zone": zone,
-                                "existing_interface": zones[zone],
-                                "new_interface": iface,
-                                "peer_node": peer_node.name,
-                            },
-                            indent=2,
-                            default=str,
-                        )
+            tenants = _access_node_tenants(peer_node)
+            if len(tenants) != 1:
+                raise RuntimeError(
+                    "policy-facing access node must resolve to exactly one tenant\n"
+                    + json.dumps(
+                        {
+                            "peer_node": peer_node.name,
+                            "tenants": tenants,
+                        },
+                        indent=2,
+                        default=str,
                     )
-                zones[zone] = iface
+                )
+            interface_tags[iface_name] = tenants[0]
             continue
 
         if peer_node.role == "upstream-selector":
-            external_interfaces["wan"] = iface
-            for external in sorted(required_externals):
-                if external_interfaces.get(external) not in {None, iface}:
-                    raise RuntimeError(
-                        "external zone resolved to multiple policy interfaces\n"
-                        + json.dumps(
-                            {
-                                "zone": external,
-                                "existing_interface": external_interfaces[external],
-                                "new_interface": iface,
-                                "peer_node": peer_node.name,
-                            },
-                            indent=2,
-                            default=str,
-                        )
-                    )
-                external_interfaces[external] = iface
+            interface_tags[iface_name] = "wan"
             continue
 
         if peer_node.role == "core":
@@ -225,113 +186,79 @@ def _build_policy_zone_interfaces(
                     wan_uplinks.append(uplink)
 
             wan_uplinks = sorted(set(wan_uplinks))
-
-            if not wan_uplinks:
-                external_interfaces["wan"] = iface
-            else:
-                for uplink in wan_uplinks:
-                    if uplink in external_interfaces and external_interfaces[uplink] != iface:
-                        raise RuntimeError(
-                            "external zone resolved to multiple policy interfaces\n"
-                            + json.dumps(
-                                {
-                                    "zone": uplink,
-                                    "existing_interface": external_interfaces[uplink],
-                                    "new_interface": iface,
-                                    "peer_node": peer_node.name,
-                                },
-                                indent=2,
-                                default=str,
-                            )
-                        )
-                    external_interfaces[uplink] = iface
+            interface_tags[iface_name] = wan_uplinks[0] if wan_uplinks else "wan"
             continue
 
-    if not external_interfaces:
+    if not interface_tags:
         raise RuntimeError(
-            "wan cannot be resolved from topology\n"
+            "policy interface tags cannot be resolved from topology\n"
             + json.dumps(peer_map, indent=2, default=str)
         )
 
-    if "wan" not in external_interfaces:
-        if len(external_interfaces) == 1:
-            external_interfaces["wan"] = next(iter(external_interfaces.values()))
-        elif "wan" in required_externals:
-            raise RuntimeError(
-                "external zone 'wan' cannot be resolved from topology\n"
-                + json.dumps(
-                    {
-                        "external_interfaces": external_interfaces,
-                        "required_externals": sorted(required_externals),
-                        "peer_map": peer_map,
-                    },
-                    indent=2,
-                    default=str,
-                )
-            )
+    available_tags = set(interface_tags.values())
 
-    zones.update(external_interfaces)
-
-    for external in required_externals:
-        if external not in zones:
-            raise RuntimeError(
-                f"external zone {external} cannot be mapped from topology\n"
-                + json.dumps(
-                    {
-                        "zones": zones,
-                        "required_externals": sorted(required_externals),
-                        "peer_map": peer_map,
-                    },
-                    indent=2,
-                    default=str,
-                )
-            )
+    if "wan" not in available_tags and required_externals == {"wan"} and len(available_tags) == 1:
+        only_if = next(iter(interface_tags.keys()))
+        interface_tags[only_if] = "wan"
+        available_tags = {"wan"}
 
     for tenant in required_tenants:
-        if tenant not in zones:
+        if tenant not in available_tags:
             raise RuntimeError(
-                f"tenant zone {tenant} cannot be mapped to policy interface\n"
+                f"tenant {tenant!r} cannot be mapped to any policy interface tag\n"
                 + json.dumps(
                     {
-                        "zones": zones,
+                        "interface_tags": interface_tags,
                         "required_tenants": sorted(required_tenants),
-                        "policy_node": policy_node_name,
-                        "peer_map": peer_map,
                     },
                     indent=2,
                     default=str,
                 )
             )
 
-    return zones
+    for external in required_externals:
+        if external not in available_tags:
+            raise RuntimeError(
+                f"external {external!r} cannot be mapped to any policy interface tag\n"
+                + json.dumps(
+                    {
+                        "interface_tags": interface_tags,
+                        "required_externals": sorted(required_externals),
+                    },
+                    indent=2,
+                    default=str,
+                )
+            )
+
+    return interface_tags
 
 
-def _build_policy_rules(contract: Dict[str, Any], zone_interfaces: Dict[str, str]):
+def _build_policy_rules(contract: Dict[str, Any], known_tags: set[str]):
     rules = []
 
     for relation in _relation_objects(contract):
-        src = _members(relation.get("from"))
+        src_members = _members(relation.get("from"))
         dst = relation.get("to")
 
         if dst == "any":
-            dst_members = list(zone_interfaces.keys())
+            dst_members = sorted(known_tags)
         else:
             dst_members = _members(dst)
 
         action = "accept" if relation.get("action") == "allow" else "drop"
         matches = relation.get("match") or []
 
-        for s in src:
-            for d in dst_members:
-                if s == d:
+        for src_tenant in src_members:
+            for dst_tenant in dst_members:
+                if src_tenant == dst_tenant:
                     continue
-                if s not in zone_interfaces or d not in zone_interfaces:
+                if src_tenant not in known_tags or dst_tenant not in known_tags:
                     continue
 
                 rules.append(
                     {
-                        "src_zone": s,
-                        "dst_zone": d,
+                        "src_tenant": src_tenant,
+                        "dst_tenant": dst_tenant,
                         "action": action,
                         "matches": matches,
                     }
@@ -346,7 +273,7 @@ def build_policy_firewall_state(site: SiteModel, policy_node_name: str, eth_map:
     tenants = set(_contract_tenant_names(contract))
     externals = set(_contract_external_names(contract))
 
-    zone_interfaces = _build_policy_zone_interfaces(
+    interface_tags = _build_policy_interface_tags(
         site,
         policy_node_name,
         eth_map,
@@ -354,10 +281,10 @@ def build_policy_firewall_state(site: SiteModel, policy_node_name: str, eth_map:
         externals,
     )
 
-    rules = _build_policy_rules(contract, zone_interfaces)
+    rules = _build_policy_rules(contract, set(interface_tags.values()))
 
     return {
-        "zone_interfaces": zone_interfaces,
+        "interface_tags": interface_tags,
         "rules": rules,
     }
 

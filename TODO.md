@@ -1,16 +1,20 @@
-# TODO — Remove Hardcoded Tenant / Zone Names
+# TODO — Decouple Firewall Policy from Interfaces
 
-Renderer must not infer zones from interface or node name strings.
+## Problem
+Firewall rules are currently generated **using interface names**.  
+Policy in the model is defined using **tenants and services**, not interfaces.
 
-* Remove substring-based zone detection (`admin`, `client`, `mgmt`, etc.).
-* Zones must be derived from solver model semantics:
+This couples security policy to topology details and makes it fragile.
 
-  * `ownership.endpoints[].tenant`
-  * `provider_zone_map`
-  * interface `kind`
-  * `_s88_links` topology.
-* All renderer modules must consume a deterministic `zone → interface` map.
-* Zone resolution must be centralized in a single renderer helper.
-* Renderer must hard fail if zones cannot be resolved from the model.
-* Renderer must never depend on naming conventions.
+## Required Change
+Write firewall policy using **tenant → tenant relations**, not interfaces.
 
+Interfaces must then be **tagged with the tenant they belong to**, and that tenant policy is applied to them.
+
+In short:
+
+1. Define policy using tenants.
+2. Map interfaces to tenants using solver data.
+3. Apply the tenant policy to those interfaces.
+
+Policy must **never be derived from interface names**.

@@ -30,6 +30,7 @@ class InterfaceModel:
     )
     kind: Optional[str] = None
     upstream: Optional[str] = None
+    tenant: Optional[str] = None
 
 
 @dataclass

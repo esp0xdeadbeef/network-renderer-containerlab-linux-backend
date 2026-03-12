@@ -13,38 +13,67 @@ from clabgen.s88.enterprise.inject_clients import inject_clients
 from clabgen.s88.Unit.base import render_units
 
 
-MAX_NODE_NAME = 32
+MAX_NODE_NAME = 64
 
 
 def _hash5(value: str) -> str:
     return hashlib.blake2s(value.encode(), digest_size=3).hexdigest()[:5]
 
 
+def _tail_tokens(value: str, max_len: int) -> str:
+    if max_len <= 0:
+        return ""
+
+    if len(value) <= max_len:
+        return value
+
+    parts = [p for p in value.split("-") if p]
+    if not parts:
+        return value[-max_len:]
+
+    selected: List[str] = []
+    total = 0
+
+    for part in reversed(parts):
+        extra = len(part) + (1 if selected else 0)
+        if total + extra > max_len:
+            break
+        selected.append(part)
+        total += extra
+
+    if not selected:
+        return value[-max_len:]
+
+    return "-".join(reversed(selected))
+
+
 def _scoped_node_name(site: SiteModel, node_name: str) -> str:
     enterprise = site.enterprise
     site_name = site.site
 
-    candidate = f"{enterprise}-{site_name}-{node_name}"
+    candidates = [
+        f"{enterprise}-{site_name}-{node_name}",
+        f"{_hash5(enterprise)}-{site_name}-{node_name}",
+        f"{_hash5(enterprise)}-{_hash5(site_name)}-{node_name}",
+    ]
+
+    for candidate in candidates:
+        if len(candidate) <= MAX_NODE_NAME:
+            return candidate
+
+    prefix = f"{_hash5(enterprise)}-{_hash5(site_name)}-"
+    remaining = MAX_NODE_NAME - len(prefix)
+
+    if remaining <= 0:
+        return prefix[:MAX_NODE_NAME]
+
+    readable_tail = _tail_tokens(node_name, remaining)
+    candidate = f"{prefix}{readable_tail}"
+
     if len(candidate) <= MAX_NODE_NAME:
         return candidate
 
-    enterprise_h = _hash5(enterprise)
-    candidate = f"{enterprise_h}-{site_name}-{node_name}"
-    if len(candidate) <= MAX_NODE_NAME:
-        return candidate
-
-    site_h = _hash5(site_name)
-    candidate = f"{enterprise_h}-{site_h}-{node_name}"
-    if len(candidate) <= MAX_NODE_NAME:
-        return candidate
-
-    node_h = hashlib.blake2s(node_name.encode(), digest_size=6).hexdigest()
-    candidate = f"{enterprise_h}-{site_h}-{node_h}"
-
-    if len(candidate) > MAX_NODE_NAME:
-        candidate = candidate[:MAX_NODE_NAME]
-
-    return candidate
+    return candidate[:MAX_NODE_NAME]
 
 
 def generate_topology(site: SiteModel) -> Dict[str, Any]:

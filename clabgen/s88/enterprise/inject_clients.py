@@ -109,6 +109,7 @@ def inject_clients(site: SiteModel) -> None:
                         addr4=client_v4,
                         addr6=client_v6,
                         kind="tenant",
+                        tenant=iface.tenant,
                         upstream=ifname,
                         routes=routes,
                     )

@@ -2,7 +2,7 @@
 # {
 #   "renderer": {
 #     "gitDirty": true,
-#     "gitRev": "a1afea3e893fff593bed532cef47ed7c1b007185",
+#     "gitRev": "bac56d1f60e7fc18504a5a425394e6d687d33062",
 #     "name": "network-renderer-containerlab-linux-backend",
 #     "schemaVersion": 2
 #   }
@@ -15,7 +15,7 @@ topology:
     kind: linux
     image: clab-frr-plus-tooling:latest
   nodes:
-    e366a-55b9c-98d53c267c0b:
+    esp0xdeadbeef-site-a-client-s-router-access-admin-tenant-admin:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -25,7 +25,7 @@ topology:
       - ip -6 addr replace fd42:dead:beef:15::2/64 dev eth1
       - ip route replace default via 10.20.15.1 dev eth1 onlink
       - ip -6 route replace default via fd42:dead:beef:15::1 dev eth1 onlink
-    e366a-55b9c-06b8f08550aa:
+    esp0xdeadbeef-site-a-client-s-router-access-client-tenant-client:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -35,7 +35,7 @@ topology:
       - ip -6 addr replace fd42:dead:beef:20::2/64 dev eth1
       - ip route replace default via 10.20.20.1 dev eth1 onlink
       - ip -6 route replace default via fd42:dead:beef:20::1 dev eth1 onlink
-    e366a-55b9c-e09e8ff85b22:
+    esp0xdeadbeef-site-a-client-s-router-access-mgmt-tenant-mgmt:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -45,7 +45,7 @@ topology:
       - ip -6 addr replace fd42:dead:beef:10::2/64 dev eth1
       - ip route replace default via 10.20.10.1 dev eth1 onlink
       - ip -6 route replace default via fd42:dead:beef:10::1 dev eth1 onlink
-    e366a-55b9c-50c93945ebe2:
+    esp0xdeadbeef-site-a-s-router-access-admin:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -92,7 +92,7 @@ topology:
       - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
       - ip route replace default via 10.10.0.1 dev eth1 onlink
-    e366a-55b9c-01ff9e3b5c4b:
+    esp0xdeadbeef-site-a-s-router-access-client:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -139,7 +139,7 @@ topology:
       - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
       - ip route replace default via 10.10.0.3 dev eth1 onlink
-    e366a-55b9c-s-router-access-mgmt:
+    esp0xdeadbeef-site-a-s-router-access-mgmt:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -186,7 +186,7 @@ topology:
       - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
       - ip route replace default via 10.10.0.5 dev eth1 onlink
-    e366a-site-a-s-router-core-wan:
+    esp0xdeadbeef-site-a-s-router-core-wan:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -277,7 +277,7 @@ topology:
         ; policy accept ; }'
       - nft add rule inet mangle forward oifname "eth2" tcp flags syn tcp option maxseg
         size set rt mtu
-    e366a-site-a-s-router-policy:
+    esp0xdeadbeef-site-a-s-router-policy:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -342,14 +342,39 @@ topology:
       - nft add rule inet fw forward ct state invalid drop
       - nft add rule inet fw forward iifname "eth0" drop
       - nft add rule inet fw forward oifname "eth0" drop
-      - nft add rule inet fw forward iifname "eth3" oifname "eth4" accept
-      - nft add rule inet fw forward iifname "eth1" oifname "eth4" accept
-      - nft add rule inet fw forward iifname "eth2" oifname "eth4" accept
-      - nft add rule inet fw forward iifname "eth4" oifname "eth3" accept
-      - nft add rule inet fw forward iifname "eth4" oifname "eth1" accept
-      - nft add rule inet fw forward iifname "eth4" oifname "eth2" accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth1" counter accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth2" counter accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth1" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth2" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth4" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth2" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth3" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth4" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth2" oifname "eth1" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth2" oifname "eth3" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth2" oifname "eth4" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth4" tcp dport { 80,
+        443 } counter drop
+      - nft add rule inet fw forward iifname "eth1" oifname "eth4" tcp dport { 80,
+        443 } counter drop
+      - nft add rule inet fw forward iifname "eth2" oifname "eth4" tcp dport { 80,
+        443 } counter drop
+      - nft add rule inet fw forward iifname "eth3" oifname "eth4" counter accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth4" counter accept
+      - nft add rule inet fw forward iifname "eth2" oifname "eth4" counter accept
+      - nft add rule inet fw forward iifname "eth4" oifname "eth3" meta l4proto icmp
+        counter accept
       - nft list table inet fw
-    e366a-55b9c-a50dafc4cb08:
+    esp0xdeadbeef-site-a-s-router-upstream-selector:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -404,7 +429,7 @@ topology:
       - sysctl -w net.ipv6.conf.all.forwarding=1
       - sysctl -w net.ipv4.conf.eth0.forwarding=0
       - sysctl -w net.ipv6.conf.eth0.forwarding=0
-    e366a-site-a-wanp-50fc83d84c0e:
+    esp0xdeadbeef-site-a-wanp-50fc83d84c0e:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -427,74 +452,74 @@ topology:
       - ip -6 route flush cache
   links:
   - endpoints:
-    - e366a-55b9c-50c93945ebe2:eth1
-    - e366a-site-a-s-router-policy:eth1
+    - esp0xdeadbeef-site-a-s-router-access-admin:eth1
+    - esp0xdeadbeef-site-a-s-router-policy:eth1
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-1ae349e25379
   - endpoints:
-    - e366a-55b9c-01ff9e3b5c4b:eth1
-    - e366a-site-a-s-router-policy:eth2
+    - esp0xdeadbeef-site-a-s-router-access-client:eth1
+    - esp0xdeadbeef-site-a-s-router-policy:eth2
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-5980f0dc953e
   - endpoints:
-    - e366a-55b9c-s-router-access-mgmt:eth1
-    - e366a-site-a-s-router-policy:eth3
+    - esp0xdeadbeef-site-a-s-router-access-mgmt:eth1
+    - esp0xdeadbeef-site-a-s-router-policy:eth3
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-6fff74cec0ec
   - endpoints:
-    - e366a-site-a-s-router-core-wan:eth1
-    - e366a-55b9c-a50dafc4cb08:eth1
+    - esp0xdeadbeef-site-a-s-router-core-wan:eth1
+    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth1
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-8240a4b630f9
   - endpoints:
-    - e366a-site-a-s-router-policy:eth4
-    - e366a-55b9c-a50dafc4cb08:eth2
+    - esp0xdeadbeef-site-a-s-router-policy:eth4
+    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth2
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-4743c4e638ef
   - endpoints:
-    - e366a-site-a-s-router-core-wan:eth2
-    - e366a-site-a-wanp-50fc83d84c0e:eth1
+    - esp0xdeadbeef-site-a-s-router-core-wan:eth2
+    - esp0xdeadbeef-site-a-wanp-50fc83d84c0e:eth1
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-e035268ceff9
   - endpoints:
-    - e366a-site-a-s-router-core-wan:eth3
+    - esp0xdeadbeef-site-a-s-router-core-wan:eth3
     - host:veth-br-ee5-1c4
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-ee5b4e0a0df0
   - endpoints:
-    - e366a-site-a-s-router-policy:eth5
+    - esp0xdeadbeef-site-a-s-router-policy:eth5
     - host:veth-br-1a5-52b
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-1a5257cd7433
   - endpoints:
-    - e366a-55b9c-a50dafc4cb08:eth3
+    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth3
     - host:veth-br-839-d62
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-839ae6988e3f
   - endpoints:
-    - e366a-55b9c-e09e8ff85b22:eth1
-    - e366a-55b9c-s-router-access-mgmt:eth2
+    - esp0xdeadbeef-site-a-client-s-router-access-mgmt-tenant-mgmt:eth1
+    - esp0xdeadbeef-site-a-s-router-access-mgmt:eth2
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-93d709323a57
   - endpoints:
-    - e366a-55b9c-98d53c267c0b:eth1
-    - e366a-55b9c-50c93945ebe2:eth2
+    - esp0xdeadbeef-site-a-client-s-router-access-admin-tenant-admin:eth1
+    - esp0xdeadbeef-site-a-s-router-access-admin:eth2
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-d915c87afd65
   - endpoints:
-    - e366a-55b9c-06b8f08550aa:eth1
-    - e366a-55b9c-01ff9e3b5c4b:eth2
+    - esp0xdeadbeef-site-a-client-s-router-access-client-tenant-client:eth1
+    - esp0xdeadbeef-site-a-s-router-access-client:eth2
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-8897a6fa9b88

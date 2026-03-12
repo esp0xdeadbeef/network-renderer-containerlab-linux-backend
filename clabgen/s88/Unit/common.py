@@ -23,6 +23,7 @@ def build_node_data(
                 "addr6": iface.addr6,
                 "ll6": iface.ll6,
                 "kind": iface.kind,
+                "tenant": iface.tenant,
                 "upstream": iface.upstream,
                 "routes": copy.deepcopy(iface.routes),
             }

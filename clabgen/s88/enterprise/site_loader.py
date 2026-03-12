@@ -63,15 +63,57 @@ def _endpoint_fallbacks(
     }
 
 
+def _network_of(addr: Any) -> str | None:
+    if not isinstance(addr, str) or not addr:
+        return None
+    try:
+        return str(ipaddress.ip_interface(addr).network)
+    except ValueError:
+        return None
+
+
+def _infer_interface_tenant(
+    *,
+    iface_name: str,
+    fb: Dict[str, Any],
+    tenant_prefix_owners: Dict[str, str],
+) -> str | None:
+    explicit_tenant = fb.get("tenant")
+    if isinstance(explicit_tenant, str) and explicit_tenant:
+        return explicit_tenant
+
+    kind = fb.get("kind")
+    if kind != "tenant":
+        return None
+
+    for addr in (fb.get("addr4"), fb.get("addr6")):
+        network = _network_of(addr)
+        if network is None:
+            continue
+        tenant = tenant_prefix_owners.get(network)
+        if isinstance(tenant, str) and tenant:
+            return tenant
+
+    raise ValueError(
+        f"tenant interface {iface_name!r} has no tenant mapping from solver prefix ownership"
+    )
+
+
 def _build_interfaces(
     site: Dict[str, Any],
     node_name: str,
     node_obj: Dict[str, Any],
+    tenant_prefix_owners: Dict[str, str],
 ) -> Dict[str, InterfaceModel]:
     interfaces: Dict[str, InterfaceModel] = {}
 
     for link_key, iface in node_obj.get("interfaces", {}).items():
         fb = _endpoint_fallbacks(site, node_name, link_key, iface)
+        tenant = _infer_interface_tenant(
+            iface_name=link_key,
+            fb=fb,
+            tenant_prefix_owners=tenant_prefix_owners,
+        )
 
         interfaces[link_key] = InterfaceModel(
             name=link_key,
@@ -81,6 +123,7 @@ def _build_interfaces(
             routes=_route_lists(iface),
             kind=fb["kind"],
             upstream=fb["upstream"],
+            tenant=tenant,
         )
 
         print(
@@ -88,6 +131,7 @@ def _build_interfaces(
             f" node={node_name}"
             f" ifname={link_key}"
             f" kind={fb['kind']}"
+            f" tenant={tenant}"
             f" upstream={fb['upstream']}"
             f" addr4={fb['addr4']}"
             f" addr6={fb['addr6']}"
@@ -96,11 +140,11 @@ def _build_interfaces(
     return interfaces
 
 
-def _build_nodes(site: Dict[str, Any]) -> Dict[str, NodeModel]:
+def _build_nodes(site: Dict[str, Any], tenant_prefix_owners: Dict[str, str]) -> Dict[str, NodeModel]:
     nodes: Dict[str, NodeModel] = {}
 
     for unit, node_obj in site.get("nodes", {}).items():
-        interfaces = _build_interfaces(site, unit, node_obj)
+        interfaces = _build_interfaces(site, unit, node_obj, tenant_prefix_owners)
 
         nodes[unit] = NodeModel(
             name=unit,
@@ -399,8 +443,9 @@ def load_sites(
         )
 
         assumptions = validate_routing_assumptions(site)
+        tenant_prefix_owners = _tenant_prefix_owners(site)
 
-        nodes = _build_nodes(site)
+        nodes = _build_nodes(site, tenant_prefix_owners)
         links = _build_links(site)
         raw_policy = dict(site.get("communicationContract", {}) or {})
         raw_ownership = dict(site.get("ownership", {}) or {})
@@ -436,7 +481,7 @@ def load_sites(
             solver_meta=solver_meta,
             policy_node_name=str(site.get("policyNodeName", "") or ""),
             upstream_selector_node_name=str(site.get("upstreamSelectorNodeName", "") or ""),
-            tenant_prefix_owners=_tenant_prefix_owners(site),
+            tenant_prefix_owners=tenant_prefix_owners,
         )
 
     return result

@@ -234,6 +234,17 @@ def _peer_in_subnet(cidr: str | None) -> str | None:
     return None
 
 
+def _same_subnet(gateway: str | None, iface_addr: str | None) -> bool:
+    if not gateway or not iface_addr:
+        return False
+    try:
+        net = ipaddress.ip_interface(iface_addr).network
+        gw = ipaddress.ip_address(gateway)
+        return gw in net
+    except Exception:
+        return False
+
+
 def _effective_via4(node: Dict[str, Any], iface: Dict[str, Any], route: Dict[str, Any]) -> str | None:
     via = _via4(route)
     local4, _ = _local_ips(node)
@@ -248,6 +259,9 @@ def _effective_via4(node: Dict[str, Any], iface: Dict[str, Any], route: Dict[str
         via = _peer_in_subnet(iface.get("addr4"))
 
     if via in local4:
+        return None
+
+    if not _same_subnet(via, iface.get("addr4")):
         return None
 
     return via
@@ -267,6 +281,9 @@ def _effective_via6(node: Dict[str, Any], iface: Dict[str, Any], route: Dict[str
         via = _peer_in_subnet(iface.get("addr6"))
 
     if via in local6:
+        return None
+
+    if not _same_subnet(via, iface.get("addr6")):
         return None
 
     return via
