@@ -64,26 +64,32 @@ def inject_clients(site: SiteModel) -> None:
             if iface.kind != "tenant":
                 continue
 
-            if not iface.addr4:
+            if not iface.addr4 and not iface.addr6:
                 continue
 
             client_name = f"client-{node_name}-{ifname}"
             if client_name in site.nodes:
                 continue
 
-            router_v4, client_v4 = _derive_client_iface(iface.addr4)
+            router_v4: str | None = None
+            client_v4: str | None = None
+            router_v6: str | None = None
+            client_v6: str | None = None
 
             routes = {
-                "ipv4": [
+                "ipv4": [],
+                "ipv6": [],
+            }
+
+            if iface.addr4:
+                router_v4, client_v4 = _derive_client_iface(iface.addr4)
+                routes["ipv4"].append(
                     {
                         "dst": "0.0.0.0/0",
                         "via4": router_v4,
                     }
-                ],
-                "ipv6": [],
-            }
+                )
 
-            client_v6: str | None = None
             if iface.addr6:
                 router_v6, client_v6 = _derive_client_iface(iface.addr6)
                 routes["ipv6"].append(
