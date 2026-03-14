@@ -3,7 +3,7 @@ set -euo pipefail
 
 INPUT_NIX="../network-compiler/examples/single-wan/inputs.nix"
 INPUT_NIX="../network-compiler/examples/single-wan/inputs.nix"
-INPUT_NIX="../network-compiler/examples/single-wan-with-nebula/inputs.nix"
+#INPUT_NIX="../network-compiler/examples/single-wan-with-nebula/inputs.nix"
 TOPO_OUT="fabric.clab.yml"
 BRIDGES_OUT="vm-bridges-generated.nix"
 
