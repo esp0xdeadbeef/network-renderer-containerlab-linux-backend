@@ -7,7 +7,12 @@ import json
 from clabgen.s88.CM.base import render as render_cm
 
 
-_ROUTER_ROLES = {"access", "core", "policy", "upstream-selector", "wan-peer", "isp"}
+_ROUTER_ROLES = {"access", "core", "policy", "upstream-selector", "isp"}
+
+
+def _sh(cmd: str) -> str:
+    escaped = cmd.replace("'", "'\"'\"'")
+    return f"sh -c '{escaped}'"
 
 
 def _is_virtual_interface(iface: Dict[str, Any]) -> bool:
@@ -218,6 +223,23 @@ def _connected_prefixes(node: Dict[str, Any]) -> tuple[set[str], set[str]]:
             except Exception:
                 pass
 
+    loopback = node.get("loopback", {})
+    if isinstance(loopback, dict):
+        loop4 = loopback.get("ipv4")
+        loop6 = loopback.get("ipv6")
+
+        if isinstance(loop4, str) and loop4:
+            try:
+                connected4.add(str(ipaddress.ip_interface(loop4).network))
+            except Exception:
+                pass
+
+        if isinstance(loop6, str) and loop6:
+            try:
+                connected6.add(str(ipaddress.ip_interface(loop6).network))
+            except Exception:
+                pass
+
     return connected4, connected6
 
 
@@ -245,6 +267,23 @@ def _local_ips(node: Dict[str, Any]) -> tuple[set[str], set[str]]:
         if isinstance(ll6, str) and ll6 and not _conflicts_with_wan_peer(node, ifname, ll6):
             try:
                 local6.add(str(ipaddress.ip_interface(_canon_v6(ll6)).ip))
+            except Exception:
+                pass
+
+    loopback = node.get("loopback", {})
+    if isinstance(loopback, dict):
+        loop4 = loopback.get("ipv4")
+        loop6 = loopback.get("ipv6")
+
+        if isinstance(loop4, str) and loop4:
+            try:
+                local4.add(str(ipaddress.ip_interface(loop4).ip))
+            except Exception:
+                pass
+
+        if isinstance(loop6, str) and loop6:
+            try:
+                local6.add(str(ipaddress.ip_interface(_canon_v6(loop6)).ip))
             except Exception:
                 pass
 
@@ -329,10 +368,31 @@ def _render_interfaces(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[st
 
         if _is_virtual_interface(iface):
             cmds.append(
-                f"sh -c 'ip link show {eth} >/dev/null 2>&1 || ip link add {eth} type dummy'"
+                _sh(f"ip link show {eth} >/dev/null 2>&1 || ip link add {eth} type dummy")
             )
 
         cmds.append(f"ip link set {eth} up")
+
+    cmds.append("ip link set lo up")
+
+    return cmds
+
+
+def _render_loopback(node: Dict[str, Any]) -> List[str]:
+    cmds: List[str] = []
+    loopback = node.get("loopback", {})
+
+    if not isinstance(loopback, dict):
+        return cmds
+
+    addr4 = loopback.get("ipv4")
+    addr6 = loopback.get("ipv6")
+
+    if isinstance(addr4, str) and addr4:
+        cmds.append(f"ip addr replace {addr4} dev lo")
+
+    if isinstance(addr6, str) and addr6:
+        cmds.append(f"ip -6 addr replace {_canon_v6(addr6)} dev lo")
 
     return cmds
 
@@ -377,6 +437,8 @@ def _render_addressing(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[st
 
         if isinstance(ll6, str) and ll6 and not _conflicts_with_wan_peer(node, ifname, ll6):
             cmds.append(f"ip -6 addr replace {_canon_v6(ll6)} dev eth{eth}")
+
+    cmds.extend(_render_loopback(node))
 
     return cmds
 
@@ -534,6 +596,15 @@ def _is_bgp_router(role: str) -> bool:
 
 
 def _first_router_id(node: Dict[str, Any]) -> str:
+    loopback = node.get("loopback", {})
+    if isinstance(loopback, dict):
+        addr4 = loopback.get("ipv4")
+        if isinstance(addr4, str) and addr4:
+            try:
+                return str(ipaddress.ip_interface(addr4).ip)
+            except Exception:
+                pass
+
     candidates: List[str] = []
 
     for iface in (node.get("interfaces", {}) or {}).values():
@@ -544,7 +615,8 @@ def _first_router_id(node: Dict[str, Any]) -> str:
         if isinstance(addr4, str) and addr4:
             try:
                 ipi = ipaddress.ip_interface(_normalize_l3_addr(addr4, iface))
-                candidates.append(str(ipi.ip))
+                if ipi.network.prefixlen != 31:
+                    candidates.append(str(ipi.ip))
             except Exception:
                 pass
 
@@ -554,42 +626,56 @@ def _first_router_id(node: Dict[str, Any]) -> str:
     return sorted(candidates)[0]
 
 
-def _network_statement_ipv4(addr: str, iface: Dict[str, Any]) -> str | None:
-    try:
-        normalized = _normalize_l3_addr(addr, iface)
-        return str(ipaddress.ip_interface(normalized).network)
-    except Exception:
-        return None
-
-
-def _network_statement_ipv6(addr: str, iface: Dict[str, Any]) -> str | None:
-    try:
-        normalized = _normalize_l3_addr(_canon_v6(addr), iface)
-        return str(ipaddress.ip_interface(normalized).network)
-    except Exception:
-        return None
+def _is_service_interface(iface: Dict[str, Any]) -> bool:
+    kind = iface.get("kind")
+    if kind == "tenant":
+        tenant = iface.get("tenant")
+        return tenant != "loopback"
+    return False
 
 
 def _collect_bgp_networks(node: Dict[str, Any]) -> tuple[List[str], List[str]]:
     networks4: set[str] = set()
     networks6: set[str] = set()
 
+    loopback = node.get("loopback", {})
+    if isinstance(loopback, dict):
+        loop4 = loopback.get("ipv4")
+        loop6 = loopback.get("ipv6")
+
+        if isinstance(loop4, str) and loop4:
+            try:
+                networks4.add(str(ipaddress.ip_interface(loop4).network))
+            except Exception:
+                pass
+
+        if isinstance(loop6, str) and loop6:
+            try:
+                networks6.add(str(ipaddress.ip_interface(loop6).network))
+            except Exception:
+                pass
+
     for ifname, iface in (node.get("interfaces", {}) or {}).items():
         if not isinstance(iface, dict):
+            continue
+
+        if not _is_service_interface(iface):
             continue
 
         addr4 = iface.get("addr4")
         addr6 = iface.get("addr6")
 
         if isinstance(addr4, str) and addr4 and not _conflicts_with_wan_peer(node, ifname, addr4):
-            net4 = _network_statement_ipv4(addr4, iface)
-            if isinstance(net4, str):
-                networks4.add(net4)
+            try:
+                networks4.add(str(ipaddress.ip_interface(_normalize_l3_addr(addr4, iface)).network))
+            except Exception:
+                pass
 
         if isinstance(addr6, str) and addr6 and not _conflicts_with_wan_peer(node, ifname, addr6):
-            net6 = _network_statement_ipv6(addr6, iface)
-            if isinstance(net6, str):
-                networks6.add(net6)
+            try:
+                networks6.add(str(ipaddress.ip_interface(_normalize_l3_addr(_canon_v6(addr6), iface)).network))
+            except Exception:
+                pass
 
     return sorted(networks4), sorted(networks6)
 
@@ -619,8 +705,8 @@ def _render_bgp(node_name: str, node: Dict[str, Any], role: str) -> List[str]:
     if not isinstance(neighbors, list):
         neighbors = []
 
-    ipv4_neighbors: List[tuple[str, int]] = []
-    ipv6_neighbors: List[tuple[str, int]] = []
+    ipv4_neighbors: List[Dict[str, Any]] = []
+    ipv6_neighbors: List[Dict[str, Any]] = []
 
     for neighbor in neighbors:
         if not isinstance(neighbor, dict):
@@ -630,16 +716,45 @@ def _render_bgp(node_name: str, node: Dict[str, Any], role: str) -> List[str]:
         if not isinstance(peer_asn, int):
             continue
 
+        update_source = neighbor.get("update_source")
+        rr_client = bool(neighbor.get("route_reflector_client", False))
+
         peer_addr4 = _peer_ip(neighbor.get("peer_addr4"))
         peer_addr6 = _peer_ip(neighbor.get("peer_addr6"))
 
         if isinstance(peer_addr4, str):
-            ipv4_neighbors.append((peer_addr4, peer_asn))
+            ipv4_neighbors.append(
+                {
+                    "peer_ip": peer_addr4,
+                    "peer_asn": peer_asn,
+                    "update_source": update_source,
+                    "rr_client": rr_client,
+                }
+            )
         if isinstance(peer_addr6, str):
-            ipv6_neighbors.append((peer_addr6, peer_asn))
+            ipv6_neighbors.append(
+                {
+                    "peer_ip": peer_addr6,
+                    "peer_asn": peer_asn,
+                    "update_source": update_source,
+                    "rr_client": rr_client,
+                }
+            )
 
-    ipv4_neighbors = sorted(set(ipv4_neighbors), key=lambda item: item[0])
-    ipv6_neighbors = sorted(set(ipv6_neighbors), key=lambda item: item[0])
+    ipv4_neighbors = sorted(
+        {
+            (n["peer_ip"], n["peer_asn"], n.get("update_source"), n["rr_client"]): n
+            for n in ipv4_neighbors
+        }.values(),
+        key=lambda item: item["peer_ip"],
+    )
+    ipv6_neighbors = sorted(
+        {
+            (n["peer_ip"], n["peer_asn"], n.get("update_source"), n["rr_client"]): n
+            for n in ipv6_neighbors
+        }.values(),
+        key=lambda item: item["peer_ip"],
+    )
 
     networks4, networks6 = _collect_bgp_networks(node)
     router_id = _first_router_id(node)
@@ -659,29 +774,37 @@ def _render_bgp(node_name: str, node: Dict[str, Any], role: str) -> List[str]:
         " no bgp network import-check",
     ]
 
-    for peer_ip, peer_asn in ipv4_neighbors:
+    for neighbor in ipv4_neighbors:
+        peer_ip = neighbor["peer_ip"]
+        peer_asn = neighbor["peer_asn"]
         config_lines.append(f" neighbor {peer_ip} remote-as {peer_asn}")
+        if isinstance(neighbor.get("update_source"), str) and neighbor["update_source"]:
+            config_lines.append(f" neighbor {peer_ip} update-source {neighbor['update_source']}")
 
-    for peer_ip, peer_asn in ipv6_neighbors:
+    for neighbor in ipv6_neighbors:
+        peer_ip = neighbor["peer_ip"]
+        peer_asn = neighbor["peer_asn"]
         config_lines.append(f" neighbor {peer_ip} remote-as {peer_asn}")
+        if isinstance(neighbor.get("update_source"), str) and neighbor["update_source"]:
+            config_lines.append(f" neighbor {peer_ip} update-source {neighbor['update_source']}")
 
     config_lines.append(" !")
     config_lines.append(" address-family ipv4 unicast")
-    config_lines.append("  redistribute connected")
-    config_lines.append("  redistribute static")
     for network in networks4:
         config_lines.append(f"  network {network}")
-    for peer_ip, _peer_asn in ipv4_neighbors:
-        config_lines.append(f"  neighbor {peer_ip} activate")
+    for neighbor in ipv4_neighbors:
+        config_lines.append(f"  neighbor {neighbor['peer_ip']} activate")
+        if neighbor["rr_client"]:
+            config_lines.append(f"  neighbor {neighbor['peer_ip']} route-reflector-client")
     config_lines.append(" exit-address-family")
     config_lines.append(" !")
     config_lines.append(" address-family ipv6 unicast")
-    config_lines.append("  redistribute connected")
-    config_lines.append("  redistribute static")
     for network in networks6:
         config_lines.append(f"  network {network}")
-    for peer_ip, _peer_asn in ipv6_neighbors:
-        config_lines.append(f"  neighbor {peer_ip} activate")
+    for neighbor in ipv6_neighbors:
+        config_lines.append(f"  neighbor {neighbor['peer_ip']} activate")
+        if neighbor["rr_client"]:
+            config_lines.append(f"  neighbor {neighbor['peer_ip']} route-reflector-client")
     config_lines.append(" exit-address-family")
     config_lines.append("!")
     config_lines.append("line vty")
@@ -715,28 +838,44 @@ def _render_bgp(node_name: str, node: Dict[str, Any], role: str) -> List[str]:
         "vtysh_conf": "service integrated-vtysh-config\n",
     }
 
-    python_script = (
-        "import json, pathlib\n"
-        f"payload = json.loads({json.dumps(json.dumps(payload))})\n"
-        "pathlib.Path('/etc/frr').mkdir(parents=True, exist_ok=True)\n"
+    payload_json = json.dumps(payload)
+    bootstrap_script = (
+        "import json, pathlib, subprocess\n"
+        f"payload = json.loads(r'''{payload_json}''')\n"
+        "frr_dir = pathlib.Path('/etc/frr')\n"
+        "run_dir = pathlib.Path('/var/run/frr')\n"
+        "frr_dir.mkdir(parents=True, exist_ok=True)\n"
+        "run_dir.mkdir(parents=True, exist_ok=True)\n"
         "daemon_lines = [f\"{k}={v}\" for k, v in payload['daemons'].items()]\n"
-        "pathlib.Path('/etc/frr/daemons').write_text('\\n'.join(daemon_lines) + '\\n')\n"
-        "pathlib.Path('/etc/frr/frr.conf').write_text(payload['frr_conf'])\n"
-        "pathlib.Path('/etc/frr/vtysh.conf').write_text(payload['vtysh_conf'])\n"
+        "(frr_dir / 'daemons').write_text('\\n'.join(daemon_lines) + '\\n')\n"
+        "(frr_dir / 'frr.conf').write_text(payload['frr_conf'])\n"
+        "(frr_dir / 'vtysh.conf').write_text(payload['vtysh_conf'])\n"
+        "subprocess.run(['chown', '-R', 'frr:frr', '/etc/frr', '/var/run/frr'], check=False)\n"
+        "subprocess.run(['chmod', '640', '/etc/frr/daemons', '/etc/frr/frr.conf', '/etc/frr/vtysh.conf'], check=False)\n"
+        "subprocess.run(['pkill', '-x', 'zebra'], check=False)\n"
+        "subprocess.run(['pkill', '-x', 'bgpd'], check=False)\n"
+        "restart_cmds = [\n"
+        "    ['/usr/lib/frr/frrinit.sh', 'restart'],\n"
+        "    ['/etc/init.d/frr', 'restart'],\n"
+        "    ['service', 'frr', 'restart'],\n"
+        "]\n"
+        "for cmd in restart_cmds:\n"
+        "    result = subprocess.run(cmd, check=False)\n"
+        "    if result.returncode == 0:\n"
+        "        break\n"
+        "subprocess.run(['vtysh', '-c', 'show bgp ipv4 summary'], check=False)\n"
+        "subprocess.run(['vtysh', '-c', 'show bgp ipv6 summary'], check=False)\n"
     )
 
     return [
-        "mkdir -p /var/run/frr /etc/frr",
-        "touch /etc/frr/daemons /etc/frr/frr.conf /etc/frr/vtysh.conf",
-        f"python3 -c {json.dumps(python_script)}",
-        "chown -R frr:frr /etc/frr /var/run/frr >/dev/null 2>&1 || true",
-        "chmod 640 /etc/frr/daemons /etc/frr/frr.conf /etc/frr/vtysh.conf >/dev/null 2>&1 || true",
-        "pkill -x zebra >/dev/null 2>&1 || true",
-        "pkill -x bgpd >/dev/null 2>&1 || true",
-        "/usr/lib/frr/frrinit.sh restart >/dev/null 2>&1 || /etc/init.d/frr restart >/dev/null 2>&1 || service frr restart >/dev/null 2>&1 || true",
-        "sleep 1",
-        "vtysh -c 'show bgp ipv4 summary' >/dev/null 2>&1 || true",
-        "vtysh -c 'show bgp ipv6 summary' >/dev/null 2>&1 || true",
+        _sh("mkdir -p /var/run/frr /etc/frr"),
+        _sh("touch /etc/frr/daemons /etc/frr/frr.conf /etc/frr/vtysh.conf"),
+        _sh(
+            "cat >/tmp/clabgen-frr-bootstrap.py <<'PY'\n"
+            + bootstrap_script
+            + "PY\n"
+            + "python3 /tmp/clabgen-frr-bootstrap.py\n"
+        ),
     ]
 
 
@@ -747,7 +886,7 @@ def render(
     eth_map: Dict[str, int],
 ) -> List[str]:
     cmds: List[str] = [
-        "sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > \"$i\"; done'",
+        _sh('for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$i"; done'),
     ]
 
     routing_mode = str(node_data.get("routing_mode", "static")).strip().lower()
@@ -758,6 +897,8 @@ def render(
     cmds.extend(_render_addressing(node_data, eth_map))
 
     if routing_mode == "bgp" and _is_bgp_router(role):
+        cmds.extend(_render_static_routes(node_data, eth_map))
+        cmds.extend(_render_default_routes(node_data, eth_map))
         cmds.extend(_render_uplink_routes(node_data, eth_map))
         cmds.extend(_render_bgp(node_name, node_data, role))
     elif role != "wan-peer":

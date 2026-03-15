@@ -91,60 +91,62 @@ def _renderers() -> Dict[str, NodeRenderer]:
     }
 
 
-def _bgp_asn(node_name: str) -> int:
-    digest = hashlib.blake2s(node_name.encode(), digest_size=4).digest()
-    value = int.from_bytes(digest, byteorder="big", signed=False)
-    return 4_200_000_000 + (value % 100_000_000)
+def _loopback_ip(value: str | None) -> str | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return str(ipaddress.ip_interface(value).ip)
+    except ValueError:
+        return None
 
 
 def _node_extra(site: SiteModel, node_name: str) -> Dict[str, Any]:
-    bgp_neighbors: List[Dict[str, Any]] = []
+    node = site.nodes[node_name]
+    neighbors: List[Dict[str, Any]] = []
 
-    for link_name in sorted(site.links.keys()):
-        link = site.links[link_name]
-        endpoints = dict(link.endpoints or {})
+    for session in site.bgp_sessions:
+        a = session.get("a")
+        b = session.get("b")
+        rr = session.get("rr")
 
-        if node_name not in endpoints:
+        if node_name not in {a, b}:
             continue
 
-        local_ep = endpoints[node_name]
-        if not isinstance(local_ep, dict):
+        peer_name = b if node_name == a else a
+        if not isinstance(peer_name, str) or peer_name not in site.nodes:
             continue
 
-        peers = [
-            peer_name
-            for peer_name in endpoints.keys()
-            if peer_name != node_name and peer_name in site.nodes
-        ]
-        if len(peers) != 1:
-            continue
+        peer = site.nodes[peer_name]
 
-        peer_name = peers[0]
-        peer_ep = endpoints.get(peer_name)
-        if not isinstance(peer_ep, dict):
-            continue
-
-        local_ifname = local_ep.get("interface")
-        if not isinstance(local_ifname, str) or not local_ifname:
-            continue
-
-        bgp_neighbors.append(
+        neighbors.append(
             {
-                "link_name": link_name,
-                "kind": str(link.kind or ""),
-                "local_ifname": local_ifname,
                 "peer_name": peer_name,
-                "peer_asn": _bgp_asn(peer_name),
-                "peer_addr4": peer_ep.get("addr4"),
-                "peer_addr6": peer_ep.get("addr6"),
+                "peer_asn": site.bgp_asn,
+                "peer_addr4": peer.loopback4,
+                "peer_addr6": peer.loopback6,
+                "update_source": "lo",
+                "route_reflector_client": bool(node_name == rr and peer_name != rr),
             }
         )
 
+    neighbors = sorted(
+        neighbors,
+        key=lambda item: (
+            str(item.get("peer_name") or ""),
+            str(item.get("peer_addr4") or ""),
+            str(item.get("peer_addr6") or ""),
+        ),
+    )
+
     return {
+        "loopback": {
+            "ipv4": node.loopback4,
+            "ipv6": node.loopback6,
+        },
         "bgp": {
-            "asn": _bgp_asn(node_name),
-            "neighbors": bgp_neighbors,
-        }
+            "asn": site.bgp_asn,
+            "neighbors": neighbors,
+        },
     }
 
 

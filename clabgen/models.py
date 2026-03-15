@@ -47,6 +47,8 @@ class NodeModel:
     route_intents: List[Dict[str, Any]] = field(default_factory=list)
     policy_intents: List[Dict[str, Any]] = field(default_factory=list)
     nat_intents: List[Dict[str, Any]] = field(default_factory=list)
+    loopback4: Optional[str] = None
+    loopback6: Optional[str] = None
 
 
 @dataclass
@@ -77,3 +79,5 @@ class SiteModel:
     policy_node_name: str = ""
     upstream_selector_node_name: str = ""
     tenant_prefix_owners: Dict[str, Any] = field(default_factory=dict)
+    bgp_asn: int = 0
+    bgp_sessions: List[Dict[str, Any]] = field(default_factory=list)

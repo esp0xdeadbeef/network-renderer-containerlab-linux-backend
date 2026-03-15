@@ -9,7 +9,7 @@ BRIDGES_OUT="vm-bridges-generated.nix"
 
 rm -f "$TOPO_OUT" "$BRIDGES_OUT"
 
-nix run .#generate-clab-config "$INPUT_NIX" "$TOPO_OUT" "$BRIDGES_OUT"
+CLABGEN_ROUTING_MODE=bgp nix run .#generate-clab-config "$INPUT_NIX" "$TOPO_OUT" "$BRIDGES_OUT"
 
 echo links generated:
 sed -n '/links:/,$p' "$TOPO_OUT"

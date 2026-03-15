@@ -1,8 +1,8 @@
-# ./clabgen/s88/enterprise/site_loader.py
 from __future__ import annotations
 
 from typing import Dict, List, Any
 from pathlib import Path
+import hashlib
 import ipaddress
 
 from clabgen.solver import (
@@ -161,6 +161,20 @@ def _build_interfaces(
     return interfaces
 
 
+def _loopback_addrs(node_obj: Dict[str, Any]) -> tuple[str | None, str | None]:
+    loopback = node_obj.get("loopback", {})
+    if not isinstance(loopback, dict):
+        return None, None
+
+    addr4 = loopback.get("ipv4")
+    addr6 = loopback.get("ipv6")
+
+    return (
+        addr4 if isinstance(addr4, str) and addr4 else None,
+        addr6 if isinstance(addr6, str) and addr6 else None,
+    )
+
+
 def _build_nodes(
     site: Dict[str, Any],
     tenant_prefix_owners: Dict[str, str],
@@ -169,6 +183,7 @@ def _build_nodes(
 
     for unit, node_obj in site.get("nodes", {}).items():
         interfaces = _build_interfaces(site, unit, node_obj, tenant_prefix_owners)
+        loopback4, loopback6 = _loopback_addrs(node_obj)
 
         nodes[unit] = NodeModel(
             name=unit,
@@ -177,6 +192,8 @@ def _build_nodes(
             interfaces=interfaces,
             containers=list(node_obj.get("containers", [])),
             isolated=bool(node_obj.get("isolated", False)),
+            loopback4=loopback4,
+            loopback6=loopback6,
         )
 
     return nodes
@@ -224,6 +241,62 @@ def _tenant_prefix_owners(site: Dict[str, Any]) -> Dict[str, str]:
     return result
 
 
+def _site_asn(enterprise: str, site_name: str) -> int:
+    digest = hashlib.blake2s(
+        f"{enterprise}:{site_name}".encode(),
+        digest_size=4,
+    ).digest()
+    value = int.from_bytes(digest, byteorder="big", signed=False)
+    return 4_200_000_000 + (value % 100_000_000)
+
+
+def _build_bgp_sessions(site: Dict[str, Any]) -> List[Dict[str, Any]]:
+    nodes = dict(site.get("nodes", {}) or {})
+    policy = site.get("policyNodeName")
+
+    if not isinstance(policy, str) or not policy:
+        return []
+
+    policy_node = nodes.get(policy)
+    if not isinstance(policy_node, dict):
+        return []
+
+    sessions: List[Dict[str, Any]] = []
+
+    for node_name, node_obj in sorted(nodes.items()):
+        if node_name == policy:
+            continue
+        if not isinstance(node_obj, dict):
+            continue
+
+        role = node_obj.get("role")
+        if role not in {"access", "core", "upstream-selector"}:
+            continue
+
+        sessions.append(
+            {
+                "a": node_name,
+                "b": policy,
+                "rr": policy,
+            }
+        )
+
+    deduped: List[Dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    for session in sessions:
+        a = str(session["a"])
+        b = str(session["b"])
+        rr = str(session["rr"])
+        key = (a, b, rr)
+        if a == b or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(session)
+
+    return deduped
+
+
 def load_sites(
     path: str | Path,
     renderer_inventory: Dict[str, Any] | None = None,
@@ -253,6 +326,8 @@ def load_sites(
         raw_ownership = dict(site.get("ownership", {}) or {})
         raw_domains = dict(site.get("domains", {}) or {})
         raw_transport = dict(site.get("transport", {}) or {})
+        bgp_asn = _site_asn(enterprise, site_name)
+        bgp_sessions = _build_bgp_sessions(site)
 
         key = f"{enterprise}-{site_name}"
 
@@ -275,6 +350,8 @@ def load_sites(
             policy_node_name=str(site.get("policyNodeName", "") or ""),
             upstream_selector_node_name=str(site.get("upstreamSelectorNodeName", "") or ""),
             tenant_prefix_owners=tenant_prefix_owners,
+            bgp_asn=bgp_asn,
+            bgp_sessions=bgp_sessions,
         )
 
     return result

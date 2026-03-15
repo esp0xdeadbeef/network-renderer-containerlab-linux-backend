@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Dict, Any
-import os
+from typing import Dict, Any, List
 import copy
+import ipaddress
+import os
 
 from clabgen.models import NodeModel
-from clabgen.s88.engine import render_node_s88
+from clabgen.s88.EM.base import render as render_em
 
 
-_ROUTER_ROLES = {"access", "core", "policy", "upstream-selector", "wan-peer", "isp"}
+_ROUTER_ROLES = {"access", "core", "policy", "upstream-selector", "isp"}
 
 
 def _routing_mode() -> str:
@@ -19,10 +20,60 @@ def _routing_mode() -> str:
     return value
 
 
-def _keep_static_routes(role: str, routing_mode: str) -> bool:
-    if routing_mode != "bgp":
-        return True
-    return role not in _ROUTER_ROLES
+def _is_host_route(dst: Any) -> bool:
+    if not isinstance(dst, str) or not dst:
+        return False
+
+    try:
+        net = ipaddress.ip_network(dst, strict=False)
+    except ValueError:
+        return False
+
+    return net.prefixlen == net.max_prefixlen
+
+
+def _filter_router_bgp_routes(routes: Dict[str, List[Dict[str, Any]]]) -> Dict[str, List[Dict[str, Any]]]:
+    filtered = {"ipv4": [], "ipv6": []}
+
+    for family in ("ipv4", "ipv6"):
+        family_routes = routes.get(family, [])
+        if not isinstance(family_routes, list):
+            continue
+
+        for route in family_routes:
+            if not isinstance(route, dict):
+                continue
+
+            dst = route.get("dst")
+            proto = route.get("proto")
+
+            if dst in {"0.0.0.0/0", "::/0"}:
+                filtered[family].append(copy.deepcopy(route))
+                continue
+
+            if proto == "uplink":
+                filtered[family].append(copy.deepcopy(route))
+                continue
+
+            if _is_host_route(dst):
+                filtered[family].append(copy.deepcopy(route))
+                continue
+
+    return filtered
+
+
+def _routes_for_node(role: str, routing_mode: str, iface_routes: Dict[str, List[Dict[str, Any]]]) -> Dict[str, List[Dict[str, Any]]]:
+    if routing_mode != "bgp" or role not in _ROUTER_ROLES:
+        return copy.deepcopy(iface_routes)
+
+    return _filter_router_bgp_routes(iface_routes)
+
+
+def _route_intents_for_node(role: str, routing_mode: str, route_intents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if routing_mode != "bgp" or role not in _ROUTER_ROLES:
+        return list(route_intents)
+
+    return []
 
 
 def build_node_data(
@@ -32,7 +83,6 @@ def build_node_data(
     extra: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     routing_mode = _routing_mode()
-    keep_static = _keep_static_routes(node.role, routing_mode)
 
     node_data: Dict[str, Any] = {
         "name": node_name,
@@ -47,12 +97,16 @@ def build_node_data(
                 "tenant": iface.tenant,
                 "overlay": iface.overlay,
                 "upstream": iface.upstream,
-                "routes": copy.deepcopy(iface.routes) if keep_static else {"ipv4": [], "ipv6": []},
+                "routes": _routes_for_node(node.role, routing_mode, iface.routes),
             }
             for ifname, iface in sorted(node.interfaces.items())
             if ifname in eth_map
         },
-        "route_intents": list(node.route_intents) if keep_static else [],
+        "route_intents": _route_intents_for_node(node.role, routing_mode, node.route_intents),
+        "loopback": {
+            "ipv4": node.loopback4,
+            "ipv6": node.loopback6,
+        },
     }
 
     if extra:
@@ -70,7 +124,8 @@ def render_linux_node(
     routing_mode = _routing_mode()
     node_data = build_node_data(node_name, node, eth_map, extra=extra)
 
-    exec_cmds = render_node_s88(
+    exec_cmds = render_em(
+        node.role,
         node_name,
         node_data,
         eth_map,
