@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-find ../network-compiler/examples -name inputs.nix -type f | while read -r file; do
+example_repo=$(nix flake prefetch github:esp0xdeadbeef/network-labs --json | jq -r .storePath)
+find $example_repo -name intent.nix -type f | while read -r file; do
   echo "[*] Running for $file"
 
   if ! nix run .#generate-clab-config "$file"; then

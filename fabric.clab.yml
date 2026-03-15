@@ -2,7 +2,7 @@
 # {
 #   "renderer": {
 #     "gitDirty": true,
-#     "gitRev": "e25faeff83e82f7e0d00a6235664c1ab7b7b0357",
+#     "gitRev": "2757bac35e6fd94f8d00593b7c7d2c2bcdc41c19",
 #     "name": "network-renderer-containerlab-linux-backend",
 #     "schemaVersion": 2
 #   }
@@ -63,64 +63,47 @@ topology:
       - ip -6 addr replace fd42:dead:beef:15::1/64 dev eth2
       - ip addr replace 10.19.0.1/32 dev lo
       - ip -6 addr replace fd42:dead:beef:1900::1/128 dev lo
+      - ip route replace 10.10.0.10/31 via 10.10.0.1 dev eth1 onlink
+      - ip route replace 10.10.0.2/31 via 10.10.0.1 dev eth1 onlink
+      - ip route replace 10.10.0.4/31 via 10.10.0.1 dev eth1 onlink
+      - ip route replace 10.10.0.6/31 via 10.10.0.1 dev eth1 onlink
+      - ip route replace 10.10.0.8/31 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.19.0.2/32 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.19.0.3/32 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.19.0.4/32 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.19.0.5/32 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.19.0.6/32 via 10.10.0.1 dev eth1 onlink
+      - ip route replace 10.19.0.7/32 via 10.10.0.1 dev eth1 onlink
+      - ip route replace 10.20.10.0/24 via 10.10.0.1 dev eth1 onlink
+      - ip route replace 10.20.20.0/24 via 10.10.0.1 dev eth1 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:1 dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:1
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:1
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::2/127 via fd42:dead:beef:1000:0:0:0:1
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::4/127 via fd42:dead:beef:1000:0:0:0:1
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::6/127 via fd42:dead:beef:1000:0:0:0:1
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:1
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:1
+        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:1
+        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
       - ip route replace default via 10.10.0.1 dev eth1 onlink
-      - sh -c 'mkdir -p /var/run/frr /etc/frr'
-      - sh -c 'touch /etc/frr/daemons /etc/frr/frr.conf /etc/frr/vtysh.conf'
-      - "sh -c 'cat >/tmp/clabgen-frr-bootstrap.py <<'\"'\"'PY'\"'\"'\nimport json,\
-        \ pathlib, subprocess\npayload = json.loads(r'\"'\"''\"'\"''\"'\"'{\"daemons\"\
-        : {\"zebra\": \"yes\", \"bgpd\": \"yes\", \"ospfd\": \"no\", \"ospf6d\": \"\
-        no\", \"ripd\": \"no\", \"ripngd\": \"no\", \"isisd\": \"no\", \"pimd\": \"\
-        no\", \"pim6d\": \"no\", \"ldpd\": \"no\", \"nhrpd\": \"no\", \"eigrpd\":\
-        \ \"no\", \"babeld\": \"no\", \"sharpd\": \"no\", \"staticd\": \"yes\", \"\
-        bfdd\": \"no\", \"fabricd\": \"no\", \"vrrpd\": \"no\", \"pathd\": \"no\"\
-        }, \"frr_conf\": \"frr defaults traditional\\nhostname s-router-access-admin\\\
-        nservice integrated-vtysh-config\\nlog stdout\\n!\\nip forwarding\\nipv6 forwarding\\\
-        n!\\nrouter bgp 4258700933\\n bgp router-id 10.19.0.1\\n no bgp ebgp-requires-policy\\\
-        n no bgp network import-check\\n neighbor 10.19.0.5 remote-as 4258700933\\\
-        n neighbor 10.19.0.5 update-source lo\\n neighbor fd42:dead:beef:1900::5 remote-as\
-        \ 4258700933\\n neighbor fd42:dead:beef:1900::5 update-source lo\\n !\\n address-family\
-        \ ipv4 unicast\\n  network 10.19.0.1/32\\n  network 10.20.15.0/24\\n  neighbor\
-        \ 10.19.0.5 activate\\n exit-address-family\\n !\\n address-family ipv6 unicast\\\
-        n  network fd42:dead:beef:15::/64\\n  network fd42:dead:beef:1900::1/128\\\
-        n  neighbor fd42:dead:beef:1900::5 activate\\n exit-address-family\\n!\\nline\
-        \ vty\\n!\\n\", \"vtysh_conf\": \"service integrated-vtysh-config\\n\"}'\"\
-        '\"''\"'\"''\"'\"')\nfrr_dir = pathlib.Path('\"'\"'/etc/frr'\"'\"')\nrun_dir\
-        \ = pathlib.Path('\"'\"'/var/run/frr'\"'\"')\nfrr_dir.mkdir(parents=True,\
-        \ exist_ok=True)\nrun_dir.mkdir(parents=True, exist_ok=True)\ndaemon_lines\
-        \ = [f\"{k}={v}\" for k, v in payload['\"'\"'daemons'\"'\"'].items()]\n(frr_dir\
-        \ / '\"'\"'daemons'\"'\"').write_text('\"'\"'\\n'\"'\"'.join(daemon_lines)\
-        \ + '\"'\"'\\n'\"'\"')\n(frr_dir / '\"'\"'frr.conf'\"'\"').write_text(payload['\"\
-        '\"'frr_conf'\"'\"'])\n(frr_dir / '\"'\"'vtysh.conf'\"'\"').write_text(payload['\"\
-        '\"'vtysh_conf'\"'\"'])\nsubprocess.run(['\"'\"'chown'\"'\"', '\"'\"'-R'\"\
-        '\"', '\"'\"'frr:frr'\"'\"', '\"'\"'/etc/frr'\"'\"', '\"'\"'/var/run/frr'\"\
-        '\"'], check=False)\nsubprocess.run(['\"'\"'chmod'\"'\"', '\"'\"'640'\"'\"\
-        ', '\"'\"'/etc/frr/daemons'\"'\"', '\"'\"'/etc/frr/frr.conf'\"'\"', '\"'\"\
-        '/etc/frr/vtysh.conf'\"'\"'], check=False)\nsubprocess.run(['\"'\"'pkill'\"\
-        '\"', '\"'\"'-x'\"'\"', '\"'\"'zebra'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'pkill'\"'\"', '\"'\"'-x'\"'\"', '\"'\"'bgpd'\"'\"'], check=False)\nrestart_cmds\
-        \ = [\n    ['\"'\"'/usr/lib/frr/frrinit.sh'\"'\"', '\"'\"'restart'\"'\"'],\n\
-        \    ['\"'\"'/etc/init.d/frr'\"'\"', '\"'\"'restart'\"'\"'],\n    ['\"'\"\
-        'service'\"'\"', '\"'\"'frr'\"'\"', '\"'\"'restart'\"'\"'],\n]\nfor cmd in\
-        \ restart_cmds:\n    result = subprocess.run(cmd, check=False)\n    if result.returncode\
-        \ == 0:\n        break\nsubprocess.run(['\"'\"'vtysh'\"'\"', '\"'\"'-c'\"\
-        '\"', '\"'\"'show bgp ipv4 summary'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'vtysh'\"'\"', '\"'\"'-c'\"'\"', '\"'\"'show bgp ipv6 summary'\"'\"'],\
-        \ check=False)\nPY\npython3 /tmp/clabgen-frr-bootstrap.py\n'"
     esp0xdeadbeef-site-a-s-router-access-client:
       kind: linux
       image: clab-frr-plus-tooling:latest
@@ -136,64 +119,47 @@ topology:
       - ip -6 addr replace fd42:dead:beef:20::1/64 dev eth2
       - ip addr replace 10.19.0.2/32 dev lo
       - ip -6 addr replace fd42:dead:beef:1900::2/128 dev lo
+      - ip route replace 10.10.0.0/31 via 10.10.0.3 dev eth1 onlink
+      - ip route replace 10.10.0.10/31 via 10.10.0.3 dev eth1 onlink
+      - ip route replace 10.10.0.4/31 via 10.10.0.3 dev eth1 onlink
+      - ip route replace 10.10.0.6/31 via 10.10.0.3 dev eth1 onlink
+      - ip route replace 10.10.0.8/31 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.19.0.1/32 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.19.0.3/32 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.19.0.4/32 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.19.0.5/32 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.19.0.6/32 via 10.10.0.3 dev eth1 onlink
+      - ip route replace 10.19.0.7/32 via 10.10.0.3 dev eth1 onlink
+      - ip route replace 10.20.10.0/24 via 10.10.0.3 dev eth1 onlink
+      - ip route replace 10.20.15.0/24 via 10.10.0.3 dev eth1 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:3 dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:3
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:3
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::/127 via fd42:dead:beef:1000:0:0:0:3
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::4/127 via fd42:dead:beef:1000:0:0:0:3
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::6/127 via fd42:dead:beef:1000:0:0:0:3
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:3
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:3
+        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:3
+        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
       - ip route replace default via 10.10.0.3 dev eth1 onlink
-      - sh -c 'mkdir -p /var/run/frr /etc/frr'
-      - sh -c 'touch /etc/frr/daemons /etc/frr/frr.conf /etc/frr/vtysh.conf'
-      - "sh -c 'cat >/tmp/clabgen-frr-bootstrap.py <<'\"'\"'PY'\"'\"'\nimport json,\
-        \ pathlib, subprocess\npayload = json.loads(r'\"'\"''\"'\"''\"'\"'{\"daemons\"\
-        : {\"zebra\": \"yes\", \"bgpd\": \"yes\", \"ospfd\": \"no\", \"ospf6d\": \"\
-        no\", \"ripd\": \"no\", \"ripngd\": \"no\", \"isisd\": \"no\", \"pimd\": \"\
-        no\", \"pim6d\": \"no\", \"ldpd\": \"no\", \"nhrpd\": \"no\", \"eigrpd\":\
-        \ \"no\", \"babeld\": \"no\", \"sharpd\": \"no\", \"staticd\": \"yes\", \"\
-        bfdd\": \"no\", \"fabricd\": \"no\", \"vrrpd\": \"no\", \"pathd\": \"no\"\
-        }, \"frr_conf\": \"frr defaults traditional\\nhostname s-router-access-client\\\
-        nservice integrated-vtysh-config\\nlog stdout\\n!\\nip forwarding\\nipv6 forwarding\\\
-        n!\\nrouter bgp 4258700933\\n bgp router-id 10.19.0.2\\n no bgp ebgp-requires-policy\\\
-        n no bgp network import-check\\n neighbor 10.19.0.5 remote-as 4258700933\\\
-        n neighbor 10.19.0.5 update-source lo\\n neighbor fd42:dead:beef:1900::5 remote-as\
-        \ 4258700933\\n neighbor fd42:dead:beef:1900::5 update-source lo\\n !\\n address-family\
-        \ ipv4 unicast\\n  network 10.19.0.2/32\\n  network 10.20.20.0/24\\n  neighbor\
-        \ 10.19.0.5 activate\\n exit-address-family\\n !\\n address-family ipv6 unicast\\\
-        n  network fd42:dead:beef:1900::2/128\\n  network fd42:dead:beef:20::/64\\\
-        n  neighbor fd42:dead:beef:1900::5 activate\\n exit-address-family\\n!\\nline\
-        \ vty\\n!\\n\", \"vtysh_conf\": \"service integrated-vtysh-config\\n\"}'\"\
-        '\"''\"'\"''\"'\"')\nfrr_dir = pathlib.Path('\"'\"'/etc/frr'\"'\"')\nrun_dir\
-        \ = pathlib.Path('\"'\"'/var/run/frr'\"'\"')\nfrr_dir.mkdir(parents=True,\
-        \ exist_ok=True)\nrun_dir.mkdir(parents=True, exist_ok=True)\ndaemon_lines\
-        \ = [f\"{k}={v}\" for k, v in payload['\"'\"'daemons'\"'\"'].items()]\n(frr_dir\
-        \ / '\"'\"'daemons'\"'\"').write_text('\"'\"'\\n'\"'\"'.join(daemon_lines)\
-        \ + '\"'\"'\\n'\"'\"')\n(frr_dir / '\"'\"'frr.conf'\"'\"').write_text(payload['\"\
-        '\"'frr_conf'\"'\"'])\n(frr_dir / '\"'\"'vtysh.conf'\"'\"').write_text(payload['\"\
-        '\"'vtysh_conf'\"'\"'])\nsubprocess.run(['\"'\"'chown'\"'\"', '\"'\"'-R'\"\
-        '\"', '\"'\"'frr:frr'\"'\"', '\"'\"'/etc/frr'\"'\"', '\"'\"'/var/run/frr'\"\
-        '\"'], check=False)\nsubprocess.run(['\"'\"'chmod'\"'\"', '\"'\"'640'\"'\"\
-        ', '\"'\"'/etc/frr/daemons'\"'\"', '\"'\"'/etc/frr/frr.conf'\"'\"', '\"'\"\
-        '/etc/frr/vtysh.conf'\"'\"'], check=False)\nsubprocess.run(['\"'\"'pkill'\"\
-        '\"', '\"'\"'-x'\"'\"', '\"'\"'zebra'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'pkill'\"'\"', '\"'\"'-x'\"'\"', '\"'\"'bgpd'\"'\"'], check=False)\nrestart_cmds\
-        \ = [\n    ['\"'\"'/usr/lib/frr/frrinit.sh'\"'\"', '\"'\"'restart'\"'\"'],\n\
-        \    ['\"'\"'/etc/init.d/frr'\"'\"', '\"'\"'restart'\"'\"'],\n    ['\"'\"\
-        'service'\"'\"', '\"'\"'frr'\"'\"', '\"'\"'restart'\"'\"'],\n]\nfor cmd in\
-        \ restart_cmds:\n    result = subprocess.run(cmd, check=False)\n    if result.returncode\
-        \ == 0:\n        break\nsubprocess.run(['\"'\"'vtysh'\"'\"', '\"'\"'-c'\"\
-        '\"', '\"'\"'show bgp ipv4 summary'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'vtysh'\"'\"', '\"'\"'-c'\"'\"', '\"'\"'show bgp ipv6 summary'\"'\"'],\
-        \ check=False)\nPY\npython3 /tmp/clabgen-frr-bootstrap.py\n'"
     esp0xdeadbeef-site-a-s-router-access-mgmt:
       kind: linux
       image: clab-frr-plus-tooling:latest
@@ -209,65 +175,48 @@ topology:
       - ip -6 addr replace fd42:dead:beef:10::1/64 dev eth2
       - ip addr replace 10.19.0.3/32 dev lo
       - ip -6 addr replace fd42:dead:beef:1900::3/128 dev lo
+      - ip route replace 10.10.0.0/31 via 10.10.0.5 dev eth1 onlink
+      - ip route replace 10.10.0.10/31 via 10.10.0.5 dev eth1 onlink
+      - ip route replace 10.10.0.2/31 via 10.10.0.5 dev eth1 onlink
+      - ip route replace 10.10.0.6/31 via 10.10.0.5 dev eth1 onlink
+      - ip route replace 10.10.0.8/31 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.19.0.1/32 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.19.0.2/32 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.19.0.4/32 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.19.0.5/32 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.19.0.6/32 via 10.10.0.5 dev eth1 onlink
+      - ip route replace 10.19.0.7/32 via 10.10.0.5 dev eth1 onlink
+      - ip route replace 10.20.15.0/24 via 10.10.0.5 dev eth1 onlink
+      - ip route replace 10.20.20.0/24 via 10.10.0.5 dev eth1 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:5 dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:5
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:5
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::/127 via fd42:dead:beef:1000:0:0:0:5
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::2/127 via fd42:dead:beef:1000:0:0:0:5
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::6/127 via fd42:dead:beef:1000:0:0:0:5
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:5
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:5
+        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:5
+        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
       - ip route replace default via 10.10.0.5 dev eth1 onlink
-      - sh -c 'mkdir -p /var/run/frr /etc/frr'
-      - sh -c 'touch /etc/frr/daemons /etc/frr/frr.conf /etc/frr/vtysh.conf'
-      - "sh -c 'cat >/tmp/clabgen-frr-bootstrap.py <<'\"'\"'PY'\"'\"'\nimport json,\
-        \ pathlib, subprocess\npayload = json.loads(r'\"'\"''\"'\"''\"'\"'{\"daemons\"\
-        : {\"zebra\": \"yes\", \"bgpd\": \"yes\", \"ospfd\": \"no\", \"ospf6d\": \"\
-        no\", \"ripd\": \"no\", \"ripngd\": \"no\", \"isisd\": \"no\", \"pimd\": \"\
-        no\", \"pim6d\": \"no\", \"ldpd\": \"no\", \"nhrpd\": \"no\", \"eigrpd\":\
-        \ \"no\", \"babeld\": \"no\", \"sharpd\": \"no\", \"staticd\": \"yes\", \"\
-        bfdd\": \"no\", \"fabricd\": \"no\", \"vrrpd\": \"no\", \"pathd\": \"no\"\
-        }, \"frr_conf\": \"frr defaults traditional\\nhostname s-router-access-mgmt\\\
-        nservice integrated-vtysh-config\\nlog stdout\\n!\\nip forwarding\\nipv6 forwarding\\\
-        n!\\nrouter bgp 4258700933\\n bgp router-id 10.19.0.3\\n no bgp ebgp-requires-policy\\\
-        n no bgp network import-check\\n neighbor 10.19.0.5 remote-as 4258700933\\\
-        n neighbor 10.19.0.5 update-source lo\\n neighbor fd42:dead:beef:1900::5 remote-as\
-        \ 4258700933\\n neighbor fd42:dead:beef:1900::5 update-source lo\\n !\\n address-family\
-        \ ipv4 unicast\\n  network 10.19.0.3/32\\n  network 10.20.10.0/24\\n  neighbor\
-        \ 10.19.0.5 activate\\n exit-address-family\\n !\\n address-family ipv6 unicast\\\
-        n  network fd42:dead:beef:10::/64\\n  network fd42:dead:beef:1900::3/128\\\
-        n  neighbor fd42:dead:beef:1900::5 activate\\n exit-address-family\\n!\\nline\
-        \ vty\\n!\\n\", \"vtysh_conf\": \"service integrated-vtysh-config\\n\"}'\"\
-        '\"''\"'\"''\"'\"')\nfrr_dir = pathlib.Path('\"'\"'/etc/frr'\"'\"')\nrun_dir\
-        \ = pathlib.Path('\"'\"'/var/run/frr'\"'\"')\nfrr_dir.mkdir(parents=True,\
-        \ exist_ok=True)\nrun_dir.mkdir(parents=True, exist_ok=True)\ndaemon_lines\
-        \ = [f\"{k}={v}\" for k, v in payload['\"'\"'daemons'\"'\"'].items()]\n(frr_dir\
-        \ / '\"'\"'daemons'\"'\"').write_text('\"'\"'\\n'\"'\"'.join(daemon_lines)\
-        \ + '\"'\"'\\n'\"'\"')\n(frr_dir / '\"'\"'frr.conf'\"'\"').write_text(payload['\"\
-        '\"'frr_conf'\"'\"'])\n(frr_dir / '\"'\"'vtysh.conf'\"'\"').write_text(payload['\"\
-        '\"'vtysh_conf'\"'\"'])\nsubprocess.run(['\"'\"'chown'\"'\"', '\"'\"'-R'\"\
-        '\"', '\"'\"'frr:frr'\"'\"', '\"'\"'/etc/frr'\"'\"', '\"'\"'/var/run/frr'\"\
-        '\"'], check=False)\nsubprocess.run(['\"'\"'chmod'\"'\"', '\"'\"'640'\"'\"\
-        ', '\"'\"'/etc/frr/daemons'\"'\"', '\"'\"'/etc/frr/frr.conf'\"'\"', '\"'\"\
-        '/etc/frr/vtysh.conf'\"'\"'], check=False)\nsubprocess.run(['\"'\"'pkill'\"\
-        '\"', '\"'\"'-x'\"'\"', '\"'\"'zebra'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'pkill'\"'\"', '\"'\"'-x'\"'\"', '\"'\"'bgpd'\"'\"'], check=False)\nrestart_cmds\
-        \ = [\n    ['\"'\"'/usr/lib/frr/frrinit.sh'\"'\"', '\"'\"'restart'\"'\"'],\n\
-        \    ['\"'\"'/etc/init.d/frr'\"'\"', '\"'\"'restart'\"'\"'],\n    ['\"'\"\
-        'service'\"'\"', '\"'\"'frr'\"'\"', '\"'\"'restart'\"'\"'],\n]\nfor cmd in\
-        \ restart_cmds:\n    result = subprocess.run(cmd, check=False)\n    if result.returncode\
-        \ == 0:\n        break\nsubprocess.run(['\"'\"'vtysh'\"'\"', '\"'\"'-c'\"\
-        '\"', '\"'\"'show bgp ipv4 summary'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'vtysh'\"'\"', '\"'\"'-c'\"'\"', '\"'\"'show bgp ipv6 summary'\"'\"'],\
-        \ check=False)\nPY\npython3 /tmp/clabgen-frr-bootstrap.py\n'"
-    esp0xdeadbeef-site-a-s-router-core-wan:
+    esp0xdeadbeef-site-a-s-router-core-nebula:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -287,14 +236,41 @@ topology:
       - ip -6 addr replace fe80::1/128 dev eth2
       - ip addr replace 10.19.0.4/32 dev lo
       - ip -6 addr replace fd42:dead:beef:1900::4/128 dev lo
+      - ip route replace 10.10.0.0/31 via 10.10.0.7 dev eth1 onlink
+      - ip route replace 10.10.0.10/31 via 10.10.0.7 dev eth1 onlink
+      - ip route replace 10.10.0.2/31 via 10.10.0.7 dev eth1 onlink
+      - ip route replace 10.10.0.4/31 via 10.10.0.7 dev eth1 onlink
+      - ip route replace 10.10.0.8/31 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.19.0.1/32 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.19.0.2/32 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.19.0.3/32 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.19.0.5/32 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.19.0.6/32 via 10.10.0.7 dev eth1 onlink
+      - ip route replace 10.19.0.7/32 via 10.10.0.7 dev eth1 onlink
+      - ip route replace 10.20.10.0/24 via 10.10.0.7 dev eth1 onlink
+      - ip route replace 10.20.15.0/24 via 10.10.0.7 dev eth1 onlink
+      - ip route replace 10.20.20.0/24 via 10.10.0.7 dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:7
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:7
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:7
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::/127 via fd42:dead:beef:1000:0:0:0:7
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::2/127 via fd42:dead:beef:1000:0:0:0:7
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::4/127 via fd42:dead:beef:1000:0:0:0:7
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:7
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:7
+        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:7
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:7
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:7
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:7
         dev eth1 onlink
@@ -302,51 +278,110 @@ topology:
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:7
         dev eth1 onlink
+      - ip route replace 100.64.0.0/32 via 10.19.0.1 dev eth2 onlink
       - ip -6 route replace ::/0 via fd42:dead:beef:1900:0:0:0:1 dev eth2 onlink
+      - ip -6 route replace fd42::/48 via fd42:dead:beef:1900:0:0:0:1 dev eth2 onlink
       - ip route replace default via 10.19.0.1 dev eth2 onlink
-      - ip route replace default via 10.19.0.1 dev eth2 onlink
-      - ip -6 route replace ::/0 via fd42:dead:beef:1900:0:0:0:1 dev eth2 onlink
-      - sh -c 'mkdir -p /var/run/frr /etc/frr'
-      - sh -c 'touch /etc/frr/daemons /etc/frr/frr.conf /etc/frr/vtysh.conf'
-      - "sh -c 'cat >/tmp/clabgen-frr-bootstrap.py <<'\"'\"'PY'\"'\"'\nimport json,\
-        \ pathlib, subprocess\npayload = json.loads(r'\"'\"''\"'\"''\"'\"'{\"daemons\"\
-        : {\"zebra\": \"yes\", \"bgpd\": \"yes\", \"ospfd\": \"no\", \"ospf6d\": \"\
-        no\", \"ripd\": \"no\", \"ripngd\": \"no\", \"isisd\": \"no\", \"pimd\": \"\
-        no\", \"pim6d\": \"no\", \"ldpd\": \"no\", \"nhrpd\": \"no\", \"eigrpd\":\
-        \ \"no\", \"babeld\": \"no\", \"sharpd\": \"no\", \"staticd\": \"yes\", \"\
-        bfdd\": \"no\", \"fabricd\": \"no\", \"vrrpd\": \"no\", \"pathd\": \"no\"\
-        }, \"frr_conf\": \"frr defaults traditional\\nhostname s-router-core-wan\\\
-        nservice integrated-vtysh-config\\nlog stdout\\n!\\nip forwarding\\nipv6 forwarding\\\
-        n!\\nrouter bgp 4258700933\\n bgp router-id 10.19.0.4\\n no bgp ebgp-requires-policy\\\
-        n no bgp network import-check\\n neighbor 10.19.0.5 remote-as 4258700933\\\
-        n neighbor 10.19.0.5 update-source lo\\n neighbor fd42:dead:beef:1900::5 remote-as\
-        \ 4258700933\\n neighbor fd42:dead:beef:1900::5 update-source lo\\n !\\n address-family\
-        \ ipv4 unicast\\n  network 10.19.0.4/32\\n  neighbor 10.19.0.5 activate\\\
-        n exit-address-family\\n !\\n address-family ipv6 unicast\\n  network fd42:dead:beef:1900::4/128\\\
-        n  neighbor fd42:dead:beef:1900::5 activate\\n exit-address-family\\n!\\nline\
-        \ vty\\n!\\n\", \"vtysh_conf\": \"service integrated-vtysh-config\\n\"}'\"\
-        '\"''\"'\"''\"'\"')\nfrr_dir = pathlib.Path('\"'\"'/etc/frr'\"'\"')\nrun_dir\
-        \ = pathlib.Path('\"'\"'/var/run/frr'\"'\"')\nfrr_dir.mkdir(parents=True,\
-        \ exist_ok=True)\nrun_dir.mkdir(parents=True, exist_ok=True)\ndaemon_lines\
-        \ = [f\"{k}={v}\" for k, v in payload['\"'\"'daemons'\"'\"'].items()]\n(frr_dir\
-        \ / '\"'\"'daemons'\"'\"').write_text('\"'\"'\\n'\"'\"'.join(daemon_lines)\
-        \ + '\"'\"'\\n'\"'\"')\n(frr_dir / '\"'\"'frr.conf'\"'\"').write_text(payload['\"\
-        '\"'frr_conf'\"'\"'])\n(frr_dir / '\"'\"'vtysh.conf'\"'\"').write_text(payload['\"\
-        '\"'vtysh_conf'\"'\"'])\nsubprocess.run(['\"'\"'chown'\"'\"', '\"'\"'-R'\"\
-        '\"', '\"'\"'frr:frr'\"'\"', '\"'\"'/etc/frr'\"'\"', '\"'\"'/var/run/frr'\"\
-        '\"'], check=False)\nsubprocess.run(['\"'\"'chmod'\"'\"', '\"'\"'640'\"'\"\
-        ', '\"'\"'/etc/frr/daemons'\"'\"', '\"'\"'/etc/frr/frr.conf'\"'\"', '\"'\"\
-        '/etc/frr/vtysh.conf'\"'\"'], check=False)\nsubprocess.run(['\"'\"'pkill'\"\
-        '\"', '\"'\"'-x'\"'\"', '\"'\"'zebra'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'pkill'\"'\"', '\"'\"'-x'\"'\"', '\"'\"'bgpd'\"'\"'], check=False)\nrestart_cmds\
-        \ = [\n    ['\"'\"'/usr/lib/frr/frrinit.sh'\"'\"', '\"'\"'restart'\"'\"'],\n\
-        \    ['\"'\"'/etc/init.d/frr'\"'\"', '\"'\"'restart'\"'\"'],\n    ['\"'\"\
-        'service'\"'\"', '\"'\"'frr'\"'\"', '\"'\"'restart'\"'\"'],\n]\nfor cmd in\
-        \ restart_cmds:\n    result = subprocess.run(cmd, check=False)\n    if result.returncode\
-        \ == 0:\n        break\nsubprocess.run(['\"'\"'vtysh'\"'\"', '\"'\"'-c'\"\
-        '\"', '\"'\"'show bgp ipv4 summary'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'vtysh'\"'\"', '\"'\"'-c'\"'\"', '\"'\"'show bgp ipv6 summary'\"'\"'],\
-        \ check=False)\nPY\npython3 /tmp/clabgen-frr-bootstrap.py\n'"
+      - sysctl -w net.ipv4.ip_forward=1
+      - sysctl -w net.ipv6.conf.all.forwarding=1
+      - sysctl -w net.ipv4.conf.eth0.forwarding=0
+      - sysctl -w net.ipv6.conf.eth0.forwarding=0
+      - nft flush ruleset
+      - nft add table inet filter
+      - nft 'add chain inet filter input { type filter hook input priority 0 ; policy
+        drop ; }'
+      - nft 'add chain inet filter forward { type filter hook forward priority 0 ;
+        policy accept ; }'
+      - nft 'add chain inet filter output { type filter hook output priority 0 ; policy
+        accept ; }'
+      - nft add rule inet filter input iif lo accept
+      - nft add rule inet filter input ct state established,related accept
+      - nft add rule inet filter input ct state invalid drop
+      - nft add rule inet filter input meta l4proto ipv6-icmp accept
+      - nft add rule inet filter input iifname "eth2" ip saddr { 0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,240.0.0.0/4
+        } drop
+      - nft add rule inet filter input iifname "eth2" ip6 saddr { ::1,fc00::/7,fe80::/10
+        } drop
+      - nft add rule inet filter input iifname != "eth2" tcp dport 22 accept
+      - nft add rule inet filter forward ct state established,related accept
+      - nft add rule inet filter forward ct state invalid drop
+      - nft add rule inet filter forward iifname "eth2" ip saddr { 10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16
+        } drop
+      - nft add rule inet filter forward iifname "eth2" ip6 saddr fc00::/7 drop
+      - nft add table ip nat
+      - nft 'add chain ip nat postrouting { type nat hook postrouting priority srcnat
+        ; policy accept ; }'
+      - nft add rule ip nat postrouting ip saddr { 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+        } oifname "eth2" masquerade
+      - nft add table inet mangle
+      - nft 'add chain inet mangle forward { type filter hook forward priority mangle
+        ; policy accept ; }'
+      - nft add rule inet mangle forward oifname "eth2" tcp flags syn tcp option maxseg
+        size set rt mtu
+    esp0xdeadbeef-site-a-s-router-core-wan:
+      kind: linux
+      image: clab-frr-plus-tooling:latest
+      exec:
+      - sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$i"; done'
+      - ip link set eth1 up
+      - ip link set eth3 up
+      - ip link set eth2 up
+      - ip link set lo up
+      - ip addr replace 10.10.0.8/31 peer 10.10.0.9/31 dev eth1
+      - ip -6 addr replace fd42:dead:beef:1000::8/127 peer fd42:dead:beef:1000::9/127
+        dev eth1
+      - ip addr replace 10.19.0.5/32 dev eth3
+      - ip -6 addr replace fd42:dead:beef:1900::5/128 dev eth3
+      - ip addr replace 10.19.0.2/31 peer 10.19.0.3/31 dev eth2
+      - ip -6 addr replace fd42:dead:beef:1900::2/127 peer fd42:dead:beef:1900::3/127
+        dev eth2
+      - ip -6 addr replace fe80::3/128 dev eth2
+      - ip addr replace 10.19.0.5/32 dev lo
+      - ip -6 addr replace fd42:dead:beef:1900::5/128 dev lo
+      - ip route replace 10.10.0.0/31 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.10.0.10/31 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.10.0.2/31 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.10.0.4/31 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.10.0.6/31 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.19.0.1/32 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.19.0.2/32 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.19.0.3/32 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.19.0.4/32 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.19.0.6/32 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.19.0.7/32 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.20.10.0/24 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.20.15.0/24 via 10.10.0.9 dev eth1 onlink
+      - ip route replace 10.20.20.0/24 via 10.10.0.9 dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::/127 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::2/127 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::4/127 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::6/127 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:9
+        dev eth1 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1900:0:0:0:3 dev eth2 onlink
+      - ip route replace default via 10.19.0.3 dev eth2 onlink
       - sysctl -w net.ipv4.ip_forward=1
       - sysctl -w net.ipv6.conf.all.forwarding=1
       - sysctl -w net.ipv4.conf.eth0.forwarding=0
@@ -403,90 +438,48 @@ topology:
       - ip addr replace 10.10.0.5/31 peer 10.10.0.4/31 dev eth3
       - ip -6 addr replace fd42:dead:beef:1000::5/127 peer fd42:dead:beef:1000::4/127
         dev eth3
-      - ip addr replace 10.10.0.8/31 peer 10.10.0.9/31 dev eth4
-      - ip -6 addr replace fd42:dead:beef:1000::8/127 peer fd42:dead:beef:1000::9/127
+      - ip addr replace 10.10.0.10/31 peer 10.10.0.11/31 dev eth4
+      - ip -6 addr replace fd42:dead:beef:1000::a/127 peer fd42:dead:beef:1000::b/127
         dev eth4
-      - ip addr replace 10.19.0.5/32 dev eth5
-      - ip -6 addr replace fd42:dead:beef:1900::5/128 dev eth5
-      - ip addr replace 10.19.0.5/32 dev lo
-      - ip -6 addr replace fd42:dead:beef:1900::5/128 dev lo
+      - ip addr replace 10.19.0.6/32 dev eth5
+      - ip -6 addr replace fd42:dead:beef:1900::6/128 dev eth5
+      - ip addr replace 10.19.0.6/32 dev lo
+      - ip -6 addr replace fd42:dead:beef:1900::6/128 dev lo
       - ip route replace 10.19.0.1/32 via 10.10.0.0 dev eth1 onlink
+      - ip route replace 10.20.15.0/24 via 10.10.0.0 dev eth1 onlink
+      - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:0
+        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:0
         dev eth1 onlink
       - ip route replace 10.19.0.2/32 via 10.10.0.2 dev eth2 onlink
+      - ip route replace 10.20.20.0/24 via 10.10.0.2 dev eth2 onlink
+      - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:2
+        dev eth2 onlink
       - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:2
         dev eth2 onlink
       - ip route replace 10.19.0.3/32 via 10.10.0.4 dev eth3 onlink
+      - ip route replace 10.20.10.0/24 via 10.10.0.4 dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:4
+        dev eth3 onlink
       - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:4
         dev eth3 onlink
-      - ip route replace 10.19.0.4/32 via 10.10.0.9 dev eth4 onlink
-      - ip route replace 10.19.0.6/32 via 10.10.0.9 dev eth4 onlink
-      - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:9
+      - ip route replace 10.10.0.6/31 via 10.10.0.11 dev eth4 onlink
+      - ip route replace 10.10.0.8/31 via 10.10.0.11 dev eth4 onlink
+      - ip route replace 10.19.0.4/32 via 10.10.0.11 dev eth4 onlink
+      - ip route replace 10.19.0.5/32 via 10.10.0.11 dev eth4 onlink
+      - ip route replace 10.19.0.7/32 via 10.10.0.11 dev eth4 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:b dev eth4 onlink
+      - ip -6 route replace fd42:dead:beef:1000::6/127 via fd42:dead:beef:1000:0:0:0:b
         dev eth4 onlink
-      - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:9
+      - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:b
         dev eth4 onlink
-      - ip route replace default via 10.10.0.9 dev eth4 onlink
-      - sh -c 'mkdir -p /var/run/frr /etc/frr'
-      - sh -c 'touch /etc/frr/daemons /etc/frr/frr.conf /etc/frr/vtysh.conf'
-      - "sh -c 'cat >/tmp/clabgen-frr-bootstrap.py <<'\"'\"'PY'\"'\"'\nimport json,\
-        \ pathlib, subprocess\npayload = json.loads(r'\"'\"''\"'\"''\"'\"'{\"daemons\"\
-        : {\"zebra\": \"yes\", \"bgpd\": \"yes\", \"ospfd\": \"no\", \"ospf6d\": \"\
-        no\", \"ripd\": \"no\", \"ripngd\": \"no\", \"isisd\": \"no\", \"pimd\": \"\
-        no\", \"pim6d\": \"no\", \"ldpd\": \"no\", \"nhrpd\": \"no\", \"eigrpd\":\
-        \ \"no\", \"babeld\": \"no\", \"sharpd\": \"no\", \"staticd\": \"yes\", \"\
-        bfdd\": \"no\", \"fabricd\": \"no\", \"vrrpd\": \"no\", \"pathd\": \"no\"\
-        }, \"frr_conf\": \"frr defaults traditional\\nhostname s-router-policy\\nservice\
-        \ integrated-vtysh-config\\nlog stdout\\n!\\nip forwarding\\nipv6 forwarding\\\
-        n!\\nrouter bgp 4258700933\\n bgp router-id 10.19.0.5\\n no bgp ebgp-requires-policy\\\
-        n no bgp network import-check\\n neighbor 10.19.0.1 remote-as 4258700933\\\
-        n neighbor 10.19.0.1 update-source lo\\n neighbor 10.19.0.2 remote-as 4258700933\\\
-        n neighbor 10.19.0.2 update-source lo\\n neighbor 10.19.0.3 remote-as 4258700933\\\
-        n neighbor 10.19.0.3 update-source lo\\n neighbor 10.19.0.4 remote-as 4258700933\\\
-        n neighbor 10.19.0.4 update-source lo\\n neighbor 10.19.0.6 remote-as 4258700933\\\
-        n neighbor 10.19.0.6 update-source lo\\n neighbor fd42:dead:beef:1900::1 remote-as\
-        \ 4258700933\\n neighbor fd42:dead:beef:1900::1 update-source lo\\n neighbor\
-        \ fd42:dead:beef:1900::2 remote-as 4258700933\\n neighbor fd42:dead:beef:1900::2\
-        \ update-source lo\\n neighbor fd42:dead:beef:1900::3 remote-as 4258700933\\\
-        n neighbor fd42:dead:beef:1900::3 update-source lo\\n neighbor fd42:dead:beef:1900::4\
-        \ remote-as 4258700933\\n neighbor fd42:dead:beef:1900::4 update-source lo\\\
-        n neighbor fd42:dead:beef:1900::6 remote-as 4258700933\\n neighbor fd42:dead:beef:1900::6\
-        \ update-source lo\\n !\\n address-family ipv4 unicast\\n  network 10.19.0.5/32\\\
-        n  neighbor 10.19.0.1 activate\\n  neighbor 10.19.0.1 route-reflector-client\\\
-        n  neighbor 10.19.0.2 activate\\n  neighbor 10.19.0.2 route-reflector-client\\\
-        n  neighbor 10.19.0.3 activate\\n  neighbor 10.19.0.3 route-reflector-client\\\
-        n  neighbor 10.19.0.4 activate\\n  neighbor 10.19.0.4 route-reflector-client\\\
-        n  neighbor 10.19.0.6 activate\\n  neighbor 10.19.0.6 route-reflector-client\\\
-        n exit-address-family\\n !\\n address-family ipv6 unicast\\n  network fd42:dead:beef:1900::5/128\\\
-        n  neighbor fd42:dead:beef:1900::1 activate\\n  neighbor fd42:dead:beef:1900::1\
-        \ route-reflector-client\\n  neighbor fd42:dead:beef:1900::2 activate\\n \
-        \ neighbor fd42:dead:beef:1900::2 route-reflector-client\\n  neighbor fd42:dead:beef:1900::3\
-        \ activate\\n  neighbor fd42:dead:beef:1900::3 route-reflector-client\\n \
-        \ neighbor fd42:dead:beef:1900::4 activate\\n  neighbor fd42:dead:beef:1900::4\
-        \ route-reflector-client\\n  neighbor fd42:dead:beef:1900::6 activate\\n \
-        \ neighbor fd42:dead:beef:1900::6 route-reflector-client\\n exit-address-family\\\
-        n!\\nline vty\\n!\\n\", \"vtysh_conf\": \"service integrated-vtysh-config\\\
-        n\"}'\"'\"''\"'\"''\"'\"')\nfrr_dir = pathlib.Path('\"'\"'/etc/frr'\"'\"')\n\
-        run_dir = pathlib.Path('\"'\"'/var/run/frr'\"'\"')\nfrr_dir.mkdir(parents=True,\
-        \ exist_ok=True)\nrun_dir.mkdir(parents=True, exist_ok=True)\ndaemon_lines\
-        \ = [f\"{k}={v}\" for k, v in payload['\"'\"'daemons'\"'\"'].items()]\n(frr_dir\
-        \ / '\"'\"'daemons'\"'\"').write_text('\"'\"'\\n'\"'\"'.join(daemon_lines)\
-        \ + '\"'\"'\\n'\"'\"')\n(frr_dir / '\"'\"'frr.conf'\"'\"').write_text(payload['\"\
-        '\"'frr_conf'\"'\"'])\n(frr_dir / '\"'\"'vtysh.conf'\"'\"').write_text(payload['\"\
-        '\"'vtysh_conf'\"'\"'])\nsubprocess.run(['\"'\"'chown'\"'\"', '\"'\"'-R'\"\
-        '\"', '\"'\"'frr:frr'\"'\"', '\"'\"'/etc/frr'\"'\"', '\"'\"'/var/run/frr'\"\
-        '\"'], check=False)\nsubprocess.run(['\"'\"'chmod'\"'\"', '\"'\"'640'\"'\"\
-        ', '\"'\"'/etc/frr/daemons'\"'\"', '\"'\"'/etc/frr/frr.conf'\"'\"', '\"'\"\
-        '/etc/frr/vtysh.conf'\"'\"'], check=False)\nsubprocess.run(['\"'\"'pkill'\"\
-        '\"', '\"'\"'-x'\"'\"', '\"'\"'zebra'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'pkill'\"'\"', '\"'\"'-x'\"'\"', '\"'\"'bgpd'\"'\"'], check=False)\nrestart_cmds\
-        \ = [\n    ['\"'\"'/usr/lib/frr/frrinit.sh'\"'\"', '\"'\"'restart'\"'\"'],\n\
-        \    ['\"'\"'/etc/init.d/frr'\"'\"', '\"'\"'restart'\"'\"'],\n    ['\"'\"\
-        'service'\"'\"', '\"'\"'frr'\"'\"', '\"'\"'restart'\"'\"'],\n]\nfor cmd in\
-        \ restart_cmds:\n    result = subprocess.run(cmd, check=False)\n    if result.returncode\
-        \ == 0:\n        break\nsubprocess.run(['\"'\"'vtysh'\"'\"', '\"'\"'-c'\"\
-        '\"', '\"'\"'show bgp ipv4 summary'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'vtysh'\"'\"', '\"'\"'-c'\"'\"', '\"'\"'show bgp ipv6 summary'\"'\"'],\
-        \ check=False)\nPY\npython3 /tmp/clabgen-frr-bootstrap.py\n'"
+      - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:b
+        dev eth4 onlink
+      - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:b
+        dev eth4 onlink
+      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:b
+        dev eth4 onlink
+      - ip route replace default via 10.10.0.11 dev eth4 onlink
       - sysctl -w net.ipv4.ip_forward=1
       - sysctl -w net.ipv6.conf.all.forwarding=1
       - sysctl -w net.ipv4.conf.eth0.forwarding=0
@@ -499,37 +492,6 @@ topology:
       - nft add rule inet fw forward ct state invalid drop
       - nft add rule inet fw forward iifname "eth0" drop
       - nft add rule inet fw forward oifname "eth0" drop
-      - nft add rule inet fw forward iifname "eth3" oifname "eth1" counter accept
-      - nft add rule inet fw forward iifname "eth3" oifname "eth2" counter accept
-      - nft add rule inet fw forward iifname "eth3" oifname "eth1" meta l4proto icmp
-        counter accept
-      - nft add rule inet fw forward iifname "eth3" oifname "eth2" meta l4proto icmp
-        counter accept
-      - nft add rule inet fw forward iifname "eth3" oifname "eth4" meta l4proto icmp
-        counter accept
-      - nft add rule inet fw forward iifname "eth1" oifname "eth2" meta l4proto icmp
-        counter accept
-      - nft add rule inet fw forward iifname "eth1" oifname "eth3" meta l4proto icmp
-        counter accept
-      - nft add rule inet fw forward iifname "eth1" oifname "eth4" meta l4proto icmp
-        counter accept
-      - nft add rule inet fw forward iifname "eth2" oifname "eth1" meta l4proto icmp
-        counter accept
-      - nft add rule inet fw forward iifname "eth2" oifname "eth3" meta l4proto icmp
-        counter accept
-      - nft add rule inet fw forward iifname "eth2" oifname "eth4" meta l4proto icmp
-        counter accept
-      - nft add rule inet fw forward iifname "eth3" oifname "eth4" tcp dport { 80,
-        443 } counter drop
-      - nft add rule inet fw forward iifname "eth1" oifname "eth4" tcp dport { 80,
-        443 } counter drop
-      - nft add rule inet fw forward iifname "eth2" oifname "eth4" tcp dport { 80,
-        443 } counter drop
-      - nft add rule inet fw forward iifname "eth3" oifname "eth4" counter accept
-      - nft add rule inet fw forward iifname "eth1" oifname "eth4" counter accept
-      - nft add rule inet fw forward iifname "eth2" oifname "eth4" counter accept
-      - nft add rule inet fw forward iifname "eth4" oifname "eth3" meta l4proto icmp
-        counter accept
       - nft list table inet fw
     esp0xdeadbeef-site-a-s-router-upstream-selector:
       kind: linux
@@ -539,6 +501,7 @@ topology:
       - ip link set eth1 up
       - ip link set eth2 up
       - ip link set eth3 up
+      - ip link set eth4 up
       - ip link set lo up
       - ip addr replace 10.10.0.7/31 peer 10.10.0.6/31 dev eth1
       - ip -6 addr replace fd42:dead:beef:1000::7/127 peer fd42:dead:beef:1000::6/127
@@ -546,75 +509,60 @@ topology:
       - ip addr replace 10.10.0.9/31 peer 10.10.0.8/31 dev eth2
       - ip -6 addr replace fd42:dead:beef:1000::9/127 peer fd42:dead:beef:1000::8/127
         dev eth2
-      - ip addr replace 10.19.0.6/32 dev eth3
-      - ip -6 addr replace fd42:dead:beef:1900::6/128 dev eth3
-      - ip addr replace 10.19.0.6/32 dev lo
-      - ip -6 addr replace fd42:dead:beef:1900::6/128 dev lo
+      - ip addr replace 10.10.0.11/31 peer 10.10.0.10/31 dev eth3
+      - ip -6 addr replace fd42:dead:beef:1000::b/127 peer fd42:dead:beef:1000::a/127
+        dev eth3
+      - ip addr replace 10.19.0.7/32 dev eth4
+      - ip -6 addr replace fd42:dead:beef:1900::7/128 dev eth4
+      - ip addr replace 10.19.0.7/32 dev lo
+      - ip -6 addr replace fd42:dead:beef:1900::7/128 dev lo
       - ip route replace 10.19.0.4/32 via 10.10.0.6 dev eth1 onlink
+      - ip route replace 100.64.0.0/32 via 10.10.0.6 dev eth1 onlink
       - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:6 dev eth1 onlink
+      - ip -6 route replace fd42::/48 via fd42:dead:beef:1000:0:0:0:6 dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:6
         dev eth1 onlink
-      - ip route replace 10.19.0.1/32 via 10.10.0.8 dev eth2 onlink
-      - ip route replace 10.19.0.2/32 via 10.10.0.8 dev eth2 onlink
-      - ip route replace 10.19.0.3/32 via 10.10.0.8 dev eth2 onlink
       - ip route replace 10.19.0.5/32 via 10.10.0.8 dev eth2 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:8 dev eth2 onlink
       - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:8
         dev eth2 onlink
-      - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:8
-        dev eth2 onlink
-      - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:8
-        dev eth2 onlink
-      - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:8
-        dev eth2 onlink
+      - ip route replace 10.10.0.0/31 via 10.10.0.10 dev eth3 onlink
+      - ip route replace 10.10.0.2/31 via 10.10.0.10 dev eth3 onlink
+      - ip route replace 10.10.0.4/31 via 10.10.0.10 dev eth3 onlink
+      - ip route replace 10.19.0.1/32 via 10.10.0.10 dev eth3 onlink
+      - ip route replace 10.19.0.2/32 via 10.10.0.10 dev eth3 onlink
+      - ip route replace 10.19.0.3/32 via 10.10.0.10 dev eth3 onlink
+      - ip route replace 10.19.0.6/32 via 10.10.0.10 dev eth3 onlink
+      - ip route replace 10.20.10.0/24 via 10.10.0.10 dev eth3 onlink
+      - ip route replace 10.20.15.0/24 via 10.10.0.10 dev eth3 onlink
+      - ip route replace 10.20.20.0/24 via 10.10.0.10 dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:a
+        dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:a
+        dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:a
+        dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:1000::/127 via fd42:dead:beef:1000:0:0:0:a
+        dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:1000::2/127 via fd42:dead:beef:1000:0:0:0:a
+        dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:1000::4/127 via fd42:dead:beef:1000:0:0:0:a
+        dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:a
+        dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:a
+        dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:a
+        dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:a
+        dev eth3 onlink
       - ip route replace default via 10.10.0.6 dev eth1 onlink
-      - ip route replace default via 10.10.0.6 dev eth1 onlink
-      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:6 dev eth1 onlink
-      - sh -c 'mkdir -p /var/run/frr /etc/frr'
-      - sh -c 'touch /etc/frr/daemons /etc/frr/frr.conf /etc/frr/vtysh.conf'
-      - "sh -c 'cat >/tmp/clabgen-frr-bootstrap.py <<'\"'\"'PY'\"'\"'\nimport json,\
-        \ pathlib, subprocess\npayload = json.loads(r'\"'\"''\"'\"''\"'\"'{\"daemons\"\
-        : {\"zebra\": \"yes\", \"bgpd\": \"yes\", \"ospfd\": \"no\", \"ospf6d\": \"\
-        no\", \"ripd\": \"no\", \"ripngd\": \"no\", \"isisd\": \"no\", \"pimd\": \"\
-        no\", \"pim6d\": \"no\", \"ldpd\": \"no\", \"nhrpd\": \"no\", \"eigrpd\":\
-        \ \"no\", \"babeld\": \"no\", \"sharpd\": \"no\", \"staticd\": \"yes\", \"\
-        bfdd\": \"no\", \"fabricd\": \"no\", \"vrrpd\": \"no\", \"pathd\": \"no\"\
-        }, \"frr_conf\": \"frr defaults traditional\\nhostname s-router-upstream-selector\\\
-        nservice integrated-vtysh-config\\nlog stdout\\n!\\nip forwarding\\nipv6 forwarding\\\
-        n!\\nrouter bgp 4258700933\\n bgp router-id 10.19.0.6\\n no bgp ebgp-requires-policy\\\
-        n no bgp network import-check\\n neighbor 10.19.0.5 remote-as 4258700933\\\
-        n neighbor 10.19.0.5 update-source lo\\n neighbor fd42:dead:beef:1900::5 remote-as\
-        \ 4258700933\\n neighbor fd42:dead:beef:1900::5 update-source lo\\n !\\n address-family\
-        \ ipv4 unicast\\n  network 10.19.0.6/32\\n  neighbor 10.19.0.5 activate\\\
-        n exit-address-family\\n !\\n address-family ipv6 unicast\\n  network fd42:dead:beef:1900::6/128\\\
-        n  neighbor fd42:dead:beef:1900::5 activate\\n exit-address-family\\n!\\nline\
-        \ vty\\n!\\n\", \"vtysh_conf\": \"service integrated-vtysh-config\\n\"}'\"\
-        '\"''\"'\"''\"'\"')\nfrr_dir = pathlib.Path('\"'\"'/etc/frr'\"'\"')\nrun_dir\
-        \ = pathlib.Path('\"'\"'/var/run/frr'\"'\"')\nfrr_dir.mkdir(parents=True,\
-        \ exist_ok=True)\nrun_dir.mkdir(parents=True, exist_ok=True)\ndaemon_lines\
-        \ = [f\"{k}={v}\" for k, v in payload['\"'\"'daemons'\"'\"'].items()]\n(frr_dir\
-        \ / '\"'\"'daemons'\"'\"').write_text('\"'\"'\\n'\"'\"'.join(daemon_lines)\
-        \ + '\"'\"'\\n'\"'\"')\n(frr_dir / '\"'\"'frr.conf'\"'\"').write_text(payload['\"\
-        '\"'frr_conf'\"'\"'])\n(frr_dir / '\"'\"'vtysh.conf'\"'\"').write_text(payload['\"\
-        '\"'vtysh_conf'\"'\"'])\nsubprocess.run(['\"'\"'chown'\"'\"', '\"'\"'-R'\"\
-        '\"', '\"'\"'frr:frr'\"'\"', '\"'\"'/etc/frr'\"'\"', '\"'\"'/var/run/frr'\"\
-        '\"'], check=False)\nsubprocess.run(['\"'\"'chmod'\"'\"', '\"'\"'640'\"'\"\
-        ', '\"'\"'/etc/frr/daemons'\"'\"', '\"'\"'/etc/frr/frr.conf'\"'\"', '\"'\"\
-        '/etc/frr/vtysh.conf'\"'\"'], check=False)\nsubprocess.run(['\"'\"'pkill'\"\
-        '\"', '\"'\"'-x'\"'\"', '\"'\"'zebra'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'pkill'\"'\"', '\"'\"'-x'\"'\"', '\"'\"'bgpd'\"'\"'], check=False)\nrestart_cmds\
-        \ = [\n    ['\"'\"'/usr/lib/frr/frrinit.sh'\"'\"', '\"'\"'restart'\"'\"'],\n\
-        \    ['\"'\"'/etc/init.d/frr'\"'\"', '\"'\"'restart'\"'\"'],\n    ['\"'\"\
-        'service'\"'\"', '\"'\"'frr'\"'\"', '\"'\"'restart'\"'\"'],\n]\nfor cmd in\
-        \ restart_cmds:\n    result = subprocess.run(cmd, check=False)\n    if result.returncode\
-        \ == 0:\n        break\nsubprocess.run(['\"'\"'vtysh'\"'\"', '\"'\"'-c'\"\
-        '\"', '\"'\"'show bgp ipv4 summary'\"'\"'], check=False)\nsubprocess.run(['\"\
-        '\"'vtysh'\"'\"', '\"'\"'-c'\"'\"', '\"'\"'show bgp ipv6 summary'\"'\"'],\
-        \ check=False)\nPY\npython3 /tmp/clabgen-frr-bootstrap.py\n'"
+      - ip route replace default via 10.10.0.8 dev eth2 onlink
       - sysctl -w net.ipv4.ip_forward=1
       - sysctl -w net.ipv6.conf.all.forwarding=1
       - sysctl -w net.ipv4.conf.eth0.forwarding=0
       - sysctl -w net.ipv6.conf.eth0.forwarding=0
-    esp0xdeadbeef-site-a-wanp-50fc83d84c0e:
+    esp0xdeadbeef-site-a-wanp-106e2baaad9a:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -623,6 +571,28 @@ topology:
       - ip link set lo up
       - ip addr replace 10.19.0.1/31 peer 10.19.0.0/31 dev eth1
       - ip -6 addr replace fd42:dead:beef:1900::1/127 peer fd42:dead:beef:1900::/127
+        dev eth1
+      - sysctl -w net.ipv4.ip_forward=1
+      - sysctl -w net.ipv6.conf.all.forwarding=1
+      - sysctl -w net.ipv4.ip_forward=1
+      - sysctl -w net.ipv6.conf.all.forwarding=1
+      - sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$i"; done'
+      - nft flush ruleset
+      - nft add table ip nat
+      - nft 'add chain ip nat postrouting { type nat hook postrouting priority 100
+        ; }'
+      - nft add rule ip nat postrouting oifname "eth0" masquerade
+      - ip route flush cache
+      - ip -6 route flush cache
+    esp0xdeadbeef-site-a-wanp-50fc83d84c0e:
+      kind: linux
+      image: clab-frr-plus-tooling:latest
+      exec:
+      - sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$i"; done'
+      - ip link set eth1 up
+      - ip link set lo up
+      - ip addr replace 10.19.0.3/31 peer 10.19.0.2/31 dev eth1
+      - ip -6 addr replace fd42:dead:beef:1900::3/127 peer fd42:dead:beef:1900::2/127
         dev eth1
       - sysctl -w net.ipv4.ip_forward=1
       - sysctl -w net.ipv6.conf.all.forwarding=1
@@ -656,17 +626,29 @@ topology:
       clab.link.type: bridge
       clab.link.bridge: br-6fff74cec0ec
   - endpoints:
-    - esp0xdeadbeef-site-a-s-router-core-wan:eth1
+    - esp0xdeadbeef-site-a-s-router-core-nebula:eth1
     - esp0xdeadbeef-site-a-s-router-upstream-selector:eth1
+    labels:
+      clab.link.type: bridge
+      clab.link.bridge: br-9137ba2a7571
+  - endpoints:
+    - esp0xdeadbeef-site-a-s-router-core-wan:eth1
+    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth2
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-8240a4b630f9
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-policy:eth4
-    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth2
+    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth3
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-4743c4e638ef
+  - endpoints:
+    - esp0xdeadbeef-site-a-s-router-core-nebula:eth2
+    - esp0xdeadbeef-site-a-wanp-106e2baaad9a:eth1
+    labels:
+      clab.link.type: bridge
+      clab.link.bridge: br-1dec167e9f83
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-core-wan:eth2
     - esp0xdeadbeef-site-a-wanp-50fc83d84c0e:eth1
@@ -674,23 +656,29 @@ topology:
       clab.link.type: bridge
       clab.link.bridge: br-e035268ceff9
   - endpoints:
-    - esp0xdeadbeef-site-a-s-router-core-wan:eth3
+    - esp0xdeadbeef-site-a-s-router-core-nebula:eth3
     - host:veth-br-ee5-1c4
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-ee5b4e0a0df0
   - endpoints:
-    - esp0xdeadbeef-site-a-s-router-policy:eth5
+    - esp0xdeadbeef-site-a-s-router-core-wan:eth3
     - host:veth-br-1a5-52b
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-1a5257cd7433
   - endpoints:
-    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth3
+    - esp0xdeadbeef-site-a-s-router-policy:eth5
     - host:veth-br-839-d62
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-839ae6988e3f
+  - endpoints:
+    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth4
+    - host:veth-br-82b-797
+    labels:
+      clab.link.type: bridge
+      clab.link.bridge: br-82bde3c5973f
   - endpoints:
     - esp0xdeadbeef-site-a-client-s-router-access-mgmt-tenant-mgmt:eth1
     - esp0xdeadbeef-site-a-s-router-access-mgmt:eth2
