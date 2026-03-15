@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import os
 from pathlib import Path
 import importlib.util
 
@@ -18,12 +19,23 @@ def _load_parser():
 
 def main() -> None:
     if len(sys.argv) < 4:
-        print("usage: generate-clab-config.py <solver.json> <output.yml> <output-bridges.nix>")
+        print(
+            "usage: generate-clab-config.py <solver.json> <output.yml> <output-bridges.nix> [routing-mode]"
+        )
         raise SystemExit(1)
 
     solver_json = sys.argv[1]
     topology_out = sys.argv[2]
     bridges_out = sys.argv[3]
+
+    routing_mode = os.environ.get("CLABGEN_ROUTING_MODE", "static").strip().lower()
+    if len(sys.argv) >= 5:
+        routing_mode = sys.argv[4].strip().lower()
+
+    if routing_mode not in {"static", "bgp"}:
+        routing_mode = "static"
+
+    os.environ["CLABGEN_ROUTING_MODE"] = routing_mode
 
     parser = _load_parser()
     parser.write_outputs(solver_json, topology_out, bridges_out)

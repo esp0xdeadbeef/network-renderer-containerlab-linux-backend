@@ -91,9 +91,61 @@ def _renderers() -> Dict[str, NodeRenderer]:
     }
 
 
-def _node_extra(site: SiteModel) -> Dict[str, Any]:
-    _ = site
-    return {}
+def _bgp_asn(node_name: str) -> int:
+    digest = hashlib.blake2s(node_name.encode(), digest_size=4).digest()
+    value = int.from_bytes(digest, byteorder="big", signed=False)
+    return 4_200_000_000 + (value % 100_000_000)
+
+
+def _node_extra(site: SiteModel, node_name: str) -> Dict[str, Any]:
+    bgp_neighbors: List[Dict[str, Any]] = []
+
+    for link_name in sorted(site.links.keys()):
+        link = site.links[link_name]
+        endpoints = dict(link.endpoints or {})
+
+        if node_name not in endpoints:
+            continue
+
+        local_ep = endpoints[node_name]
+        if not isinstance(local_ep, dict):
+            continue
+
+        peers = [
+            peer_name
+            for peer_name in endpoints.keys()
+            if peer_name != node_name and peer_name in site.nodes
+        ]
+        if len(peers) != 1:
+            continue
+
+        peer_name = peers[0]
+        peer_ep = endpoints.get(peer_name)
+        if not isinstance(peer_ep, dict):
+            continue
+
+        local_ifname = local_ep.get("interface")
+        if not isinstance(local_ifname, str) or not local_ifname:
+            continue
+
+        bgp_neighbors.append(
+            {
+                "link_name": link_name,
+                "kind": str(link.kind or ""),
+                "local_ifname": local_ifname,
+                "peer_name": peer_name,
+                "peer_asn": _bgp_asn(peer_name),
+                "peer_addr4": peer_ep.get("addr4"),
+                "peer_addr6": peer_ep.get("addr6"),
+            }
+        )
+
+    return {
+        "bgp": {
+            "asn": _bgp_asn(node_name),
+            "neighbors": bgp_neighbors,
+        }
+    }
 
 
 def _render_node(
@@ -106,7 +158,7 @@ def _render_node(
     renderer = _renderers().get(role)
     if renderer is None:
         raise ValueError(f"No Unit renderer for role={role!r} node={node_name!r}")
-    return renderer(site, node_name, node, eth_map, _node_extra(site))
+    return renderer(site, node_name, node, eth_map, _node_extra(site, node_name))
 
 
 def render_units(site: SiteModel) -> Tuple[Dict[str, Any], List[Dict[str, Any]], List[str]]:
@@ -138,7 +190,6 @@ def render_units(site: SiteModel) -> Tuple[Dict[str, Any], List[Dict[str, Any]],
             eth_index = eth_maps[node_name][iface]
             endpoint = f"{node_name}:eth{eth_index}"
             endpoints.append(endpoint)
-
 
         if len(endpoints) == 2:
             bridge = _bridge_name(f"{site.enterprise}-{site.site}-{link_name}")
