@@ -24,7 +24,8 @@
     "network-compiler_2": {
       "inputs": {
         "nixpkgs": [
-          "network-solver",
+          "network-control-plane-model",
+          "network-forwarding-model",
           "nixpkgs"
         ],
         "nixpkgs-network": "nixpkgs-network_2"
@@ -43,25 +44,47 @@
         "type": "github"
       }
     },
-    "network-solver": {
+    "network-control-plane-model": {
+      "inputs": {
+        "network-forwarding-model": "network-forwarding-model",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1773602588,
+        "narHash": "sha256-ZftepFUDINJu2n1UmkhPspwwuTmJuj/rpVEuvFFAQEI=",
+        "owner": "esp0xdeadbeef",
+        "repo": "network-control-plane-model",
+        "rev": "6637654c85048c5f0d968812524416766794d58e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "esp0xdeadbeef",
+        "repo": "network-control-plane-model",
+        "type": "github"
+      }
+    },
+    "network-forwarding-model": {
       "inputs": {
         "network-compiler": "network-compiler_2",
         "nixpkgs": [
+          "network-control-plane-model",
           "nixpkgs"
         ],
         "nixpkgs-network": "nixpkgs-network_3"
       },
       "locked": {
-        "lastModified": 1773455487,
-        "narHash": "sha256-8/Z3bt/nCULxgifUalgLz9uIDkOWQxht0W1dKkOsHvQ=",
+        "lastModified": 1773589608,
+        "narHash": "sha256-qHP4pOUQSzKFl489uiRSm31ZRVjh804TD2cdf7/NFtE=",
         "owner": "esp0xdeadbeef",
-        "repo": "network-solver",
-        "rev": "d059db1a69e898476a904f2fa98b1d10d31bc8d5",
+        "repo": "network-forwarding-model",
+        "rev": "178affb84924e3e5c1522de1b65cbf1ee087c031",
         "type": "github"
       },
       "original": {
         "owner": "esp0xdeadbeef",
-        "repo": "network-solver",
+        "repo": "network-forwarding-model",
         "type": "github"
       }
     },
@@ -132,7 +155,7 @@
     "root": {
       "inputs": {
         "network-compiler": "network-compiler",
-        "network-solver": "network-solver",
+        "network-control-plane-model": "network-control-plane-model",
         "nixpkgs": "nixpkgs"
       }
     }

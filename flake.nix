@@ -1,90 +1,97 @@
+# ./flake.nix
 {
   description = "Containerlab VM host + network renderer";
 
   inputs = {
-    #nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixpkgs.url = "github:NixOS/nixpkgs/0182a361324364ae3f436a63005877674cf45efb";
-    network-solver.url = "github:esp0xdeadbeef/network-solver";
-    network-compiler.url = "github:esp0xdeadbeef/network-compiler";
 
-    network-solver.inputs.nixpkgs.follows = "nixpkgs";
+    network-control-plane-model.url =
+      "github:esp0xdeadbeef/network-control-plane-model";
+
+    network-compiler.url =
+      "github:esp0xdeadbeef/network-compiler";
+
+    network-control-plane-model.inputs.nixpkgs.follows = "nixpkgs";
     network-compiler.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, network-solver, network-compiler }:
-  let
-    system = "x86_64-linux";
-    pkgs = nixpkgs.legacyPackages.${system};
+  outputs = { self, nixpkgs, network-control-plane-model, network-compiler }:
+    let
+      system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
 
-    pythonEnv = pkgs.python3.withPackages (ps: [
-      ps.pyyaml
-      ps.pandas
-    ]);
+      pythonEnv = pkgs.python3.withPackages (ps: [
+        ps.pyyaml
+        ps.pandas
+      ]);
 
-    solverApp =
-      network-solver.apps.${system}.compile-and-solve.program;
-  in
-  {
-    nixosConfigurations.lab = nixpkgs.lib.nixosSystem {
-      inherit system;
-      modules = [ ./vm.nix ];
-    };
+      controlPlaneApp =
+        network-control-plane-model.apps.${system}.control-plane-model.program;
 
-    packages.${system} = {
-      generate-clab-config =
-        pkgs.writeShellApplication {
-          name = "generate-clab-config";
+      rendererScript = pkgs.writeText "generate-clab-config.py"
+        (builtins.readFile ./generate-clab-config.py);
+    in
+    {
+      nixosConfigurations.lab = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [ ./vm.nix ];
+      };
 
-          runtimeInputs = [
-            pythonEnv
-            pkgs.jq
-          ];
+      packages.${system} = {
+        generate-clab-config =
+          pkgs.writeShellApplication {
+            name = "generate-clab-config";
 
-          text = ''
-            set -euo pipefail
+            runtimeInputs = [
+              pythonEnv
+              pkgs.jq
+            ];
 
-            if [ "$#" -lt 1 ]; then
-              echo "Usage: $0 <input.nix> [output-topology.yml] [output-bridges.nix]"
-              exit 1
-            fi
+            text = ''
+              set -euo pipefail
 
-            INPUT_NIX="$1"
-            OUTPUT_JSON="output-solver-signed.json"
-            TOPO_OUT="''${2:-fabric.clab.yml}"
-            BRIDGES_OUT="''${3:-vm-bridges-generated.nix}"
+              if [ "$#" -lt 1 ]; then
+                echo "Usage: $0 <input.nix> [output-topology.yml] [output-bridges.nix]" >&2
+                exit 1
+              fi
 
-            echo "[*] Running solver..."
-            ${solverApp} "$INPUT_NIX" > "$OUTPUT_JSON"
+              INPUT_NIX="$1"
+              CONTROL_JSON="control-plane-model.json"
+              TOPO_OUT="''${2:-fabric.clab.yml}"
+              BRIDGES_OUT="''${3:-vm-bridges-generated.nix}"
 
-            echo "[*] Validating JSON..."
-            jq empty "$OUTPUT_JSON"
+              echo "[*] Running control-plane-model..."
+              ${controlPlaneApp} "$INPUT_NIX" "$CONTROL_JSON"
 
-            echo "[*] Generating Containerlab topology..."
+              echo "[*] Validating JSON..."
+              jq empty "$CONTROL_JSON"
 
-            export PYTHONPYCACHEPREFIX=/tmp/python-cache
+              echo "[*] Generating Containerlab topology..."
 
-            PYTHONPATH="$(pwd)" \
-              ${pythonEnv}/bin/python3 ${./generate-clab-config.py} \
-                "$OUTPUT_JSON" "$TOPO_OUT" "$BRIDGES_OUT"
-          '';
+              export PYTHONPYCACHEPREFIX=/tmp/python-cache
+
+              PYTHONPATH="$(pwd)" \
+              ${pythonEnv}/bin/python3 ${rendererScript} \
+                "$CONTROL_JSON" \
+                "$TOPO_OUT" \
+                "$BRIDGES_OUT"
+            '';
+          };
+
+        default = self.packages.${system}.generate-clab-config;
+      };
+
+      apps.${system} = {
+        generate-clab-config = {
+          type = "app";
+          program =
+            "${self.packages.${system}.generate-clab-config}/bin/generate-clab-config";
         };
-    };
 
-    apps.${system} = {
-      generate-clab-config = {
-        type = "app";
-        program =
-          "${self.packages.${system}.generate-clab-config}/bin/generate-clab-config";
+        default = self.apps.${system}.generate-clab-config;
       };
 
-      default = {
-        type = "app";
-        program =
-          "${self.packages.${system}.generate-clab-config}/bin/generate-clab-config";
-      };
+      defaultPackage.${system} =
+        self.packages.${system}.generate-clab-config;
     };
-
-    defaultPackage.${system} =
-      self.packages.${system}.generate-clab-config;
-  };
 }
