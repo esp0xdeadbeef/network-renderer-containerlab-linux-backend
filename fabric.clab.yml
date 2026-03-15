@@ -2,7 +2,7 @@
 # {
 #   "renderer": {
 #     "gitDirty": true,
-#     "gitRev": "b67e358717536f615abd118fd19c5eaaa4de1f68",
+#     "gitRev": "973f734f37470d79c2dd8136476fa58d5560a09d",
 #     "name": "network-renderer-containerlab-linux-backend",
 #     "schemaVersion": 2
 #   }
@@ -57,7 +57,6 @@ topology:
         dev eth1
       - ip addr replace 10.20.15.1/24 dev eth2
       - ip -6 addr replace fd42:dead:beef:15::1/64 dev eth2
-      - ip route replace 10.10.0.10/31 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.10.0.2/31 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.10.0.4/31 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.10.0.6/31 via 10.10.0.1 dev eth1 onlink
@@ -67,7 +66,6 @@ topology:
       - ip route replace 10.19.0.4/32 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.19.0.5/32 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.19.0.6/32 via 10.10.0.1 dev eth1 onlink
-      - ip route replace 10.19.0.7/32 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.20.10.0/24 via 10.10.0.1 dev eth1 onlink
       - ip route replace 10.20.20.0/24 via 10.10.0.1 dev eth1 onlink
       - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:1 dev eth1 onlink
@@ -83,15 +81,11 @@ topology:
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:1
-        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:1
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:1
         dev eth1 onlink
@@ -111,7 +105,6 @@ topology:
       - ip addr replace 10.20.20.1/24 dev eth2
       - ip -6 addr replace fd42:dead:beef:20::1/64 dev eth2
       - ip route replace 10.10.0.0/31 via 10.10.0.3 dev eth1 onlink
-      - ip route replace 10.10.0.10/31 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.10.0.4/31 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.10.0.6/31 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.10.0.8/31 via 10.10.0.3 dev eth1 onlink
@@ -120,7 +113,6 @@ topology:
       - ip route replace 10.19.0.4/32 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.19.0.5/32 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.19.0.6/32 via 10.10.0.3 dev eth1 onlink
-      - ip route replace 10.19.0.7/32 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.20.10.0/24 via 10.10.0.3 dev eth1 onlink
       - ip route replace 10.20.15.0/24 via 10.10.0.3 dev eth1 onlink
       - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:3 dev eth1 onlink
@@ -136,15 +128,11 @@ topology:
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:3
-        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:3
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:3
         dev eth1 onlink
@@ -164,7 +152,6 @@ topology:
       - ip addr replace 10.20.10.1/24 dev eth2
       - ip -6 addr replace fd42:dead:beef:10::1/64 dev eth2
       - ip route replace 10.10.0.0/31 via 10.10.0.5 dev eth1 onlink
-      - ip route replace 10.10.0.10/31 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.10.0.2/31 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.10.0.6/31 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.10.0.8/31 via 10.10.0.5 dev eth1 onlink
@@ -173,7 +160,6 @@ topology:
       - ip route replace 10.19.0.4/32 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.19.0.5/32 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.19.0.6/32 via 10.10.0.5 dev eth1 onlink
-      - ip route replace 10.19.0.7/32 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.20.15.0/24 via 10.10.0.5 dev eth1 onlink
       - ip route replace 10.20.20.0/24 via 10.10.0.5 dev eth1 onlink
       - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:5 dev eth1 onlink
@@ -189,22 +175,18 @@ topology:
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:5
-        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:5
-        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:5
         dev eth1 onlink
       - ip route replace default via 10.10.0.5 dev eth1 onlink
-    esp0xdeadbeef-site-a-s-router-core-nebula:
+    esp0xdeadbeef-site-a-s-router-core-wan:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -222,7 +204,6 @@ topology:
         dev eth2
       - ip -6 addr replace fe80::1/128 dev eth2
       - ip route replace 10.10.0.0/31 via 10.10.0.7 dev eth1 onlink
-      - ip route replace 10.10.0.10/31 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.10.0.2/31 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.10.0.4/31 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.10.0.8/31 via 10.10.0.7 dev eth1 onlink
@@ -231,7 +212,6 @@ topology:
       - ip route replace 10.19.0.3/32 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.19.0.5/32 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.19.0.6/32 via 10.10.0.7 dev eth1 onlink
-      - ip route replace 10.19.0.7/32 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.20.10.0/24 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.20.15.0/24 via 10.10.0.7 dev eth1 onlink
       - ip route replace 10.20.20.0/24 via 10.10.0.7 dev eth1 onlink
@@ -249,13 +229,9 @@ topology:
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:7
         dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:7
-        dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:7
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:7
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:7
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:7
         dev eth1 onlink
@@ -263,107 +239,8 @@ topology:
         dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:7
         dev eth1 onlink
-      - ip route replace 100.64.0.0/64 via 10.19.0.1 dev eth2 onlink
       - ip -6 route replace ::/0 via fd42:dead:beef:1900:0:0:0:1 dev eth2 onlink
-      - ip -6 route replace fd42::/48 via fd42:dead:beef:1900:0:0:0:1 dev eth2 onlink
       - ip route replace default via 10.19.0.1 dev eth2 onlink
-      - sysctl -w net.ipv4.ip_forward=1
-      - sysctl -w net.ipv6.conf.all.forwarding=1
-      - sysctl -w net.ipv4.conf.eth0.forwarding=0
-      - sysctl -w net.ipv6.conf.eth0.forwarding=0
-      - nft flush ruleset
-      - nft add table inet filter
-      - nft 'add chain inet filter input { type filter hook input priority 0 ; policy
-        drop ; }'
-      - nft 'add chain inet filter forward { type filter hook forward priority 0 ;
-        policy accept ; }'
-      - nft 'add chain inet filter output { type filter hook output priority 0 ; policy
-        accept ; }'
-      - nft add rule inet filter input iif lo accept
-      - nft add rule inet filter input ct state established,related accept
-      - nft add rule inet filter input ct state invalid drop
-      - nft add rule inet filter input meta l4proto ipv6-icmp accept
-      - nft add rule inet filter input iifname "eth2" ip saddr { 0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,240.0.0.0/4
-        } drop
-      - nft add rule inet filter input iifname "eth2" ip6 saddr { ::1,fc00::/7,fe80::/10
-        } drop
-      - nft add rule inet filter input iifname != "eth2" tcp dport 22 accept
-      - nft add rule inet filter forward ct state established,related accept
-      - nft add rule inet filter forward ct state invalid drop
-      - nft add rule inet filter forward iifname "eth2" ip saddr { 10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16
-        } drop
-      - nft add rule inet filter forward iifname "eth2" ip6 saddr fc00::/7 drop
-      - nft add table ip nat
-      - nft 'add chain ip nat postrouting { type nat hook postrouting priority srcnat
-        ; policy accept ; }'
-      - nft add rule ip nat postrouting ip saddr { 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
-        } oifname "eth2" masquerade
-      - nft add table inet mangle
-      - nft 'add chain inet mangle forward { type filter hook forward priority mangle
-        ; policy accept ; }'
-      - nft add rule inet mangle forward oifname "eth2" tcp flags syn tcp option maxseg
-        size set rt mtu
-    esp0xdeadbeef-site-a-s-router-core-wan:
-      kind: linux
-      image: clab-frr-plus-tooling:latest
-      exec:
-      - sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$i"; done'
-      - ip link set eth1 up
-      - ip link set eth3 up
-      - ip link set eth2 up
-      - ip addr replace 10.10.0.8/31 peer 10.10.0.9/31 dev eth1
-      - ip -6 addr replace fd42:dead:beef:1000::8/127 peer fd42:dead:beef:1000::9/127
-        dev eth1
-      - ip addr replace 10.19.0.5/32 dev eth3
-      - ip -6 addr replace fd42:dead:beef:1900::5/128 dev eth3
-      - ip addr replace 10.19.0.2/31 peer 10.19.0.3/31 dev eth2
-      - ip -6 addr replace fd42:dead:beef:1900::2/127 peer fd42:dead:beef:1900::3/127
-        dev eth2
-      - ip -6 addr replace fe80::3/128 dev eth2
-      - ip route replace 10.10.0.0/31 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.10.0.10/31 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.10.0.2/31 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.10.0.4/31 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.10.0.6/31 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.19.0.1/32 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.19.0.2/32 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.19.0.3/32 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.19.0.4/32 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.19.0.6/32 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.19.0.7/32 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.20.10.0/24 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.20.15.0/24 via 10.10.0.9 dev eth1 onlink
-      - ip route replace 10.20.20.0/24 via 10.10.0.9 dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1000::/127 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1000::2/127 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1000::4/127 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1000::6/127 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1000::a/127 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:9
-        dev eth1 onlink
-      - ip -6 route replace ::/0 via fd42:dead:beef:1900:0:0:0:3 dev eth2 onlink
-      - ip route replace default via 10.19.0.3 dev eth2 onlink
       - sysctl -w net.ipv4.ip_forward=1
       - sysctl -w net.ipv6.conf.all.forwarding=1
       - sysctl -w net.ipv4.conf.eth0.forwarding=0
@@ -419,11 +296,11 @@ topology:
       - ip addr replace 10.10.0.5/31 peer 10.10.0.4/31 dev eth3
       - ip -6 addr replace fd42:dead:beef:1000::5/127 peer fd42:dead:beef:1000::4/127
         dev eth3
-      - ip addr replace 10.10.0.10/31 peer 10.10.0.11/31 dev eth4
-      - ip -6 addr replace fd42:dead:beef:1000::a/127 peer fd42:dead:beef:1000::b/127
+      - ip addr replace 10.10.0.8/31 peer 10.10.0.9/31 dev eth4
+      - ip -6 addr replace fd42:dead:beef:1000::8/127 peer fd42:dead:beef:1000::9/127
         dev eth4
-      - ip addr replace 10.19.0.6/32 dev eth5
-      - ip -6 addr replace fd42:dead:beef:1900::6/128 dev eth5
+      - ip addr replace 10.19.0.5/32 dev eth5
+      - ip -6 addr replace fd42:dead:beef:1900::5/128 dev eth5
       - ip route replace 10.19.0.1/32 via 10.10.0.0 dev eth1 onlink
       - ip route replace 10.20.15.0/24 via 10.10.0.0 dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:0
@@ -442,23 +319,17 @@ topology:
         dev eth3 onlink
       - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:4
         dev eth3 onlink
-      - ip route replace 10.10.0.6/31 via 10.10.0.11 dev eth4 onlink
-      - ip route replace 10.10.0.8/31 via 10.10.0.11 dev eth4 onlink
-      - ip route replace 10.19.0.4/32 via 10.10.0.11 dev eth4 onlink
-      - ip route replace 10.19.0.5/32 via 10.10.0.11 dev eth4 onlink
-      - ip route replace 10.19.0.7/32 via 10.10.0.11 dev eth4 onlink
-      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:b dev eth4 onlink
-      - ip -6 route replace fd42:dead:beef:1000::6/127 via fd42:dead:beef:1000:0:0:0:b
+      - ip route replace 10.10.0.6/31 via 10.10.0.9 dev eth4 onlink
+      - ip route replace 10.19.0.4/32 via 10.10.0.9 dev eth4 onlink
+      - ip route replace 10.19.0.6/32 via 10.10.0.9 dev eth4 onlink
+      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:9 dev eth4 onlink
+      - ip -6 route replace fd42:dead:beef:1000::6/127 via fd42:dead:beef:1000:0:0:0:9
         dev eth4 onlink
-      - ip -6 route replace fd42:dead:beef:1000::8/127 via fd42:dead:beef:1000:0:0:0:b
+      - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:9
         dev eth4 onlink
-      - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:b
+      - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:9
         dev eth4 onlink
-      - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:b
-        dev eth4 onlink
-      - ip -6 route replace fd42:dead:beef:1900::7/128 via fd42:dead:beef:1000:0:0:0:b
-        dev eth4 onlink
-      - ip route replace default via 10.10.0.11 dev eth4 onlink
+      - ip route replace default via 10.10.0.9 dev eth4 onlink
       - sysctl -w net.ipv4.ip_forward=1
       - sysctl -w net.ipv6.conf.all.forwarding=1
       - sysctl -w net.ipv4.conf.eth0.forwarding=0
@@ -471,8 +342,37 @@ topology:
       - nft add rule inet fw forward ct state invalid drop
       - nft add rule inet fw forward iifname "eth0" drop
       - nft add rule inet fw forward oifname "eth0" drop
-      - nft add rule inet fw forward iifname "eth2" oifname "eth3" counter drop
+      - nft add rule inet fw forward iifname "eth3" oifname "eth1" counter accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth2" counter accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth1" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth2" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth4" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth2" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth3" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth4" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth2" oifname "eth1" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth2" oifname "eth3" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth2" oifname "eth4" meta l4proto icmp
+        counter accept
+      - nft add rule inet fw forward iifname "eth3" oifname "eth4" tcp dport { 80,
+        443 } counter drop
+      - nft add rule inet fw forward iifname "eth1" oifname "eth4" tcp dport { 80,
+        443 } counter drop
+      - nft add rule inet fw forward iifname "eth2" oifname "eth4" tcp dport { 80,
+        443 } counter drop
+      - nft add rule inet fw forward iifname "eth3" oifname "eth4" counter accept
+      - nft add rule inet fw forward iifname "eth1" oifname "eth4" counter accept
       - nft add rule inet fw forward iifname "eth2" oifname "eth4" counter accept
+      - nft add rule inet fw forward iifname "eth4" oifname "eth3" meta l4proto icmp
+        counter accept
       - nft list table inet fw
     esp0xdeadbeef-site-a-s-router-upstream-selector:
       kind: linux
@@ -482,65 +382,54 @@ topology:
       - ip link set eth1 up
       - ip link set eth2 up
       - ip link set eth3 up
-      - ip link set eth4 up
       - ip addr replace 10.10.0.7/31 peer 10.10.0.6/31 dev eth1
       - ip -6 addr replace fd42:dead:beef:1000::7/127 peer fd42:dead:beef:1000::6/127
         dev eth1
       - ip addr replace 10.10.0.9/31 peer 10.10.0.8/31 dev eth2
       - ip -6 addr replace fd42:dead:beef:1000::9/127 peer fd42:dead:beef:1000::8/127
         dev eth2
-      - ip addr replace 10.10.0.11/31 peer 10.10.0.10/31 dev eth3
-      - ip -6 addr replace fd42:dead:beef:1000::b/127 peer fd42:dead:beef:1000::a/127
-        dev eth3
-      - ip addr replace 10.19.0.7/32 dev eth4
-      - ip -6 addr replace fd42:dead:beef:1900::7/128 dev eth4
+      - ip addr replace 10.19.0.6/32 dev eth3
+      - ip -6 addr replace fd42:dead:beef:1900::6/128 dev eth3
       - ip route replace 10.19.0.4/32 via 10.10.0.6 dev eth1 onlink
-      - ip route replace 100.64.0.0/64 via 10.10.0.6 dev eth1 onlink
       - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:6 dev eth1 onlink
-      - ip -6 route replace fd42::/48 via fd42:dead:beef:1000:0:0:0:6 dev eth1 onlink
       - ip -6 route replace fd42:dead:beef:1900::4/128 via fd42:dead:beef:1000:0:0:0:6
         dev eth1 onlink
+      - ip route replace 10.10.0.0/31 via 10.10.0.8 dev eth2 onlink
+      - ip route replace 10.10.0.2/31 via 10.10.0.8 dev eth2 onlink
+      - ip route replace 10.10.0.4/31 via 10.10.0.8 dev eth2 onlink
+      - ip route replace 10.19.0.1/32 via 10.10.0.8 dev eth2 onlink
+      - ip route replace 10.19.0.2/32 via 10.10.0.8 dev eth2 onlink
+      - ip route replace 10.19.0.3/32 via 10.10.0.8 dev eth2 onlink
       - ip route replace 10.19.0.5/32 via 10.10.0.8 dev eth2 onlink
-      - ip -6 route replace ::/0 via fd42:dead:beef:1000:0:0:0:8 dev eth2 onlink
+      - ip route replace 10.20.10.0/24 via 10.10.0.8 dev eth2 onlink
+      - ip route replace 10.20.15.0/24 via 10.10.0.8 dev eth2 onlink
+      - ip route replace 10.20.20.0/24 via 10.10.0.8 dev eth2 onlink
+      - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:8
+        dev eth2 onlink
+      - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:8
+        dev eth2 onlink
+      - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:8
+        dev eth2 onlink
+      - ip -6 route replace fd42:dead:beef:1000::/127 via fd42:dead:beef:1000:0:0:0:8
+        dev eth2 onlink
+      - ip -6 route replace fd42:dead:beef:1000::2/127 via fd42:dead:beef:1000:0:0:0:8
+        dev eth2 onlink
+      - ip -6 route replace fd42:dead:beef:1000::4/127 via fd42:dead:beef:1000:0:0:0:8
+        dev eth2 onlink
       - ip -6 route replace fd42:dead:beef:1900::5/128 via fd42:dead:beef:1000:0:0:0:8
         dev eth2 onlink
-      - ip route replace 10.10.0.0/31 via 10.10.0.10 dev eth3 onlink
-      - ip route replace 10.10.0.2/31 via 10.10.0.10 dev eth3 onlink
-      - ip route replace 10.10.0.4/31 via 10.10.0.10 dev eth3 onlink
-      - ip route replace 10.19.0.1/32 via 10.10.0.10 dev eth3 onlink
-      - ip route replace 10.19.0.2/32 via 10.10.0.10 dev eth3 onlink
-      - ip route replace 10.19.0.3/32 via 10.10.0.10 dev eth3 onlink
-      - ip route replace 10.19.0.6/32 via 10.10.0.10 dev eth3 onlink
-      - ip route replace 10.20.10.0/24 via 10.10.0.10 dev eth3 onlink
-      - ip route replace 10.20.15.0/24 via 10.10.0.10 dev eth3 onlink
-      - ip route replace 10.20.20.0/24 via 10.10.0.10 dev eth3 onlink
-      - ip -6 route replace fd42:dead:beef:10::/64 via fd42:dead:beef:1000:0:0:0:a
-        dev eth3 onlink
-      - ip -6 route replace fd42:dead:beef:15::/64 via fd42:dead:beef:1000:0:0:0:a
-        dev eth3 onlink
-      - ip -6 route replace fd42:dead:beef:20::/64 via fd42:dead:beef:1000:0:0:0:a
-        dev eth3 onlink
-      - ip -6 route replace fd42:dead:beef:1000::/127 via fd42:dead:beef:1000:0:0:0:a
-        dev eth3 onlink
-      - ip -6 route replace fd42:dead:beef:1000::2/127 via fd42:dead:beef:1000:0:0:0:a
-        dev eth3 onlink
-      - ip -6 route replace fd42:dead:beef:1000::4/127 via fd42:dead:beef:1000:0:0:0:a
-        dev eth3 onlink
-      - ip -6 route replace fd42:dead:beef:1900::6/128 via fd42:dead:beef:1000:0:0:0:a
-        dev eth3 onlink
-      - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:a
-        dev eth3 onlink
-      - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:a
-        dev eth3 onlink
-      - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:a
-        dev eth3 onlink
+      - ip -6 route replace fd42:dead:beef:1900::1/128 via fd42:dead:beef:1000:0:0:0:8
+        dev eth2 onlink
+      - ip -6 route replace fd42:dead:beef:1900::2/128 via fd42:dead:beef:1000:0:0:0:8
+        dev eth2 onlink
+      - ip -6 route replace fd42:dead:beef:1900::3/128 via fd42:dead:beef:1000:0:0:0:8
+        dev eth2 onlink
       - ip route replace default via 10.10.0.6 dev eth1 onlink
-      - ip route replace default via 10.10.0.8 dev eth2 onlink
       - sysctl -w net.ipv4.ip_forward=1
       - sysctl -w net.ipv6.conf.all.forwarding=1
       - sysctl -w net.ipv4.conf.eth0.forwarding=0
       - sysctl -w net.ipv6.conf.eth0.forwarding=0
-    esp0xdeadbeef-site-a-wanp-106e2baaad9a:
+    esp0xdeadbeef-site-a-wanp-50fc83d84c0e:
       kind: linux
       image: clab-frr-plus-tooling:latest
       exec:
@@ -548,27 +437,6 @@ topology:
       - ip link set eth1 up
       - ip addr replace 10.19.0.1/31 peer 10.19.0.0/31 dev eth1
       - ip -6 addr replace fd42:dead:beef:1900::1/127 peer fd42:dead:beef:1900::/127
-        dev eth1
-      - sysctl -w net.ipv4.ip_forward=1
-      - sysctl -w net.ipv6.conf.all.forwarding=1
-      - sysctl -w net.ipv4.ip_forward=1
-      - sysctl -w net.ipv6.conf.all.forwarding=1
-      - sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$i"; done'
-      - nft flush ruleset
-      - nft add table ip nat
-      - nft 'add chain ip nat postrouting { type nat hook postrouting priority 100
-        ; }'
-      - nft add rule ip nat postrouting oifname "eth0" masquerade
-      - ip route flush cache
-      - ip -6 route flush cache
-    esp0xdeadbeef-site-a-wanp-50fc83d84c0e:
-      kind: linux
-      image: clab-frr-plus-tooling:latest
-      exec:
-      - sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$i"; done'
-      - ip link set eth1 up
-      - ip addr replace 10.19.0.3/31 peer 10.19.0.2/31 dev eth1
-      - ip -6 addr replace fd42:dead:beef:1900::3/127 peer fd42:dead:beef:1900::2/127
         dev eth1
       - sysctl -w net.ipv4.ip_forward=1
       - sysctl -w net.ipv6.conf.all.forwarding=1
@@ -602,29 +470,17 @@ topology:
       clab.link.type: bridge
       clab.link.bridge: br-6fff74cec0ec
   - endpoints:
-    - esp0xdeadbeef-site-a-s-router-core-nebula:eth1
-    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth1
-    labels:
-      clab.link.type: bridge
-      clab.link.bridge: br-9137ba2a7571
-  - endpoints:
     - esp0xdeadbeef-site-a-s-router-core-wan:eth1
-    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth2
+    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth1
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-8240a4b630f9
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-policy:eth4
-    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth3
+    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth2
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-4743c4e638ef
-  - endpoints:
-    - esp0xdeadbeef-site-a-s-router-core-nebula:eth2
-    - esp0xdeadbeef-site-a-wanp-106e2baaad9a:eth1
-    labels:
-      clab.link.type: bridge
-      clab.link.bridge: br-1dec167e9f83
   - endpoints:
     - esp0xdeadbeef-site-a-s-router-core-wan:eth2
     - esp0xdeadbeef-site-a-wanp-50fc83d84c0e:eth1
@@ -632,29 +488,23 @@ topology:
       clab.link.type: bridge
       clab.link.bridge: br-e035268ceff9
   - endpoints:
-    - esp0xdeadbeef-site-a-s-router-core-nebula:eth3
+    - esp0xdeadbeef-site-a-s-router-core-wan:eth3
     - host:veth-br-ee5-1c4
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-ee5b4e0a0df0
   - endpoints:
-    - esp0xdeadbeef-site-a-s-router-core-wan:eth3
+    - esp0xdeadbeef-site-a-s-router-policy:eth5
     - host:veth-br-1a5-52b
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-1a5257cd7433
   - endpoints:
-    - esp0xdeadbeef-site-a-s-router-policy:eth5
+    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth3
     - host:veth-br-839-d62
     labels:
       clab.link.type: bridge
       clab.link.bridge: br-839ae6988e3f
-  - endpoints:
-    - esp0xdeadbeef-site-a-s-router-upstream-selector:eth4
-    - host:veth-br-82b-797
-    labels:
-      clab.link.type: bridge
-      clab.link.bridge: br-82bde3c5973f
   - endpoints:
     - esp0xdeadbeef-site-a-client-s-router-access-mgmt-tenant-mgmt:eth1
     - esp0xdeadbeef-site-a-s-router-access-mgmt:eth2
