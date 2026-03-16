@@ -2,7 +2,7 @@
 # {
 #   "renderer": {
 #     "gitDirty": true,
-#     "gitRev": "2757bac35e6fd94f8d00593b7c7d2c2bcdc41c19",
+#     "gitRev": "a2fb81ef3de02d5340520475bc209a8fe05e0fea",
 #     "name": "network-renderer-containerlab-linux-backend",
 #     "schemaVersion": 2
 #   }
@@ -492,6 +492,8 @@ topology:
       - nft add rule inet fw forward ct state invalid drop
       - nft add rule inet fw forward iifname "eth0" drop
       - nft add rule inet fw forward oifname "eth0" drop
+      - nft add rule inet fw forward iifname "eth2" oifname "eth3" counter drop
+      - nft add rule inet fw forward iifname "eth2" oifname "eth4" counter accept
       - nft list table inet fw
     esp0xdeadbeef-site-a-s-router-upstream-selector:
       kind: linux

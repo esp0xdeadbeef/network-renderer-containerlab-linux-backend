@@ -3,7 +3,9 @@ set -euo pipefail
 
 INPUT_NIX="../network-compiler/examples/single-wan/inputs.nix"
 INPUT_NIX="../network-compiler/examples/single-wan/inputs.nix"
-#INPUT_NIX="../network-compiler/examples/single-wan-with-nebula/inputs.nix"
+example_repo=$(nix flake prefetch github:esp0xdeadbeef/network-labs --json | jq -r .storePath)
+
+INPUT_NIX="$example_repo/examples/single-wan-with-nebula/intent.nix"
 TOPO_OUT="fabric.clab.yml"
 BRIDGES_OUT="vm-bridges-generated.nix"
 
