@@ -54,11 +54,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774148486,
-        "narHash": "sha256-8+sh9ZCC18EZFWTFAImvmD1hSl4WeW0IcAFsJrBwlm8=",
+        "lastModified": 1774217732,
+        "narHash": "sha256-gCenTw90YWzZhPIdHaNZmV8on3m3TnMmhrVcVrCy2IY=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "4a5b8add485c27263c1467233ac0c96e787a2034",
+        "rev": "e2e8c76605851413ff4be4ce522287bdc07707c3",
         "type": "github"
       },
       "original": {
