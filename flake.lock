@@ -9,11 +9,11 @@
         "nixpkgs-network": "nixpkgs-network"
       },
       "locked": {
-        "lastModified": 1774108646,
-        "narHash": "sha256-kAYTFYtXsK6iuFh6Y4kqh/A8Ntusqozz+8jzanhXVq8=",
+        "lastModified": 1774147008,
+        "narHash": "sha256-tdokO4YuNpbIQ37mgn+VG4KALtfICnDMpGxte51PIz4=",
         "owner": "esp0xdeadbeef",
         "repo": "network-compiler",
-        "rev": "b267994163df4f1640c40164d4cfd662f8cb1037",
+        "rev": "1511191e0605a9587ba4fb109881b791b30c471f",
         "type": "github"
       },
       "original": {
@@ -33,11 +33,11 @@
         "nixpkgs-network": "nixpkgs-network_2"
       },
       "locked": {
-        "lastModified": 1773612183,
-        "narHash": "sha256-vMCXkKr9qpgFMRU0Tlf9GZxfoM3e6G3KiahThwmey3o=",
+        "lastModified": 1774147008,
+        "narHash": "sha256-tdokO4YuNpbIQ37mgn+VG4KALtfICnDMpGxte51PIz4=",
         "owner": "esp0xdeadbeef",
         "repo": "network-compiler",
-        "rev": "4dc8b32f0fc60c981570de405aab00049a7f8f7e",
+        "rev": "1511191e0605a9587ba4fb109881b791b30c471f",
         "type": "github"
       },
       "original": {
@@ -54,11 +54,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774140226,
-        "narHash": "sha256-E8Y8xOoN3KOGVbdZvBylgm3dNJYVVdOBpdvKm0BuQaU=",
+        "lastModified": 1774148486,
+        "narHash": "sha256-8+sh9ZCC18EZFWTFAImvmD1hSl4WeW0IcAFsJrBwlm8=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "bdb1ff9ea01430e192521be2dd2fd991afa3f639",
+        "rev": "4a5b8add485c27263c1467233ac0c96e787a2034",
         "type": "github"
       },
       "original": {
@@ -77,11 +77,11 @@
         "nixpkgs-network": "nixpkgs-network_3"
       },
       "locked": {
-        "lastModified": 1773613961,
-        "narHash": "sha256-/8cCFJyAvHmdm1N+LICiKuTTGFgaHOvzyv7lp1M9mMw=",
+        "lastModified": 1774148326,
+        "narHash": "sha256-/Lo0Z8pmr5epmHhQLu/p1DWQCZ2G7Jd/dV+mQTFo4P4=",
         "owner": "esp0xdeadbeef",
         "repo": "network-forwarding-model",
-        "rev": "e8ff1479cf40f67d71a1397ca465d313f0f8850f",
+        "rev": "5ab52de8f902ee7fbe9ab43bfe2fc4700570ac6a",
         "type": "github"
       },
       "original": {
