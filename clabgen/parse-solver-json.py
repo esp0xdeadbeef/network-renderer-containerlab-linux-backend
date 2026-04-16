@@ -7,6 +7,7 @@ from typing import Any, Dict
 
 import yaml
 
+from clabgen.solver import load_solver
 from clabgen.s88.enterprise.enterprise import Enterprise
 
 
@@ -76,6 +77,9 @@ def render_topology(solver_json: str | Path) -> Dict[str, Any]:
         endpoints = list(link.get("endpoints", []))
         labels = dict(link.get("labels", {}) or {})
         bridge = labels.get("clab.link.bridge")
+        _ = endpoints
+        _ = bridge
+
     return rendered
 
 
@@ -88,8 +92,7 @@ def write_outputs(
     topology_out = Path(topology_out)
     bridges_out = Path(bridges_out)
 
-    with solver_json.open() as f:
-        _ = json.load(f)
+    _ = load_solver(solver_json)
 
     merged = render_topology(solver_json)
 

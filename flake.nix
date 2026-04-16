@@ -1,97 +1,85 @@
-# ./flake.nix
 {
-  description = "Containerlab VM host + network renderer";
+  description = "network-renderer-containerlab-linux-backend";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/0182a361324364ae3f436a63005877674cf45efb";
-
-    network-control-plane-model.url =
-      "github:esp0xdeadbeef/network-control-plane-model";
-
-    network-compiler.url =
-      "github:esp0xdeadbeef/network-compiler";
-
-    network-control-plane-model.inputs.nixpkgs.follows = "nixpkgs";
-    network-compiler.inputs.nixpkgs.follows = "nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, nixpkgs, network-control-plane-model, network-compiler }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      ...
+    }:
     let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
 
-      pythonEnv = pkgs.python3.withPackages (ps: [
-        ps.pyyaml
-        ps.pandas
-      ]);
-
-      controlPlaneApp =
-        network-control-plane-model.apps.${system}.control-plane-model.program;
-
-      rendererScript = pkgs.writeText "generate-clab-config.py"
-        (builtins.readFile ./generate-clab-config.py);
+      forAllSystems =
+        f:
+        nixpkgs.lib.genAttrs systems (
+          system:
+          f {
+            inherit system;
+            pkgs = import nixpkgs { inherit system; };
+          }
+        );
     in
     {
-      nixosConfigurations.lab = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [ ./vm.nix ];
-      };
-
-      packages.${system} = {
-        generate-clab-config =
-          pkgs.writeShellApplication {
+      packages = forAllSystems (
+        { system, pkgs }:
+        let
+          pythonEnv = pkgs.python3.withPackages (
+            ps: with ps; [
+              pyyaml
+            ]
+          );
+          repoRoot = ./.;
+        in
+        {
+          generate-clab-config = pkgs.writeShellApplication {
             name = "generate-clab-config";
-
             runtimeInputs = [
               pythonEnv
-              pkgs.jq
             ];
-
             text = ''
-              set -euo pipefail
-
-              if [ "$#" -lt 1 ]; then
-                echo "Usage: $0 <input.nix> [output-topology.yml] [output-bridges.nix]" >&2
-                exit 1
-              fi
-
-              INPUT_NIX="$1"
-              CONTROL_JSON="control-plane-model.json"
-              TOPO_OUT="''${2:-fabric.clab.yml}"
-              BRIDGES_OUT="''${3:-vm-bridges-generated.nix}"
-
-              echo "[*] Running control-plane-model..."
-              ${controlPlaneApp} "$INPUT_NIX" "$CONTROL_JSON"
-
-              echo "[*] Validating JSON..."
-              jq empty "$CONTROL_JSON"
-
-              echo "[*] Generating Containerlab topology..."
-
-              export PYTHONPYCACHEPREFIX=/tmp/python-cache
-
-              PYTHONPATH="$(pwd)" \
-              ${pythonEnv}/bin/python3 ${rendererScript} \
-                "$CONTROL_JSON" \
-                "$TOPO_OUT" \
-                "$BRIDGES_OUT"
+              export PYTHONPATH="${repoRoot}:''${PYTHONPATH:+:$PYTHONPATH}"
+              exec ${pythonEnv}/bin/python ${./generate-clab-config.py} "$@"
             '';
           };
 
-        default = self.packages.${system}.generate-clab-config;
-      };
+          start-vm = pkgs.writeShellApplication {
+            name = "start-vm";
+            runtimeInputs = with pkgs; [
+              bash
+              qemu
+            ];
+            text = ''
+              exec ${./start-vm.sh} "$@"
+            '';
+          };
 
-      apps.${system} = {
-        generate-clab-config = {
-          type = "app";
-          program =
-            "${self.packages.${system}.generate-clab-config}/bin/generate-clab-config";
-        };
+          default = self.packages.${system}.generate-clab-config;
+        }
+      );
 
-        default = self.apps.${system}.generate-clab-config;
-      };
+      apps = forAllSystems (
+        { system, ... }:
+        {
+          generate-clab-config = {
+            type = "app";
+            program = "${self.packages.${system}.generate-clab-config}/bin/generate-clab-config";
+          };
 
-      defaultPackage.${system} =
-        self.packages.${system}.generate-clab-config;
+          start-vm = {
+            type = "app";
+            program = "${self.packages.${system}.start-vm}/bin/start-vm";
+          };
+
+          default = self.apps.${system}.generate-clab-config;
+        }
+      );
     };
 }
