@@ -11,13 +11,11 @@ echo "ssh -o 'StrictHostKeyChecking no' -p2222 root@localhost # to connect to th
 
 FLAKE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-SOLVER_INPUT="${FLAKE_DIR}/../network-compiler/examples/multi-wan/inputs.nix"
-SOLVER_JSON="${FLAKE_DIR}/output-solver-signed.json"
 TOPO_FILE="${FLAKE_DIR}/fabric.clab.yml"
 BRIDGES_FILE="${FLAKE_DIR}/vm-bridges-generated.nix"
 
-if [ ! -f "${SOLVER_JSON}" ] || [ ! -f "${BRIDGES_FILE}" ]; then
-  echo "[*] Generating solver JSON, topology and bridges..."
+if [ ! -f "${TOPO_FILE}" ] || [ ! -f "${BRIDGES_FILE}" ]; then
+  echo "[*] Generating Containerlab topology + bridges..."
   ./run-clab-generator.sh
 fi
 

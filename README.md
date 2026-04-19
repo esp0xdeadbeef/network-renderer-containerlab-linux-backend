@@ -14,24 +14,29 @@ The internal model and schema may change between versions.
 Backward compatibility is not guaranteed.
 
 
-# Network Compiler → Solver → Containerlab Renderer
+# Control-plane model → Containerlab renderer
 
-This project generates a Containerlab network topology from a high level
-network model.
+This project generates a Containerlab topology (and a small Nix snippet for VM bridge setup) from an explicit **control-plane model** JSON.
 
 Pipeline:
 
-network-compiler -> network-solver -> renderer
+intent + inventory
+  -> compiler
+  -> forwarding model
+  -> control-plane model
+  -> this renderer
 
 
 ## Repositories
 
-Clone the required repositories:
+If you want to run the full pipeline locally, clone these repos side-by-side:
 
 ```bash
 git clone https://github.com/esp0xdeadbeef/network-compiler
-git clone https://github.com/esp0xdeadbeef/network-solver
+git clone https://github.com/esp0xdeadbeef/network-forwarding-model
+git clone https://github.com/esp0xdeadbeef/network-control-plane-model
 git clone https://github.com/esp0xdeadbeef/network-renderer-containerlab-linux-backend
+git clone https://github.com/esp0xdeadbeef/network-labs
 ```
 
 
@@ -40,35 +45,25 @@ git clone https://github.com/esp0xdeadbeef/network-renderer-containerlab-linux-b
 Nix with flakes enabled.
 
 
-## Step 1 — Compile
+## Step 1 — Build a control-plane model JSON
+
+From a lab `intent.nix` + `inventory.nix` (for example from `network-labs/examples/...`):
 
 ```bash
-cd network-compiler
-nix run .#compile -- examples/multi-wan/inputs.nix
+nix run ../network-control-plane-model#compile-and-build-control-plane-model -- \
+  ../network-labs/examples/single-wan/intent.nix \
+  ../network-labs/examples/single-wan/inventory.nix \
+  ./output-control-plane-model.json
 ```
 
-This produces:
-
-output-compiler-signed.json
-
-
-## Step 2 — Solve
-
-```bash
-cd ../network-solver
-nix run .#compile-and-solve -- ../network-compiler/examples/multi-wan/inputs.nix
-```
-
-This produces:
-
-output-solver-signed.json
-
-
-## Step 3 — Render Containerlab topology
+## Step 2 — Render Containerlab topology
 
 ```bash
 cd ../network-renderer-containerlab-linux-backend
-./run-clab-generator.sh
+nix run .#generate-clab-config -- \
+  ./output-control-plane-model.json \
+  ./fabric.clab.yml \
+  ./vm-bridges-generated.nix
 ```
 
 This generates:
@@ -77,10 +72,9 @@ fabric.clab.yml
 vm-bridges-generated.nix
 
 
-## Step 4 — Start VM
+## Step 3 — Start VM
 
 ```bash
-# this will recompile all inputs with ./run-clab-generator (edit ./run-clab-generator.sh to change the inputs)
 ./start-vm.sh
 ```
 
@@ -93,7 +87,11 @@ ssh -o "StrictHostKeyChecking no" -p2222 root@localhost
 
 ## Notes
 
-Current routing: static routes
+Routing / control-plane behavior is owned by upstream stages (forwarding model + inventory + control-plane model).
+
+This renderer should be a pure consumer of the control-plane model JSON: it should not “choose a mode” (static vs BGP, etc).
+
+TODO: remove the renderer-side routing-mode toggle and drive any such decisions from explicit control-plane-model input only.
 
 Router roles:
 
