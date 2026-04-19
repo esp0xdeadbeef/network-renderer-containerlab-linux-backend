@@ -104,51 +104,16 @@ def _loopback_ip(value: str | None) -> str | None:
 
 def _node_extra(site: SiteModel, node_name: str) -> Dict[str, Any]:
     node = site.nodes[node_name]
-    neighbors: List[Dict[str, Any]] = []
-
-    for session in site.bgp_sessions:
-        a = session.get("a")
-        b = session.get("b")
-        rr = session.get("rr")
-
-        if node_name not in {a, b}:
-            continue
-
-        peer_name = b if node_name == a else a
-        if not isinstance(peer_name, str) or peer_name not in site.nodes:
-            continue
-
-        peer = site.nodes[peer_name]
-
-        neighbors.append(
-            {
-                "peer_name": peer_name,
-                "peer_asn": site.bgp_asn,
-                "peer_addr4": peer.loopback4,
-                "peer_addr6": peer.loopback6,
-                "update_source": "lo",
-                "route_reflector_client": bool(node_name == rr and peer_name != rr),
-            }
-        )
-
-    neighbors = sorted(
-        neighbors,
-        key=lambda item: (
-            str(item.get("peer_name") or ""),
-            str(item.get("peer_addr4") or ""),
-            str(item.get("peer_addr6") or ""),
-        ),
-    )
+    bgp = getattr(node, "bgp", {}) or {}
+    if not isinstance(bgp, dict):
+        bgp = {}
 
     return {
         "loopback": {
             "ipv4": node.loopback4,
             "ipv6": node.loopback6,
         },
-        "bgp": {
-            "asn": site.bgp_asn,
-            "neighbors": neighbors,
-        },
+        "bgp": bgp,
     }
 
 

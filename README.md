@@ -96,7 +96,8 @@ Routing / control-plane behavior is owned by upstream stages (forwarding model +
 
 This renderer should be a pure consumer of the control-plane model JSON: it should not “choose a mode” (static vs BGP, etc).
 
-TODO: remove the renderer-side routing-mode toggle and drive any such decisions from explicit control-plane-model input only.
+Routing mode is driven from explicit control-plane-model input (`runtimeTargets.*.routingMode` and optional `runtimeTargets.*.bgp`),
+not from renderer environment variables.
 
 Router roles:
 

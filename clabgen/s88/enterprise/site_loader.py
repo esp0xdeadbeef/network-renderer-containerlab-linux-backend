@@ -185,11 +185,21 @@ def _build_nodes(
         interfaces = _build_interfaces(site, unit, node_obj, tenant_prefix_owners)
         loopback4, loopback6 = _loopback_addrs(node_obj)
 
+        routing_mode = str(node_obj.get("routing_mode", "static")).strip().lower()
+        if routing_mode not in {"static", "bgp"}:
+            routing_mode = "static"
+
+        bgp = node_obj.get("bgp", {})
+        if not isinstance(bgp, dict):
+            bgp = {}
+
         nodes[unit] = NodeModel(
             name=unit,
             role=node_obj.get("role", ""),
             routing_domain=node_obj.get("routingDomain", ""),
             interfaces=interfaces,
+            routing_mode=routing_mode,
+            bgp=bgp,
             containers=list(node_obj.get("containers", [])),
             isolated=bool(node_obj.get("isolated", False)),
             loopback4=loopback4,

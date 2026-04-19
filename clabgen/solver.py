@@ -169,6 +169,8 @@ def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
         nodes[node_name] = {
             "role": rt.get("role") or "",
             "routingDomain": rt.get("routingDomain") or "",
+            "routing_mode": rt.get("routingMode") or rt.get("routing_mode") or "static",
+            "bgp": rt.get("bgp") or {},
             "interfaces": iface_out,
             "containers": rt.get("containers") or [],
             "isolated": rt.get("isolated") or False,
