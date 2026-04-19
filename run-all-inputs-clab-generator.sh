@@ -31,9 +31,21 @@ fi
 
 cpm_repo="${repo_root}/../network-control-plane-model"
 cpm_app="github:esp0xdeadbeef/network-control-plane-model#compile-and-build-control-plane-model"
-if [[ -d "$cpm_repo" ]]; then
-  cpm_app="path:${cpm_repo}#compile-and-build-control-plane-model"
-fi
+
+# NOTE: On some Nix/libgit2 combinations, `nix run path:/some/git/repo#...` can fail when the
+# flake is a git checkout (ownership checks against a /nix/store copy). Running from within
+# the repo (`nix run .#...`) avoids that and keeps local dev workflows working.
+cpm_run() {
+  local intent="$1"
+  local inventory="$2"
+  local out="$3"
+
+  if [[ -d "$cpm_repo" ]]; then
+    ( cd "$cpm_repo" && nix run .#compile-and-build-control-plane-model -- "$intent" "$inventory" "$out" )
+  else
+    nix run "$cpm_app" -- "$intent" "$inventory" "$out"
+  fi
+}
 
 mkdir -p "$out_root"
 
@@ -59,7 +71,7 @@ for example_dir in "$labs_root"/*; do
 
     mkdir -p "$out_root/$name"
 
-    nix run "$cpm_app" -- "$intent" "$inventory" "$cpm_json" >/dev/null
+    cpm_run "$intent" "$inventory" "$cpm_json" >/dev/null
 
     nix run "path:${repo_root}#generate-clab-config" -- "$cpm_json" "$topo_out" "$bridges_out" >/dev/null
 

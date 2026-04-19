@@ -8,6 +8,7 @@ from clabgen.models import SiteModel, NodeModel
 from clabgen.s88.Unit.access import render as render_access
 from clabgen.s88.Unit.client import render as render_client
 from clabgen.s88.Unit.core import render as render_core
+from clabgen.s88.Unit.downstream_selector import render as render_downstream_selector
 from clabgen.s88.Unit.policy import render as render_policy
 from clabgen.s88.Unit.upstream_selector import render as render_upstream_selector
 from clabgen.s88.Unit.wan_peer import render as render_wan_peer
@@ -85,6 +86,7 @@ def _renderers() -> Dict[str, NodeRenderer]:
         "access": render_access,
         "client": render_client,
         "core": render_core,
+        "downstream-selector": render_downstream_selector,
         "policy": render_policy,
         "upstream-selector": render_upstream_selector,
         "wan-peer": render_wan_peer,

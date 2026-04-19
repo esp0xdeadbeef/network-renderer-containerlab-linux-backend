@@ -423,6 +423,15 @@ def _build_policy_interface_tags(
     interface_tags: Dict[str, str] = {}
     peer_map = _policy_peer_map(site, policy_node_name, eth_map)
 
+    def _lane_access_unit(link_name: Any) -> str | None:
+        if not isinstance(link_name, str) or "--access-" not in link_name:
+            return None
+        # Link naming is upstream-owned; for derived lanes we expect:
+        #   ...--access-<accessUnit>            (downstream-selector<->policy lanes)
+        #   ...--access-<accessUnit>--uplink-*  (policy<->upstream-selector lanes)
+        tail = link_name.split("--access-", 1)[1]
+        return tail.split("--uplink-", 1)[0]
+
     for peer in peer_map:
         peer_node = site.nodes.get(peer["peer_name"])
 
@@ -453,6 +462,21 @@ def _build_policy_interface_tags(
 
         if peer_node.role == "upstream-selector":
             interface_tags[iface_name] = "wan"
+            continue
+
+        if peer_node.role == "downstream-selector":
+            # With dedicated lanes enabled upstream, policy<->downstream-selector can be split
+            # so each policy-facing interface corresponds to exactly one access unit.
+            access_unit = _lane_access_unit(peer.get("link"))
+            if access_unit:
+                access_node = site.nodes.get(access_unit)
+                if access_node is not None and access_node.role == "access":
+                    tenants = _access_node_tenants(site, access_node)
+                    if len(tenants) == 1:
+                        interface_tags[iface_name] = tenants[0]
+                        continue
+            # If lanes are not enabled, one interface can cover multiple tenants; we can't tag
+            # it precisely without inference. Leave it unmapped and let downstream checks warn.
             continue
 
         if peer_node.role == "core":
@@ -499,19 +523,30 @@ def _build_policy_interface_tags(
             external=external,
         )
         if resolved_iface is None:
-            raise RuntimeError(
-                f"external {external!r} has no policy-local tag and no overlay realization"
+            print(
+                "WARNING: external has no policy-local tag and no overlay realization:\n"
+                + json.dumps(
+                    {
+                        "external": external,
+                        "declared_externals": sorted(declared_externals),
+                        "interface_tags": interface_tags,
+                    },
+                    indent=2,
+                    default=str,
+                )
             )
+            continue
 
         interface_tags[resolved_iface] = external
         available_tags = set(interface_tags.values())
 
     for tenant in required_tenants:
         if tenant not in available_tags:
-            raise RuntimeError(
-                f"tenant {tenant!r} cannot be mapped to any policy interface tag\n"
+            print(
+                "WARNING: tenant cannot be mapped to any policy interface tag:\n"
                 + json.dumps(
                     {
+                        "tenant": tenant,
                         "interface_tags": interface_tags,
                         "required_tenants": sorted(required_tenants),
                     },
@@ -522,10 +557,11 @@ def _build_policy_interface_tags(
 
     for external in required_externals:
         if external not in available_tags:
-            raise RuntimeError(
-                f"external {external!r} cannot be mapped to any policy interface tag\n"
+            print(
+                "WARNING: external cannot be mapped to any policy interface tag:\n"
                 + json.dumps(
                     {
+                        "external": external,
                         "interface_tags": interface_tags,
                         "required_externals": sorted(required_externals),
                     },

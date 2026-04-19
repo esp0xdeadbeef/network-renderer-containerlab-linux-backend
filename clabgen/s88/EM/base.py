@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from .roles import (
     parse_access,
     parse_core,
+    parse_downstream_selector,
     parse_policy,
     parse_upstream_selector,
     parse_wan_peer,
@@ -33,6 +34,9 @@ def _parse(
     if r == "upstream-selector":
         return parse_upstream_selector(node_name, node_data, eth_map)
 
+    if r == "downstream-selector":
+        return parse_downstream_selector(node_name, node_data, eth_map)
+
     if r == "wan-peer":
         return parse_wan_peer(node_name, node_data, eth_map)
 
@@ -46,12 +50,12 @@ def _default_cm_inputs(
 ) -> Dict[str, Any]:
     cm_inputs: Dict[str, Any] = {}
 
-    if role in {"core", "policy", "upstream-selector", "wan-peer", "isp"}:
-        cm_inputs["forwarding"] = {
-            "enable_ipv4": True,
-            "enable_ipv6": True,
-            "disable_eth0": role not in {"wan-peer", "isp"},
-        }
+    if role in {"core", "downstream-selector", "policy", "upstream-selector", "wan-peer", "isp"}:
+      cm_inputs["forwarding"] = {
+        "enable_ipv4": True,
+        "enable_ipv6": True,
+        "disable_eth0": role not in {"wan-peer", "isp"},
+      }
 
     if role == "core":
         wan_link = ((parsed.get("links") or {}).get("wan") or {})

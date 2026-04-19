@@ -9,7 +9,7 @@ from clabgen.models import NodeModel
 from clabgen.s88.EM.base import render as render_em
 
 
-_ROUTER_ROLES = {"access", "core", "policy", "upstream-selector", "isp"}
+_ROUTER_ROLES = {"access", "core", "downstream-selector", "policy", "upstream-selector", "isp"}
 
 
 def _routing_mode() -> str:

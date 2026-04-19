@@ -14,6 +14,7 @@ CM_BY_ROLE: Dict[str, List[tuple[str, Callable[[Dict[str, Any]], List[str]]]]] =
     "client": [("empty", render_empty)],
     "core": [("forwarding", render_forwarding), ("wan_firewall", render_wan_firewall)],
     "policy": [("forwarding", render_forwarding), ("firewall", render_firewall)],
+    "downstream-selector": [("forwarding", render_forwarding)],
     "upstream-selector": [("forwarding", render_forwarding)],
     "wan-peer": [("forwarding", render_forwarding), ("nat", render_nat)],
     "isp": [("forwarding", render_forwarding)],

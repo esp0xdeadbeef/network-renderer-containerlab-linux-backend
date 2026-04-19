@@ -102,6 +102,26 @@ def parse_upstream_selector(
     }
 
 
+def parse_downstream_selector(
+    node_name: str,
+    node_data: Dict[str, Any],
+    eth_map: Dict[str, int],
+) -> Dict[str, Any]:
+    _ = node_data
+    items = _sorted_ifaces(eth_map)
+
+    # By convention: a downstream-selector has multiple access-facing links and one policy-facing link.
+    return {
+        "node": node_name,
+        "role": "downstream-selector",
+        "links": {
+            "policy": _maybe_link(items, 0),
+            "accesses": _links(items[1:]) if len(items) > 1 else [],
+            "all": _links(items),
+        },
+    }
+
+
 def parse_policy(
     node_name: str,
     node_data: Dict[str, Any],

@@ -63,7 +63,187 @@ def _parse_json_candidates(path: Path, raw: str) -> Dict[str, Any]:
 
 def load_solver(path: Path) -> Dict[str, Any]:
     raw = path.read_text()
-    return _parse_json_candidates(path, raw)
+    parsed = _parse_json_candidates(path, raw)
+
+    # Accept CPM JSON directly (control-plane model), and adapt it into the older
+    # "solver JSON" shape expected by the rest of clabgen.
+    if isinstance(parsed, dict) and "control_plane_model" in parsed:
+        return _control_plane_model_to_solver_json(parsed)
+
+    return parsed
+
+
+def _control_plane_model_to_solver_json(root: Dict[str, Any]) -> Dict[str, Any]:
+    cpm = root.get("control_plane_model")
+    if not isinstance(cpm, dict):
+        raise ValueError("'control_plane_model' must be an object")
+
+    data = cpm.get("data")
+    if not isinstance(data, dict):
+        raise ValueError("'control_plane_model.data' must be an object")
+
+    enterprise_out: Dict[str, Any] = {}
+
+    for enterprise, sites_obj in data.items():
+        if not isinstance(enterprise, str) or not enterprise:
+            continue
+        if not isinstance(sites_obj, dict):
+            raise ValueError(f"control_plane_model.data.{enterprise} must be an object")
+
+        site_out: Dict[str, Any] = {}
+
+        for site_name, site_obj in sites_obj.items():
+            if not isinstance(site_name, str) or not site_name:
+                continue
+            if not isinstance(site_obj, dict):
+                raise ValueError(
+                    f"control_plane_model.data.{enterprise}.{site_name} must be an object"
+                )
+
+            site_out[site_name] = _cpm_site_to_solver_site(site_obj)
+
+        enterprise_out[enterprise] = {"site": site_out}
+
+    meta = {
+        "control_plane_model": cpm.get("meta", {}),
+        "control_plane_model_version": cpm.get("version"),
+    }
+
+    return {
+        "enterprise": enterprise_out,
+        "meta": meta,
+    }
+
+
+def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
+    runtime_targets = site.get("runtimeTargets")
+    if not isinstance(runtime_targets, dict):
+        raise ValueError("control_plane_model site must include runtimeTargets object")
+
+    nodes: Dict[str, Any] = {}
+    links: Dict[str, Any] = {}
+
+    # Nodes + their realized interfaces.
+    for rt_name, rt in runtime_targets.items():
+        if not isinstance(rt, dict):
+            continue
+
+        logical = rt.get("logicalNode") or {}
+        if not isinstance(logical, dict):
+            logical = {}
+        node_name = logical.get("name")
+        if not isinstance(node_name, str) or not node_name:
+            continue
+
+        realized = rt.get("effectiveRuntimeRealization") or {}
+        if not isinstance(realized, dict):
+            realized = {}
+
+        ifaces = realized.get("interfaces") or {}
+        if not isinstance(ifaces, dict):
+            ifaces = {}
+
+        iface_out: Dict[str, Any] = {}
+        for if_key, iface in ifaces.items():
+            if not isinstance(if_key, str) or not if_key:
+                continue
+            if not isinstance(iface, dict):
+                continue
+
+            kind = iface.get("sourceKind") or iface.get("kind")
+            iface_out[if_key] = {
+                "addr4": iface.get("addr4"),
+                "addr6": iface.get("addr6"),
+                "ll6": iface.get("ll6"),
+                "routes": iface.get("routes") or {},
+                "kind": kind,
+                "upstream": iface.get("upstream") or iface.get("uplink"),
+                "tenant": iface.get("tenant"),
+                "overlay": iface.get("overlay"),
+            }
+
+        loopback = realized.get("loopback") or {}
+        if not isinstance(loopback, dict):
+            loopback = {}
+
+        nodes[node_name] = {
+            "role": rt.get("role") or "",
+            "routingDomain": rt.get("routingDomain") or "",
+            "interfaces": iface_out,
+            "containers": rt.get("containers") or [],
+            "isolated": rt.get("isolated") or False,
+            "loopback": {
+                "ipv4": loopback.get("addr4"),
+                "ipv6": loopback.get("addr6"),
+            },
+        }
+
+        # WAN links are not part of transit.adjacencies; synthesize link objects so the
+        # existing WAN-peer injection logic can attach something to those interfaces.
+        for if_key, iface in iface_out.items():
+            if iface.get("kind") != "wan":
+                continue
+
+            link_name = f"wan-{node_name}-{if_key}"
+
+            links[link_name] = {
+                "kind": "wan",
+                "endpoints": {
+                    node_name: {
+                        "node": node_name,
+                        "interface": if_key,
+                        "upstream": iface.get("upstream"),
+                        "uplink": iface.get("upstream"),
+                        "peerAddr4": None,
+                        "peerAddr6": None,
+                    }
+                },
+            }
+
+    # Transit p2p links (lane-aware).
+    transit = site.get("transit") or {}
+    if not isinstance(transit, dict):
+        transit = {}
+    adjacencies = transit.get("adjacencies") or []
+    if not isinstance(adjacencies, list):
+        adjacencies = []
+
+    for adj in adjacencies:
+        if not isinstance(adj, dict):
+            continue
+
+        link_name = adj.get("link") or adj.get("name")
+        if not isinstance(link_name, str) or not link_name:
+            continue
+
+        endpoints_out: Dict[str, Any] = {}
+        endpoints = adj.get("endpoints") or []
+        if not isinstance(endpoints, list):
+            endpoints = []
+
+        for ep in endpoints:
+            if not isinstance(ep, dict):
+                continue
+            unit = ep.get("unit")
+            if not isinstance(unit, str) or not unit:
+                continue
+
+            endpoints_out[unit] = {
+                "node": unit,
+                "interface": link_name,
+            }
+
+        links[link_name] = {
+            "kind": adj.get("kind") or "p2p",
+            "endpoints": endpoints_out,
+        }
+
+    # Preserve the non-realization parts the unit renderers expect.
+    out = dict(site)
+    out["nodes"] = nodes
+    out["links"] = links
+
+    return out
 
 
 def extract_enterprise_sites(data: Dict[str, Any]) -> Iterable[Tuple[str, str, Dict[str, Any]]]:
