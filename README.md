@@ -50,10 +50,15 @@ Nix with flakes enabled.
 From a lab `intent.nix` + `inventory.nix` (for example from `network-labs/examples/...`):
 
 ```bash
-nix run ../network-control-plane-model#compile-and-build-control-plane-model -- \
-  ../network-labs/examples/single-wan/intent.nix \
-  ../network-labs/examples/single-wan/inventory.nix \
-  ./output-control-plane-model.json
+OUT_DIR="$(pwd)"
+LABS_DIR="$(cd ../network-labs && pwd)"
+(
+  cd ../network-control-plane-model
+  nix run .#compile-and-build-control-plane-model -- \
+    "$LABS_DIR/examples/single-wan/intent.nix" \
+    "$LABS_DIR/examples/single-wan/inventory.nix" \
+    "$OUT_DIR/output-control-plane-model.json"
+)
 ```
 
 ## Step 2 — Render Containerlab topology
