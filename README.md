@@ -29,7 +29,7 @@ intent + inventory
 
 ## Repositories
 
-If you want to run the full pipeline locally, clone these repos side-by-side:
+If you want to develop locally, clone these repos side-by-side (optional):
 
 ```bash
 git clone https://github.com/esp0xdeadbeef/network-compiler
@@ -52,20 +52,16 @@ From a lab `intent.nix` + `inventory.nix` (for example from `network-labs/exampl
 ```bash
 OUT_DIR="$(pwd)"
 LABS_DIR="$(cd ../network-labs && pwd)"
-(
-  cd ../network-control-plane-model
-  nix run .#compile-and-build-control-plane-model -- \
-    "$LABS_DIR/examples/single-wan/intent.nix" \
-    "$LABS_DIR/examples/single-wan/inventory.nix" \
-    "$OUT_DIR/output-control-plane-model.json"
-)
+nix run github:esp0xdeadbeef/network-control-plane-model#compile-and-build-control-plane-model -- \
+  "$LABS_DIR/examples/single-wan/intent.nix" \
+  "$LABS_DIR/examples/single-wan/inventory.nix" \
+  "$OUT_DIR/output-control-plane-model.json"
 ```
 
 ## Step 2 — Render Containerlab topology
 
 ```bash
-cd ../network-renderer-containerlab-linux-backend
-nix run .#generate-clab-config -- \
+nix run github:esp0xdeadbeef/network-renderer-containerlab-linux-backend#generate-clab-config -- \
   ./output-control-plane-model.json \
   ./fabric.clab.yml \
   ./vm-bridges-generated.nix
