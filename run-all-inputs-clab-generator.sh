@@ -23,28 +23,48 @@ fi
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 out_root="${1:-$repo_root/out}"
 
-labs_root="${repo_root}/../network-labs/examples"
+resolve_input_path() {
+  local input_name="$1"
+  local archive_json
+  archive_json="$(mktemp)"
+
+  nix flake archive --json "path:${repo_root}" > "${archive_json}"
+
+  INPUT_NAME="${input_name}" ARCHIVE_JSON="${archive_json}" nix eval --impure --raw --expr '
+    let
+      archived = builtins.fromJSON (builtins.readFile (builtins.getEnv "ARCHIVE_JSON"));
+      name = builtins.getEnv "INPUT_NAME";
+      input = archived.inputs.${name} or null;
+      p = if input == null then null else input.path or null;
+    in
+      if p == null then
+        throw "run-all-inputs-clab-generator: missing archived input path for " + name
+      else
+        p
+  '
+
+  rm -f "${archive_json}"
+}
+
+# Prefer flake-locked inputs, to keep a stable backlog of which inputs were run.
+labs_root="${LABS_ROOT:-}"
+if [[ -z "${labs_root}" ]]; then
+  labs_root="$(resolve_input_path network-labs)/examples"
+fi
 if [[ ! -d "$labs_root" ]]; then
-  echo "[!] Missing ${labs_root}. Clone network-labs next to this repo, or adapt the script." >&2
+  echo "[!] Missing labs examples root: ${labs_root}" >&2
   exit 1
 fi
 
-cpm_repo="${repo_root}/../network-control-plane-model"
-cpm_app="github:esp0xdeadbeef/network-control-plane-model#compile-and-build-control-plane-model"
-
-# NOTE: On some Nix/libgit2 combinations, `nix run path:/some/git/repo#...` can fail when the
-# flake is a git checkout (ownership checks against a /nix/store copy). Running from within
-# the repo (`nix run .#...`) avoids that and keeps local dev workflows working.
-cpm_run() {
+run_cpm_build() {
   local intent="$1"
   local inventory="$2"
   local out="$3"
 
-  if [[ -d "$cpm_repo" ]]; then
-    ( cd "$cpm_repo" && nix run .#compile-and-build-control-plane-model -- "$intent" "$inventory" "$out" )
-  else
-    nix run "$cpm_app" -- "$intent" "$inventory" "$out"
-  fi
+  local cpm_path
+  cpm_path="$(resolve_input_path network-control-plane-model)"
+  nix run --show-trace "${cpm_path}#compile-and-build-control-plane-model" -- \
+    "$intent" "$inventory" "$out" >/dev/null
 }
 
 mkdir -p "$out_root"
@@ -71,7 +91,7 @@ for example_dir in "$labs_root"/*; do
 
     mkdir -p "$out_root/$name"
 
-    cpm_run "$intent" "$inventory" "$cpm_json" >/dev/null
+    run_cpm_build "$intent" "$inventory" "$cpm_json"
 
     nix run "path:${repo_root}#generate-clab-config" -- "$cpm_json" "$topo_out" "$bridges_out" >/dev/null
 

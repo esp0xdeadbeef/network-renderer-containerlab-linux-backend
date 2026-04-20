@@ -29,7 +29,7 @@ intent + inventory
 
 ## Repositories
 
-If you want to develop locally, clone these repos side-by-side (optional):
+If you want to develop locally, you can clone these repos side-by-side (optional):
 
 ```bash
 git clone https://github.com/esp0xdeadbeef/network-compiler
@@ -39,6 +39,9 @@ git clone https://github.com/esp0xdeadbeef/network-renderer-containerlab-linux-b
 git clone https://github.com/esp0xdeadbeef/network-labs
 ```
 
+For reproducible testing and a stable backlog of inputs, prefer the flake-locked tests in this repo
+instead of referencing sibling checkouts.
+
 
 ## Requirements
 
@@ -47,15 +50,36 @@ Nix with flakes enabled.
 
 ## Step 1 — Build a control-plane model JSON
 
-From a lab `intent.nix` + `inventory.nix` (for example from `network-labs/examples/...`):
+From a lab `intent.nix` + `inventory.nix` (using the flake-locked `network-labs` input):
 
 ```bash
-OUT_DIR="$(pwd)"
-LABS_DIR="$(cd ../network-labs && pwd)"
-nix run github:esp0xdeadbeef/network-control-plane-model#compile-and-build-control-plane-model -- \
-  "$LABS_DIR/examples/single-wan/intent.nix" \
-  "$LABS_DIR/examples/single-wan/inventory.nix" \
-  "$OUT_DIR/output-control-plane-model.json"
+repo_root="$(pwd)"
+
+# Resolve the pinned flake inputs from *this repo's* flake.lock.
+resolve_input_path() {
+  local name="$1"
+  local archive_json
+  archive_json="$(mktemp)"
+  nix flake archive --json "path:${repo_root}" > "${archive_json}"
+  INPUT_NAME="${name}" ARCHIVE_JSON="${archive_json}" nix eval --impure --raw --expr '
+    let
+      archived = builtins.fromJSON (builtins.readFile (builtins.getEnv "ARCHIVE_JSON"));
+      name = builtins.getEnv "INPUT_NAME";
+      input = archived.inputs.${name} or null;
+      p = if input == null then null else input.path or null;
+    in
+      if p == null then throw "missing archived input path for " + name else p
+  '
+  rm -f "${archive_json}"
+}
+
+labs_path="$(resolve_input_path network-labs)"
+cpm_path="$(resolve_input_path network-control-plane-model)"
+
+nix run "${cpm_path}#compile-and-build-control-plane-model" -- \
+  "${labs_path}/examples/single-wan/intent.nix" \
+  "${labs_path}/examples/single-wan/inventory.nix" \
+  "${repo_root}/output-control-plane-model.json"
 ```
 
 ## Step 2 — Render Containerlab topology

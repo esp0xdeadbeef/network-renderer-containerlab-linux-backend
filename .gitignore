@@ -17,6 +17,15 @@ __pycache__/
 clab-*/
 *.log
 
+# Generated outputs (keep tracked `*.example.*` as references).
+fabric.clab.yml
+vm-bridges-generated.nix
+output-control-plane-model.json
+output-control-plane-model-signed.json
+
+# Batch generator output dir.
+out/
+
 # Security hygiene: never commit private keys
 clab-fabric/.tls/**/*.key
 **/*.key
