@@ -3,6 +3,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    network-control-plane-model.url = "github:esp0xdeadbeef/network-control-plane-model";
+    network-control-plane-model.inputs.nixpkgs.follows = "nixpkgs";
+
+    network-labs.url = "github:esp0xdeadbeef/network-labs";
   };
 
   outputs =
