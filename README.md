@@ -101,3 +101,17 @@ core
 policy  
 access  
 upstream-selector
+
+## Tests (flake-locked)
+
+This repository includes a flake-locked smoke test that:
+
+- builds CPM JSONs from the pinned `network-labs` examples
+- runs this renderer against each example
+- asserts the renderer produces basic expected artifacts
+
+Run:
+
+```bash
+./tests/test.sh
+```
