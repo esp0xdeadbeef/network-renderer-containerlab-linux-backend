@@ -81,5 +81,3 @@ class SiteModel:
     policy_node_name: str = ""
     upstream_selector_node_name: str = ""
     tenant_prefix_owners: Dict[str, Any] = field(default_factory=dict)
-    bgp_asn: int = 0
-    bgp_sessions: List[Dict[str, Any]] = field(default_factory=list)
