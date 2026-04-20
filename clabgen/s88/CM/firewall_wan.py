@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, List
 
 
-def _render_for_interface(wan_if: str) -> List[str]:
+def _render_base_filter(wan_if: str) -> List[str]:
     return [
         "nft flush ruleset",
         "nft add table inet filter",
@@ -21,9 +21,6 @@ def _render_for_interface(wan_if: str) -> List[str]:
         "nft add rule inet filter forward ct state invalid drop",
         f'nft add rule inet filter forward iifname "{wan_if}" ip saddr {{ 10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16 }} drop',
         f'nft add rule inet filter forward iifname "{wan_if}" ip6 saddr fc00::/7 drop',
-        "nft add table ip nat",
-        "nft 'add chain ip nat postrouting { type nat hook postrouting priority srcnat ; policy accept ; }'",
-        f'nft add rule ip nat postrouting ip saddr {{ 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16 }} oifname "{wan_if}" masquerade',
         "nft add table inet mangle",
         "nft 'add chain inet mangle forward { type filter hook forward priority mangle ; policy accept ; }'",
         f'nft add rule inet mangle forward oifname "{wan_if}" tcp flags syn tcp option maxseg size set rt mtu',
@@ -35,27 +32,109 @@ def render(input_data: Dict[str, Any]) -> List[str]:
     if not isinstance(wan_interfaces, list):
         return []
 
+    masquerade = input_data.get("masquerade", {})
+    if not isinstance(masquerade, dict):
+        masquerade = {}
+
+    oifnames = masquerade.get("oifnames", [])
+    if not isinstance(oifnames, list):
+        oifnames = []
+    oifnames = [x for x in oifnames if isinstance(x, str) and x]
+
+    enable_nat4 = bool(masquerade.get("ipv4", False))
+    enable_nat6 = bool(masquerade.get("ipv6", False))
+
+    saddr4 = masquerade.get(
+        "saddr4",
+        ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
+    )
+    if not isinstance(saddr4, list):
+        saddr4 = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+    saddr4 = [x for x in saddr4 if isinstance(x, str) and x]
+
+    saddr6 = masquerade.get("saddr6", ["fc00::/7"])
+    if not isinstance(saddr6, list):
+        saddr6 = ["fc00::/7"]
+    saddr6 = [x for x in saddr6 if isinstance(x, str) and x]
+
     cmds: List[str] = []
     first = True
+
+    # If no WAN interfaces exist (common in CLAB labs where "internet" is the
+    # management network), we still allow inventory-driven masquerading without
+    # constructing WAN-filtering rules.
+    if not wan_interfaces:
+        if oifnames and enable_nat4:
+            cmds.extend(
+                [
+                    "nft add table ip nat",
+                    "nft 'add chain ip nat postrouting { type nat hook postrouting priority srcnat ; policy accept ; }'",
+                ]
+            )
+            srcset = ",".join(saddr4)
+            for oif in oifnames:
+                cmds.append(
+                    f'nft add rule ip nat postrouting ip saddr {{ {srcset} }} oifname "{oif}" masquerade'
+                )
+
+        if oifnames and enable_nat6:
+            cmds.extend(
+                [
+                    "nft add table ip6 nat",
+                    "nft 'add chain ip6 nat postrouting { type nat hook postrouting priority srcnat ; policy accept ; }'",
+                ]
+            )
+            srcset6 = ",".join(saddr6)
+            for oif in oifnames:
+                cmds.append(
+                    f'nft add rule ip6 nat postrouting ip6 saddr {{ {srcset6} }} oifname "{oif}" masquerade'
+                )
+
+        return cmds
 
     for wan_if in wan_interfaces:
         if not isinstance(wan_if, str) or not wan_if:
             continue
         if first:
-            cmds.extend(_render_for_interface(wan_if))
+            cmds.extend(_render_base_filter(wan_if))
             first = False
-            continue
+        else:
+            cmds.extend(
+                [
+                    f'nft add rule inet filter input iifname "{wan_if}" ip saddr {{ 0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,240.0.0.0/4 }} drop',
+                    f'nft add rule inet filter input iifname "{wan_if}" ip6 saddr {{ ::1,fc00::/7,fe80::/10 }} drop',
+                    f'nft add rule inet filter input iifname != "{wan_if}" tcp dport 22 accept',
+                    f'nft add rule inet filter forward iifname "{wan_if}" ip saddr {{ 10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16 }} drop',
+                    f'nft add rule inet filter forward iifname "{wan_if}" ip6 saddr fc00::/7 drop',
+                    f'nft add rule inet mangle forward oifname "{wan_if}" tcp flags syn tcp option maxseg size set rt mtu',
+                ]
+            )
 
+    # NAT is inventory-driven and independent from which interfaces are treated as WAN for filtering.
+    if oifnames and enable_nat4:
         cmds.extend(
             [
-                f'nft add rule inet filter input iifname "{wan_if}" ip saddr {{ 0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,240.0.0.0/4 }} drop',
-                f'nft add rule inet filter input iifname "{wan_if}" ip6 saddr {{ ::1,fc00::/7,fe80::/10 }} drop',
-                f'nft add rule inet filter input iifname != "{wan_if}" tcp dport 22 accept',
-                f'nft add rule inet filter forward iifname "{wan_if}" ip saddr {{ 10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16 }} drop',
-                f'nft add rule inet filter forward iifname "{wan_if}" ip6 saddr fc00::/7 drop',
-                f'nft add rule ip nat postrouting ip saddr {{ 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16 }} oifname "{wan_if}" masquerade',
-                f'nft add rule inet mangle forward oifname "{wan_if}" tcp flags syn tcp option maxseg size set rt mtu',
+                "nft add table ip nat",
+                "nft 'add chain ip nat postrouting { type nat hook postrouting priority srcnat ; policy accept ; }'",
             ]
         )
+        srcset = ",".join(saddr4)
+        for oif in oifnames:
+            cmds.append(
+                f'nft add rule ip nat postrouting ip saddr {{ {srcset} }} oifname "{oif}" masquerade'
+            )
+
+    if oifnames and enable_nat6:
+        cmds.extend(
+            [
+                "nft add table ip6 nat",
+                "nft 'add chain ip6 nat postrouting { type nat hook postrouting priority srcnat ; policy accept ; }'",
+            ]
+        )
+        srcset6 = ",".join(saddr6)
+        for oif in oifnames:
+            cmds.append(
+                f'nft add rule ip6 nat postrouting ip6 saddr {{ {srcset6} }} oifname "{oif}" masquerade'
+            )
 
     return cmds

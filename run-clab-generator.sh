@@ -7,12 +7,8 @@ usage:
   ./run-clab-generator.sh <control-plane-model.json|output-solver.json> [topology_out] [bridges_out]
 
 defaults:
-  - If no input is provided, tries (in order):
-      ./output-control-plane-model-signed.json
-      ./output-control-plane-model.json
-      ./control-plane-model.json
-      ./output-solver-signed.json
-      ./output-solver.json
+  - No default input is assumed.
+  - Prefer generating a fresh CPM JSON in a temp dir (see ./start-vm.sh).
 
 EOF
 }
@@ -76,8 +72,7 @@ if missing:
         "[run-clab-generator] CPM input is missing required site.runtimeTargets for: "
         f"{joined}{suffix}\n"
         "[run-clab-generator] This usually means you are pointing the renderer at an older/legacy CPM output.\n"
-        "[run-clab-generator] Build a fresh CPM JSON (via network-control-plane-model) and pass it as the first argument,\n"
-        "[run-clab-generator] or put it at ./output-control-plane-model.json so auto-detection picks it up.",
+        "[run-clab-generator] Build a fresh CPM JSON (via network-control-plane-model) and pass it as the first argument.",
         file=sys.stderr,
     )
     sys.exit(3)
@@ -89,23 +84,6 @@ PY
 INPUT="${1:-}"
 TOPO_OUT="${2:-fabric.clab.yml}"
 BRIDGES_OUT="${3:-vm-bridges-generated.nix}"
-
-if [[ -z "$INPUT" ]]; then
-  for candidate in \
-    "./output-control-plane-model-signed.json" \
-    "./output-control-plane-model.json" \
-    "./control-plane-model.json" \
-    "./output-solver-signed.json" \
-    "./output-solver.json"
-  do
-    if [[ -f "$candidate" ]]; then
-      if validate_input_or_explain "$candidate"; then
-        INPUT="$candidate"
-        break
-      fi
-    fi
-  done
-fi
 
 if [[ -z "$INPUT" ]]; then
   usage

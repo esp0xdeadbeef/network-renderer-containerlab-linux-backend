@@ -48,7 +48,11 @@ run_one_example() {
 
   name="$(basename "${dir}")"
   intent="${dir}/intent.nix"
-  inventory="${dir}/inventory.nix"
+  inventory="${dir}/inventory-clab.nix"
+
+  if [[ ! -f "${inventory}" ]]; then
+    inventory="${dir}/inventory.nix"
+  fi
 
   [[ -f "${intent}" ]] || { echo "SKIP ${name} (no intent.nix)"; return 0; }
   [[ -f "${inventory}" ]] || { echo "SKIP ${name} (no inventory.nix)"; return 0; }
@@ -76,7 +80,9 @@ run_one_example() {
   # noise from Nix when evaluating a path-based flake.
   (
     cd "${repo_root}"
-    nix run --show-trace "path:${repo_root}#generate-clab-config" -- \
+    renderer_inv="${tmp_dir}/renderer-inventory.json"
+    nix eval --impure --json --expr "let inv = import ${inventory}; in { containerlab = inv.containerlab or {}; }" > "${renderer_inv}"
+    CLABGEN_RENDERER_INVENTORY_JSON="${renderer_inv}" nix run --show-trace "path:${repo_root}#generate-clab-config" -- \
       "${tmp_dir}/cpm.json" \
       "${tmp_dir}/fabric.clab.yml" \
       "${tmp_dir}/vm-bridges-generated.nix" >/dev/null 2>"${stderr_file}" \

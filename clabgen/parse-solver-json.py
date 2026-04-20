@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any, Dict
@@ -48,24 +49,48 @@ def _render_meta_comment(meta: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _load_renderer_inventory(base_dir: Path) -> Dict[str, Any]:
-    inventory_file = base_dir / "renderer-inputs.json"
+def _load_renderer_inventory_for_input(input_path: Path) -> Dict[str, Any]:
+    """
+    Renderer inventory must come from the input being rendered.
 
-    if not inventory_file.exists():
-        return {"hosts": {}}
+    We intentionally do *not* depend on local, mutable repo files (like a
+    checked-in renderer-inputs.json), so tests and runs remain flake-locked and
+    reproducible.
+    """
 
-    with inventory_file.open() as f:
-        data = json.load(f)
+    env_path = os.environ.get("CLABGEN_RENDERER_INVENTORY_JSON", "").strip()
+    if env_path:
+        p = Path(env_path)
+        try:
+            data = json.loads(p.read_text())
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
 
-    if not isinstance(data, dict):
-        raise ValueError("renderer-inputs.json top-level must be an object")
+    try:
+        raw = input_path.read_text()
+        parsed = json.loads(raw)
+    except Exception:
+        return {}
 
-    return data
+    if not isinstance(parsed, dict):
+        return {}
+
+    cpm = parsed.get("control_plane_model")
+    if not isinstance(cpm, dict):
+        return {}
+
+    endpoint_inventory = cpm.get("endpointInventory")
+    if not isinstance(endpoint_inventory, dict):
+        return {}
+
+    return endpoint_inventory
 
 
 def render_topology(solver_json: str | Path) -> Dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[1]
-    renderer_inventory = _load_renderer_inventory(repo_root)
+    solver_path = Path(solver_json)
+    renderer_inventory = _load_renderer_inventory_for_input(solver_path)
 
     enterprise = Enterprise.from_solver_json(
         solver_json,

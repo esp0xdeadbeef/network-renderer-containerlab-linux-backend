@@ -8,7 +8,6 @@ import hashlib
 
 from clabgen.models import SiteModel
 from clabgen.s88.enterprise.site_loader import load_sites
-from clabgen.s88.enterprise.inject_wan_peers import inject_emulated_wan_peers
 from clabgen.s88.enterprise.inject_clients import inject_clients
 from clabgen.s88.Unit.base import render_units
 
@@ -79,7 +78,6 @@ def _scoped_node_name(site: SiteModel, node_name: str) -> str:
 def generate_topology(site: SiteModel) -> Dict[str, Any]:
     site = copy.deepcopy(site)
 
-    inject_emulated_wan_peers(site)
     inject_clients(site)
 
     nodes, links, bridges = render_units(site)

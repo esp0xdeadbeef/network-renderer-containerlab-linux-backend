@@ -32,7 +32,11 @@ cpm_path="$(resolve_input_path network-control-plane-model)"
 
 example_dir="${labs_path}/examples/single-wan"
 intent="${example_dir}/intent.nix"
-inventory="${example_dir}/inventory.nix"
+inventory="${example_dir}/inventory-clab.nix"
+
+if [[ ! -f "${inventory}" ]]; then
+  inventory="${example_dir}/inventory.nix"
+fi
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "'"${tmp_dir}"'"' EXIT

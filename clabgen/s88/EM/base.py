@@ -50,20 +50,43 @@ def _default_cm_inputs(
 ) -> Dict[str, Any]:
     cm_inputs: Dict[str, Any] = {}
 
+    containerlab = node_data.get("containerlab", {})
+    if not isinstance(containerlab, dict):
+        containerlab = {}
+
+    roles_cfg = containerlab.get("roles", {})
+    if not isinstance(roles_cfg, dict):
+        roles_cfg = {}
+
+    role_cfg = roles_cfg.get(role, {})
+    if not isinstance(role_cfg, dict):
+        role_cfg = {}
+
+    # Forwarding defaults are environment/runtime concerns; keep them inventory-driven.
+    disable_eth0_default = role not in {"wan-peer", "isp", "core"}
+    disable_eth0 = disable_eth0_default
+    role_forwarding = role_cfg.get("forwarding", {})
+    if isinstance(role_forwarding, dict) and "disable_eth0" in role_forwarding:
+        disable_eth0 = bool(role_forwarding.get("disable_eth0"))
+
     if role in {"core", "downstream-selector", "policy", "upstream-selector", "wan-peer", "isp"}:
-      cm_inputs["forwarding"] = {
-        "enable_ipv4": True,
-        "enable_ipv6": True,
-        "disable_eth0": role not in {"wan-peer", "isp"},
-      }
+        cm_inputs["forwarding"] = {
+            "enable_ipv4": True,
+            "enable_ipv6": True,
+            "disable_eth0": disable_eth0,
+        }
 
     if role == "core":
         wan_link = ((parsed.get("links") or {}).get("wan") or {})
         wan_eth = wan_link.get("eth")
-        if isinstance(wan_eth, int):
-            cm_inputs["wan_firewall"] = {
-                "wan_interfaces": [f"eth{wan_eth}"],
-            }
+        wan_firewall_cfg = role_cfg.get("wan_firewall", {})
+        if not isinstance(wan_firewall_cfg, dict):
+            wan_firewall_cfg = {}
+
+        cm_inputs["wan_firewall"] = {
+            "wan_interfaces": [f"eth{wan_eth}"] if isinstance(wan_eth, int) else [],
+            "masquerade": wan_firewall_cfg.get("masquerade", {}),
+        }
 
     if role == "policy":
         policy_firewall_state = node_data.get("policy_firewall_state", {})

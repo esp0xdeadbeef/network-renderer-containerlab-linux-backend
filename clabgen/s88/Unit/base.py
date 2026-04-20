@@ -108,12 +108,22 @@ def _node_extra(site: SiteModel, node_name: str) -> Dict[str, Any]:
     if not isinstance(bgp, dict):
         bgp = {}
 
+    renderer_inventory = getattr(site, "renderer_inventory", {}) or {}
+    if not isinstance(renderer_inventory, dict):
+        renderer_inventory = {}
+
+    containerlab = renderer_inventory.get("containerlab", {})
+    if not isinstance(containerlab, dict):
+        containerlab = {}
+
     return {
         "loopback": {
             "ipv4": node.loopback4,
             "ipv6": node.loopback6,
         },
         "bgp": bgp,
+        # Containerlab backend runtime knobs live in inventory (not hardcoded in renderer).
+        "containerlab": containerlab,
     }
 
 
