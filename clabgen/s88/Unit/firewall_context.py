@@ -576,6 +576,20 @@ def _build_policy_interface_tags(
 def _build_policy_rules(contract: Dict[str, Any], known_tags: set[str]):
     rules = []
 
+    traffic_types_raw = contract.get("trafficTypes") or []
+    traffic_type_matches: Dict[str, List[Dict[str, Any]]] = {}
+    if isinstance(traffic_types_raw, list):
+        for obj in traffic_types_raw:
+            if not isinstance(obj, dict):
+                continue
+            name = obj.get("name")
+            matches = obj.get("match")
+            if not isinstance(name, str) or not name:
+                continue
+            if not isinstance(matches, list):
+                continue
+            traffic_type_matches[name] = [m for m in matches if isinstance(m, dict)]
+
     for relation in _relation_objects(contract):
         src_members = _members(relation.get("from"))
         dst = relation.get("to")
@@ -586,7 +600,36 @@ def _build_policy_rules(contract: Dict[str, Any], known_tags: set[str]):
             dst_members = _members(dst)
 
         action = "accept" if relation.get("action") == "allow" else "drop"
-        matches = relation.get("match") or []
+        matches = relation.get("match") or relation.get("matches") or []
+
+        # Modern contracts can refer to trafficTypes by name instead of embedding
+        # `match` directly inside each allowedRelation.
+        if matches == []:
+            tt = relation.get("trafficType")
+            if isinstance(tt, str) and tt:
+                if tt == "any":
+                    matches = [{"family": "any", "proto": "any", "dports": []}]
+                elif tt in traffic_type_matches:
+                    matches = traffic_type_matches[tt]
+                else:
+                    raise RuntimeError(
+                        "communicationContract.allowedRelations references unknown trafficType\n"
+                        + json.dumps(
+                            {
+                                "trafficType": tt,
+                                "knownTrafficTypes": sorted(traffic_type_matches.keys()),
+                                "relation": relation,
+                            },
+                            indent=2,
+                            default=str,
+                        )
+                    )
+
+        if not isinstance(matches, list):
+            raise RuntimeError(
+                "communicationContract.allowedRelations match must be an array\n"
+                + json.dumps({"relation": relation}, indent=2, default=str)
+            )
 
         for src_tenant in src_members:
             for dst_tenant in dst_members:
