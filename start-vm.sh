@@ -55,10 +55,14 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
 echo "[*] Building control-plane model from flake-locked network-labs (${example})..."
-nix run --show-trace "${cpm_path}#compile-and-build-control-plane-model" -- \
-  "${intent_path}" \
-  "${inventory_path}" \
-  "${tmp_dir}/cpm.json" >/dev/null
+(
+  # Some upstream tools write debug artifacts to CWD; keep this repo clean.
+  cd "${tmp_dir}"
+  nix run --show-trace "${cpm_path}#compile-and-build-control-plane-model" -- \
+    "${intent_path}" \
+    "${inventory_path}" \
+    "${tmp_dir}/cpm.json" >/dev/null
+)
 
 echo "[*] Rendering Containerlab topology + bridges..."
 renderer_inv="${tmp_dir}/renderer-inventory.json"
