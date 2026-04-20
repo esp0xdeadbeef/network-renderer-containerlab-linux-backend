@@ -57,17 +57,31 @@ run_one_example() {
 
   local tmp_dir
   tmp_dir="$(mktemp -d)"
+  local stderr_file
+  stderr_file="${tmp_dir}/stderr.log"
   trap 'rm -rf "'"${tmp_dir}"'"' RETURN
 
-  nix run --show-trace "${cpm_path}#compile-and-build-control-plane-model" -- \
-    "${intent}" \
-    "${inventory}" \
-    "${tmp_dir}/cpm.json" >/dev/null
+  # Some upstream tools write debug artifacts to CWD. Keep tests reproducible and
+  # keep this repo clean by running CPM build inside the temp directory.
+  (
+    cd "${tmp_dir}"
+    nix run --show-trace "${cpm_path}#compile-and-build-control-plane-model" -- \
+      "${intent}" \
+      "${inventory}" \
+      "${tmp_dir}/cpm.json" >/dev/null 2>"${stderr_file}" \
+      || { echo "--- STDERR (${name}) ---"; cat "${stderr_file}"; fail "FAIL ${name}: CPM build failed"; }
+  )
 
-  nix run --show-trace "path:${repo_root}#generate-clab-config" -- \
-    "${tmp_dir}/cpm.json" \
-    "${tmp_dir}/fabric.clab.yml" \
-    "${tmp_dir}/vm-bridges-generated.nix" >/dev/null
+  # Run the renderer from the repo root to avoid spurious "not a git repository"
+  # noise from Nix when evaluating a path-based flake.
+  (
+    cd "${repo_root}"
+    nix run --show-trace "path:${repo_root}#generate-clab-config" -- \
+      "${tmp_dir}/cpm.json" \
+      "${tmp_dir}/fabric.clab.yml" \
+      "${tmp_dir}/vm-bridges-generated.nix" >/dev/null 2>"${stderr_file}" \
+      || { echo "--- STDERR (${name}) ---"; cat "${stderr_file}"; fail "FAIL ${name}: renderer failed"; }
+  )
 
   test -s "${tmp_dir}/fabric.clab.yml" || fail "FAIL ${name}: missing fabric.clab.yml"
   test -s "${tmp_dir}/vm-bridges-generated.nix" || fail "FAIL ${name}: missing vm-bridges-generated.nix"
@@ -86,4 +100,3 @@ while read -r dir; do
 done < <(find "${examples_root}" -mindepth 1 -maxdepth 1 -type d | sort)
 
 exit 0
-
