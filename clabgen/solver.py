@@ -150,7 +150,16 @@ def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
             if not isinstance(iface, dict):
                 continue
 
+            backing_ref = iface.get("backingRef") or {}
+            if not isinstance(backing_ref, dict):
+                backing_ref = {}
             kind = iface.get("sourceKind") or iface.get("kind")
+            overlay = iface.get("overlay")
+            if not isinstance(overlay, str) or not overlay:
+                if kind == "overlay":
+                    overlay = backing_ref.get("name")
+            if not isinstance(overlay, str) or not overlay:
+                overlay = None
             iface_out[if_key] = {
                 "addr4": iface.get("addr4"),
                 "addr6": iface.get("addr6"),
@@ -159,7 +168,7 @@ def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
                 "kind": kind,
                 "upstream": iface.get("upstream") or iface.get("uplink"),
                 "tenant": iface.get("tenant"),
-                "overlay": iface.get("overlay"),
+                "overlay": overlay,
             }
 
         loopback = realized.get("loopback") or {}

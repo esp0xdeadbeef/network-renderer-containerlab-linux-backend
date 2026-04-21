@@ -126,6 +126,32 @@ policy
 access  
 upstream-selector
 
+## Required CPM contract
+
+This renderer should consume one canonical control-plane shape from upstream.
+
+In practice it expects explicit CPM data for:
+
+- runtime targets and routing mode
+- realized nodes and links
+- service exposure intent
+- site overlay projections
+- host bridge / attach realization
+
+If upstream data is incomplete, the correct direction is to fix the upstream stage or the example inventory,
+not to invent missing semantics in this renderer.
+
+## Overlay scope
+
+This backend renders overlay-related network topology and policy consumption from CPM.
+
+It does not yet claim to be a full Nebula runtime provisioner.
+
+That means:
+
+- overlay termination and overlay-facing topology should render correctly
+- full overlay daemon/bootstrap material may still belong to a different layer or a future extension
+
 ## Tests (flake-locked)
 
 This repository includes a flake-locked smoke test that:

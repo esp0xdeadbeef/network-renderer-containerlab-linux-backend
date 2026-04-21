@@ -170,6 +170,27 @@ def render_units(site: SiteModel) -> Tuple[Dict[str, Any], List[Dict[str, Any]],
             endpoint = f"{node_name}:eth{eth_index}"
             endpoints.append(endpoint)
 
+        # Containerlab requires 2 endpoints per link. CPM/solver inputs may
+        # contain external-facing links with a single endpoint (e.g. "wan"
+        # without an injected peer). In that case we attach the link to the
+        # host via a dedicated veth to ensure the interface exists in the node.
+        if len(endpoints) == 1:
+            bridge = _bridge_name(f"{site.enterprise}-{site.site}-{link_name}")
+            bridges.append(bridge)
+
+            host_endpoint = f"host:{_host_ifname(bridge)}"
+            endpoints.append(host_endpoint)
+
+            links.append(
+                {
+                    "endpoints": endpoints,
+                    "labels": {
+                        "clab.link.type": "bridge",
+                        "clab.link.bridge": bridge,
+                    },
+                }
+            )
+
         if len(endpoints) == 2:
             bridge = _bridge_name(f"{site.enterprise}-{site.site}-{link_name}")
             bridges.append(bridge)

@@ -266,6 +266,15 @@ def _string_list(value: Any) -> List[str]:
     return [item for item in value if isinstance(item, str) and item]
 
 
+def _single_string_or_only_item(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    values = _string_list(value)
+    if len(values) == 1:
+        return values[0]
+    return None
+
+
 def _overlay_terminates_on_required_interface(
     site: SiteModel,
     *,
@@ -370,7 +379,7 @@ def _resolve_external_via_overlay(
     if overlay is None:
         return None
 
-    terminate_on = overlay.get("terminateOn")
+    terminate_on = _single_string_or_only_item(overlay.get("terminateOn"))
     if not isinstance(terminate_on, str) or not terminate_on:
         raise RuntimeError(
             f"overlay {external!r} missing terminateOn\n"
@@ -378,7 +387,7 @@ def _resolve_external_via_overlay(
         )
 
     must_traverse = set(_string_list(overlay.get("mustTraverse")))
-    if "policy" not in must_traverse:
+    if must_traverse and "policy" not in must_traverse:
         raise RuntimeError(
             f"overlay {external!r} does not require policy traversal\n"
             + json.dumps(overlay, indent=2, default=str)

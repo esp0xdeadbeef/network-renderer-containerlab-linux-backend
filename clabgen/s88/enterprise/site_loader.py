@@ -279,6 +279,10 @@ def load_sites(
         raw_ownership = dict(site.get("ownership", {}) or {})
         raw_domains = dict(site.get("domains", {}) or {})
         raw_transport = dict(site.get("transport", {}) or {})
+        if "overlays" not in raw_transport:
+            overlays = site.get("overlays")
+            if isinstance(overlays, dict) and overlays:
+                raw_transport["overlays"] = overlays
 
         key = f"{enterprise}-{site_name}"
 
