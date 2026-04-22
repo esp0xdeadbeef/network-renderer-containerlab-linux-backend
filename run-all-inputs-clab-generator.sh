@@ -8,7 +8,7 @@ usage:
 
 Behavior:
   - For each lab under network-labs/examples/*:
-      intent.nix + inventory.nix
+      intent.nix + inventory-nixos.nix
         -> builds output-control-plane-model.json (via network-control-plane-model)
         -> renders fabric.clab.yml + vm-bridges-generated.nix (this repo)
 
@@ -74,10 +74,10 @@ for example_dir in "$labs_root"/*; do
 
   name="$(basename "$example_dir")"
   intent="$example_dir/intent.nix"
-  inventory="$example_dir/inventory.nix"
+  inventory="$example_dir/inventory-nixos.nix"
 
   [[ -f "$intent" ]] || { echo "[!] SKIP ${name}: missing intent.nix" >&2; continue; }
-  [[ -f "$inventory" ]] || { echo "[!] SKIP ${name}: missing inventory.nix" >&2; continue; }
+  [[ -f "$inventory" ]] || { echo "[!] SKIP ${name}: missing inventory-nixos.nix" >&2; continue; }
 
   echo "[*] ${name}"
 
@@ -94,6 +94,7 @@ for example_dir in "$labs_root"/*; do
     run_cpm_build "$intent" "$inventory" "$cpm_json"
 
     nix run "path:${repo_root}#generate-clab-config" -- "$cpm_json" "$topo_out" "$bridges_out" >/dev/null
+    "${repo_root}/tests/validate-rendered-artifacts.sh" "$topo_out" "$bridges_out"
 
     echo "    - $topo_out"
     echo "    - $bridges_out"

@@ -41,7 +41,7 @@ intent_path="${labs_path}/examples/${example}/intent.nix"
 inventory_path="${labs_path}/examples/${example}/inventory-clab.nix"
 
 if [[ ! -f "${inventory_path}" ]]; then
-  inventory_path="${labs_path}/examples/${example}/inventory.nix"
+  inventory_path="${labs_path}/examples/${example}/inventory-nixos.nix"
 fi
 
 if [[ ! -f "${intent_path}" || ! -f "${inventory_path}" ]]; then

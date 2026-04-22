@@ -102,6 +102,11 @@ run_example() {
       || fail "FAIL ${example_name}: missing site-b BGP ASN"
   fi
 
+  "${repo_root}/tests/validate-rendered-artifacts.sh" \
+    "${tmp_dir}/fabric.clab.yml" \
+    "${tmp_dir}/vm-bridges-generated.nix" \
+    || fail "FAIL ${example_name}: rendered artifact validation failed"
+
   echo "PASS ${example_name}"
 
   rm -rf "${tmp_dir}"

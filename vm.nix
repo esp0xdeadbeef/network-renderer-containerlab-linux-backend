@@ -3,11 +3,12 @@
   config,
   pkgs,
   lib,
+  generatedBridgesFile ? ./vm-bridges-generated.nix,
   ...
 }:
 
 let
-  generated = import ./vm-bridges-generated.nix { inherit lib; };
+  generated = import generatedBridgesFile { inherit lib; };
 
   bridges = generated.bridges;
 

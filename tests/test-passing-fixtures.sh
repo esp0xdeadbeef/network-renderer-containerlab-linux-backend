@@ -34,12 +34,6 @@ examples_root="${labs_path}/examples"
 log() { echo "==> $*"; }
 fail() { echo "$1" >&2; exit 1; }
 
-validate_yaml_minimal() {
-  local file="$1"
-  grep -q '^name:' "${file}" || fail "FAIL: missing top-level 'name:' in ${file}"
-  grep -q '^topology:' "${file}" || fail "FAIL: missing top-level 'topology:' in ${file}"
-}
-
 run_one_example() {
   local dir="$1"
   local name
@@ -51,11 +45,11 @@ run_one_example() {
   inventory="${dir}/inventory-clab.nix"
 
   if [[ ! -f "${inventory}" ]]; then
-    inventory="${dir}/inventory.nix"
+    inventory="${dir}/inventory-nixos.nix"
   fi
 
   [[ -f "${intent}" ]] || { echo "SKIP ${name} (no intent.nix)"; return 0; }
-  [[ -f "${inventory}" ]] || { echo "SKIP ${name} (no inventory.nix)"; return 0; }
+  [[ -f "${inventory}" ]] || { echo "SKIP ${name} (no inventory-nixos.nix)"; return 0; }
 
   log "Example ${name}"
 
@@ -92,7 +86,10 @@ run_one_example() {
   test -s "${tmp_dir}/fabric.clab.yml" || fail "FAIL ${name}: missing fabric.clab.yml"
   test -s "${tmp_dir}/vm-bridges-generated.nix" || fail "FAIL ${name}: missing vm-bridges-generated.nix"
 
-  validate_yaml_minimal "${tmp_dir}/fabric.clab.yml"
+  "${repo_root}/tests/validate-rendered-artifacts.sh" \
+    "${tmp_dir}/fabric.clab.yml" \
+    "${tmp_dir}/vm-bridges-generated.nix" \
+    || fail "FAIL ${name}: rendered artifact validation failed"
 
   echo "PASS ${name}"
 

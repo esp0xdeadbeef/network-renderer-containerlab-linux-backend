@@ -58,6 +58,10 @@ trap 'rm -rf "'"${tmp_dir}"'"' EXIT
     "${tmp_dir}/vm-bridges-generated.nix" >/dev/null
 )
 
+"${repo_root}/tests/validate-rendered-artifacts.sh" \
+  "${tmp_dir}/fabric.clab.yml" \
+  "${tmp_dir}/vm-bridges-generated.nix"
+
 grep -q 'router bgp 65000' "${tmp_dir}/fabric.clab.yml" || fail "missing site ASN in generated BGP config"
 grep -q 'neighbor 203.0.113.1 remote-as 64512' "${tmp_dir}/fabric.clab.yml" || fail "missing eBGP neighbor in generated topology"
 grep -q 'neighbor 10.19.0.5 remote-as 65000' "${tmp_dir}/fabric.clab.yml" || fail "missing iBGP neighbor in generated topology"

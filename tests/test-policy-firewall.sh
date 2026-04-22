@@ -35,7 +35,7 @@ intent="${example_dir}/intent.nix"
 inventory="${example_dir}/inventory-clab.nix"
 
 if [[ ! -f "${inventory}" ]]; then
-  inventory="${example_dir}/inventory.nix"
+  inventory="${example_dir}/inventory-nixos.nix"
 fi
 
 tmp_dir="$(mktemp -d)"

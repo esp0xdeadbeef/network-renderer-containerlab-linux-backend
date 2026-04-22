@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 usage() {
   cat >&2 <<'EOF'
 usage:
@@ -92,7 +94,9 @@ fi
 
 validate_input_or_explain "$INPUT"
 
-nix run .#generate-clab-config -- "$INPUT" "$TOPO_OUT" "$BRIDGES_OUT"
+nix run "path:${repo_root}#generate-clab-config" -- "$INPUT" "$TOPO_OUT" "$BRIDGES_OUT"
+
+"${repo_root}/tests/validate-rendered-artifacts.sh" "$TOPO_OUT" "$BRIDGES_OUT"
 
 echo "links generated:"
 sed -n '/links:/,$p' "$TOPO_OUT" 2>/dev/null || true
