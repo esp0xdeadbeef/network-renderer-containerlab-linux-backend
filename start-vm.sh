@@ -40,10 +40,6 @@ cpm_path="$(resolve_input_path network-control-plane-model)"
 intent_path="${labs_path}/examples/${example}/intent.nix"
 inventory_path="${labs_path}/examples/${example}/inventory-clab.nix"
 
-if [[ ! -f "${inventory_path}" ]]; then
-  inventory_path="${labs_path}/examples/${example}/inventory-nixos.nix"
-fi
-
 if [[ ! -f "${intent_path}" || ! -f "${inventory_path}" ]]; then
   echo "[!] Missing example inputs:" >&2
   echo "    intent:     ${intent_path}" >&2
@@ -74,4 +70,5 @@ CLABGEN_RENDERER_INVENTORY_JSON="${renderer_inv}" nix run .#generate-clab-config
   "${BRIDGES_FILE}" >/dev/null
 
 echo "[*] Starting VM via nixos-shell (preserving custom options)..."
-nix run --extra-experimental-features 'nix-command flakes' nixpkgs#nixos-shell -- "${FLAKE_DIR}/vm.nix"
+CLAB_VM_BRIDGES_FILE="${BRIDGES_FILE}" \
+  nix run --extra-experimental-features 'nix-command flakes' nixpkgs#nixos-shell -- "${FLAKE_DIR}/vm.nix"

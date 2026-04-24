@@ -21,6 +21,9 @@ fi
 [[ -s "${topology_file}" ]] || { echo "validator: missing or empty topology YAML: ${topology_file}" >&2; exit 1; }
 [[ -s "${bridges_file}" ]] || { echo "validator: missing or empty bridges nix: ${bridges_file}" >&2; exit 1; }
 
+topology_file="$(realpath "${topology_file}")"
+bridges_file="$(realpath "${bridges_file}")"
+
 python3 - "${topology_file}" <<'PY'
 import re
 import sys
@@ -50,6 +53,7 @@ PY
 validation_json="$(
   REPO_ROOT="${repo_root}" \
   BRIDGES_FILE="${bridges_file}" \
+  CLAB_VM_BRIDGES_FILE="${bridges_file}" \
   VM_NIX_FILE="${repo_root}/vm.nix" \
   nix eval --impure --json --expr '
     let
@@ -64,7 +68,6 @@ validation_json="$(
       vmModule = import vmNixPath {
         inherit lib pkgs;
         config = { };
-        generatedBridgesFile = bridgesPath;
       };
       netdevNames = builtins.attrNames (vmModule.systemd.network.netdevs or { });
       networkNames = builtins.attrNames (vmModule.systemd.network.networks or { });

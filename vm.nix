@@ -3,11 +3,16 @@
   config,
   pkgs,
   lib,
-  generatedBridgesFile ? ./vm-bridges-generated.nix,
   ...
 }:
 
 let
+  generatedBridgesFile =
+    let
+      fromEnv = builtins.getEnv "CLAB_VM_BRIDGES_FILE";
+    in
+    if fromEnv != "" then builtins.toPath fromEnv else ./vm-bridges-generated.nix;
+
   generated = import generatedBridgesFile { inherit lib; };
 
   bridges = generated.bridges;

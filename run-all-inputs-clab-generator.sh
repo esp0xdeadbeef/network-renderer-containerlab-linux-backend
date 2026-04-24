@@ -8,7 +8,7 @@ usage:
 
 Behavior:
   - For each lab under network-labs/examples/*:
-      intent.nix + inventory-nixos.nix
+      intent.nix + inventory-clab.nix
         -> builds output-control-plane-model.json (via network-control-plane-model)
         -> renders fabric.clab.yml + vm-bridges-generated.nix (this repo)
 
@@ -74,10 +74,10 @@ for example_dir in "$labs_root"/*; do
 
   name="$(basename "$example_dir")"
   intent="$example_dir/intent.nix"
-  inventory="$example_dir/inventory-nixos.nix"
+  inventory="$example_dir/inventory-clab.nix"
 
   [[ -f "$intent" ]] || { echo "[!] SKIP ${name}: missing intent.nix" >&2; continue; }
-  [[ -f "$inventory" ]] || { echo "[!] SKIP ${name}: missing inventory-nixos.nix" >&2; continue; }
+  [[ -f "$inventory" ]] || { echo "[!] SKIP ${name}: missing inventory-clab.nix" >&2; continue; }
 
   echo "[*] ${name}"
 

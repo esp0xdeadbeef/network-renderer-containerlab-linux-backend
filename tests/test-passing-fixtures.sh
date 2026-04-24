@@ -44,12 +44,8 @@ run_one_example() {
   intent="${dir}/intent.nix"
   inventory="${dir}/inventory-clab.nix"
 
-  if [[ ! -f "${inventory}" ]]; then
-    inventory="${dir}/inventory-nixos.nix"
-  fi
-
   [[ -f "${intent}" ]] || { echo "SKIP ${name} (no intent.nix)"; return 0; }
-  [[ -f "${inventory}" ]] || { echo "SKIP ${name} (no inventory-nixos.nix)"; return 0; }
+  [[ -f "${inventory}" ]] || { echo "SKIP ${name} (no inventory-clab.nix)"; return 0; }
 
   log "Example ${name}"
 
@@ -57,6 +53,8 @@ run_one_example() {
   tmp_dir="$(mktemp -d)"
   local stderr_file
   stderr_file="${tmp_dir}/stderr.log"
+  local renderer_inv
+  renderer_inv="${tmp_dir}/renderer-inventory.json"
   trap 'rm -rf "'"${tmp_dir}"'"' RETURN
 
   # Some upstream tools write debug artifacts to CWD. Keep tests reproducible and
@@ -74,7 +72,6 @@ run_one_example() {
   # noise from Nix when evaluating a path-based flake.
   (
     cd "${repo_root}"
-    renderer_inv="${tmp_dir}/renderer-inventory.json"
     nix eval --impure --json --expr "let inv = import ${inventory}; in { containerlab = inv.containerlab or {}; }" > "${renderer_inv}"
     CLABGEN_RENDERER_INVENTORY_JSON="${renderer_inv}" nix run --show-trace "path:${repo_root}#generate-clab-config" -- \
       "${tmp_dir}/cpm.json" \
@@ -90,6 +87,12 @@ run_one_example() {
     "${tmp_dir}/fabric.clab.yml" \
     "${tmp_dir}/vm-bridges-generated.nix" \
     || fail "FAIL ${name}: rendered artifact validation failed"
+
+  "${repo_root}/tests/validate-topology-conformance.sh" \
+    "${tmp_dir}/cpm.json" \
+    "${renderer_inv}" \
+    "${tmp_dir}/fabric.clab.yml" \
+    || fail "FAIL ${name}: topology conformance validation failed"
 
   echo "PASS ${name}"
 

@@ -33,7 +33,7 @@ labs_path="$(resolve_input_path network-labs)"
 example_dir="${labs_path}/examples/single-wan"
 intent="${example_dir}/intent.nix"
 inventory_clab="${example_dir}/inventory-clab.nix"
-inventory_nixos="${example_dir}/inventory-nixos.nix"
+[[ -f "${inventory_clab}" ]] || { echo "missing inventory-clab.nix: ${inventory_clab}" >&2; exit 1; }
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "'"${tmp_dir}"'"' EXIT
@@ -48,11 +48,9 @@ build_cpm() {
 }
 
 build_cpm "${inventory_clab}" "${tmp_dir}/cpm.clab.json"
-build_cpm "${inventory_nixos}" "${tmp_dir}/cpm.nixos.json"
 
-# Renderer inventory is derived from the (flake-locked) inventory inputs.
+# Renderer inventory is derived from the flake-locked containerlab inventory input.
 nix eval --impure --json --expr "let inv = import ${inventory_clab}; in { containerlab = inv.containerlab or {}; }" > "${tmp_dir}/cpm.clab.json.renderer-inventory.json"
-nix eval --impure --json --expr "let inv = import ${inventory_nixos}; in { containerlab = inv.containerlab or {}; }" > "${tmp_dir}/cpm.nixos.json.renderer-inventory.json"
 
 TMP_DIR="${tmp_dir}" python3 - <<'PY'
 from pathlib import Path
@@ -85,7 +83,6 @@ def _render_execs(cpm_path: Path) -> list[str]:
     return exec_cmds
 
 execs_clab = _render_execs(tmp / "cpm.clab.json")
-execs_nixos = _render_execs(tmp / "cpm.nixos.json")
 
 want = 'oifname "eth0" masquerade'
 want6 = 'oifname "eth0" masquerade'
@@ -93,9 +90,6 @@ want6 = 'oifname "eth0" masquerade'
 assert any(want in c for c in execs_clab), "expected NAT44 on eth0 via inventory-clab.nix"
 assert any("ip6 nat" in c for c in execs_clab), "expected NAT66 table via inventory-clab.nix"
 assert any('ip6 saddr' in c and 'oifname "eth0" masquerade' in c for c in execs_clab), "expected NAT66 on eth0 via inventory-clab.nix"
-
-assert not any(want in c for c in execs_nixos), "unexpected eth0 NAT44 without containerlab inventory"
-assert not any("ip6 nat" in c for c in execs_nixos), "unexpected NAT66 table without containerlab inventory"
 
 print("PASS core-nat-inventory")
 PY

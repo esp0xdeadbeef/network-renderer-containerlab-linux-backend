@@ -50,7 +50,7 @@ Nix with flakes enabled.
 
 ## Step 1 — Build a control-plane model JSON
 
-From a lab `intent.nix` + `inventory.nix` (using the flake-locked `network-labs` input):
+From a lab `intent.nix` + `inventory-clab.nix` (using the flake-locked `network-labs` input):
 
 ```bash
 repo_root="$(pwd)"
@@ -76,9 +76,9 @@ resolve_input_path() {
 labs_path="$(resolve_input_path network-labs)"
 cpm_path="$(resolve_input_path network-control-plane-model)"
 
-nix run "${cpm_path}#compile-and-build-control-plane-model" -- \
+  nix run "${cpm_path}#compile-and-build-control-plane-model" -- \
   "${labs_path}/examples/single-wan/intent.nix" \
-  "${labs_path}/examples/single-wan/inventory.nix" \
+  "${labs_path}/examples/single-wan/inventory-clab.nix" \
   "${repo_root}/output-control-plane-model.json"
 ```
 
