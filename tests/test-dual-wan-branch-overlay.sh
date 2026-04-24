@@ -32,15 +32,9 @@ resolve_example_dir() {
   local example_name="$1"
   local labs_path="$2"
   local pinned_dir="${labs_path}/examples/${example_name}"
-  local sibling_dir="${repo_root}/../network-labs/examples/${example_name}"
 
   if [[ -f "${pinned_dir}/intent.nix" ]]; then
     printf '%s\n' "${pinned_dir}"
-    return 0
-  fi
-
-  if [[ -f "${sibling_dir}/intent.nix" ]]; then
-    printf '%s\n' "${sibling_dir}"
     return 0
   fi
 
@@ -89,6 +83,11 @@ run_example() {
     cat "${tmp_dir}/stderr.log" >&2
     fail "FAIL ${example_name}: overlay external not mapped to policy interface"
   fi
+
+  grep -q '"prefix":"100.96.10.0/24"' "${tmp_dir}/cpm.json" \
+    || fail "FAIL ${example_name}: missing overlay IPv4 prefix in CPM output"
+  grep -q '"prefix":"fd42:dead:beef:ee::/64"' "${tmp_dir}/cpm.json" \
+    || fail "FAIL ${example_name}: missing overlay IPv6 prefix in CPM output"
 
   grep -q 'enterpriseA-site-a-s-router-core-isp-b' "${tmp_dir}/fabric.clab.yml" \
     || fail "FAIL ${example_name}: missing enterpriseA overlay terminator node"
