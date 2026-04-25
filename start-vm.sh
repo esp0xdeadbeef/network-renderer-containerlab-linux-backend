@@ -3,13 +3,43 @@ set -euo pipefail
 
 example="${1:-single-wan}"
 
-export QEMU_NET_OPTS="hostfwd=tcp::2222-:22"
-echo "ssh -o 'StrictHostKeyChecking no' -p2222 root@localhost # to connect to the vm."
+ssh_port="${CLAB_VM_SSH_PORT:-2222}"
+vm_state_dir="${CLAB_VM_STATE_DIR:-}"
+ephemeral_vm_state_dir=""
+
+if [[ -z "${vm_state_dir}" ]]; then
+  cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/network-renderer-containerlab-linux-backend/start-vm"
+  mkdir -p "${cache_root}"
+  ephemeral_vm_state_dir="$(mktemp -d "${cache_root}/state.XXXXXX")"
+  vm_state_dir="${ephemeral_vm_state_dir}"
+fi
+
+cleanup() {
+  if [[ -n "${ephemeral_vm_state_dir}" ]]; then
+    rm -rf "${ephemeral_vm_state_dir}" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+export QEMU_NET_OPTS="hostfwd=tcp::${ssh_port}-:22"
+echo "ssh -o 'StrictHostKeyChecking no' -p${ssh_port} root@localhost # to connect to the vm."
 
 FLAKE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VM_WORK_DIR="${vm_state_dir}"
 
-TOPO_FILE="${FLAKE_DIR}/fabric.clab.yml"
-BRIDGES_FILE="${FLAKE_DIR}/vm-bridges-generated.nix"
+# Some local path-based flake evaluations expect this renderer scratch dir to
+# exist even though it is not tracked in git.
+mkdir -p "${FLAKE_DIR}/clab-fabric"
+
+mkdir -p "${VM_WORK_DIR}"
+
+if [[ "${VM_WORK_DIR}" != "${FLAKE_DIR}" ]]; then
+  cp "${FLAKE_DIR}/vm.nix" "${VM_WORK_DIR}/vm.nix"
+fi
+
+TOPO_FILE="${VM_WORK_DIR}/fabric.clab.yml"
+BRIDGES_FILE="${VM_WORK_DIR}/vm-bridges-generated.nix"
+VM_NIX="${VM_WORK_DIR}/vm.nix"
 
 resolve_input_path() {
   local input_name="$1"
@@ -70,5 +100,8 @@ CLABGEN_RENDERER_INVENTORY_JSON="${renderer_inv}" nix run .#generate-clab-config
   "${BRIDGES_FILE}" >/dev/null
 
 echo "[*] Starting VM via nixos-shell (preserving custom options)..."
-CLAB_VM_BRIDGES_FILE="${BRIDGES_FILE}" \
-  nix run --extra-experimental-features 'nix-command flakes' nixpkgs#nixos-shell -- "${FLAKE_DIR}/vm.nix"
+(
+  cd "${VM_WORK_DIR}"
+  CLAB_VM_BRIDGES_FILE="${BRIDGES_FILE}" \
+    nix run --extra-experimental-features 'nix-command flakes' nixpkgs#nixos-shell -- "${VM_NIX}"
+)

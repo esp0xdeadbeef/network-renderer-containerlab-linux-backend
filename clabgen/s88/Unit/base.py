@@ -191,7 +191,7 @@ def render_units(site: SiteModel) -> Tuple[Dict[str, Any], List[Dict[str, Any]],
                 }
             )
 
-        if len(endpoints) == 2:
+        elif len(endpoints) == 2:
             bridge = _bridge_name(f"{site.enterprise}-{site.site}-{link_name}")
             bridges.append(bridge)
 

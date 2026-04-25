@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
+topo_file="${CLAB_TOPO_FILE:-fabric.clab.yml}"
 
 docker-clab-frr-plus-tooling/build.sh
 
-containerlab deploy -t fabric.clab.yml -d --reconfigure
+# Example switching reuses the same VM and lab name (`fabric`).
+# A plain deploy --reconfigure can leave stale containers behind when the node
+# set changes across examples, so clear the existing lab first.
+containerlab destroy --name fabric -c >/dev/null 2>&1 || true
+
+containerlab deploy -t "${topo_file}" -d --reconfigure
 
 for c in $(docker ps --format '{{.Names}}' | grep clab-fabric | sort )
 do

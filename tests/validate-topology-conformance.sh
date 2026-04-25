@@ -158,6 +158,13 @@ def main() -> None:
         fail(f"missing links in YAML: {missing_links[:10]}")
     if extra_links:
         fail(f"unexpected links in YAML: {extra_links[:10]}")
+    duplicate_links = [
+        f"{' | '.join(key)} (x{count})"
+        for key, count in sorted(actual_links.items(), key=lambda x: x[0])
+        if count > 1
+    ]
+    if duplicate_links:
+        fail(f"duplicate links in YAML: {duplicate_links[:10]}")
 
 
 if __name__ == "__main__":
