@@ -89,9 +89,9 @@ run_example() {
   grep -q '"prefix":"fd42:dead:beef:ee::/64"' "${tmp_dir}/cpm.json" \
     || fail "FAIL ${example_name}: missing overlay IPv6 prefix in CPM output"
 
-  grep -q 'enterpriseA-site-a-s-router-core-isp-b' "${tmp_dir}/fabric.clab.yml" \
+  grep -q 'enterpriseA-site-a-s-router-core-nebula' "${tmp_dir}/fabric.clab.yml" \
     || fail "FAIL ${example_name}: missing enterpriseA overlay terminator node"
-  grep -q 'enterpriseB-site-b-b-router-core' "${tmp_dir}/fabric.clab.yml" \
+  grep -q 'enterpriseB-site-b-b-router-core-nebula' "${tmp_dir}/fabric.clab.yml" \
     || fail "FAIL ${example_name}: missing enterpriseB overlay terminator node"
 
   if [[ "${example_name}" == *-bgp ]]; then
