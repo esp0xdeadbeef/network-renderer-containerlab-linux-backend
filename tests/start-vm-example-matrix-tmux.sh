@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${repo_root}/tests/lib/input-path.sh"
 session="${1:-clab-vm-matrix}"
 workers="${CLAB_VM_MATRIX_WORKERS:-3}"
 matrix_root="${CLAB_VM_MATRIX_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/network-renderer-containerlab-linux-backend/clab-vm-matrix}"
@@ -11,29 +12,6 @@ cleanup_legacy_tmp_state() {
     \( -name 'clab-vm-worker-*' -o -name 'clab-vm-check.*' \) \
     -exec rm -rf {} + 2>/dev/null || true
   find /tmp -maxdepth 1 -type f -name 'clab-vm-worker-*.sh' -delete 2>/dev/null || true
-}
-
-resolve_input_path() {
-  local input_name="$1"
-  local archive_json
-  archive_json="$(mktemp)"
-
-  nix flake archive --json "path:${repo_root}" > "${archive_json}"
-
-  INPUT_NAME="${input_name}" ARCHIVE_JSON="${archive_json}" nix eval --impure --raw --expr '
-    let
-      archived = builtins.fromJSON (builtins.readFile (builtins.getEnv "ARCHIVE_JSON"));
-      name = builtins.getEnv "INPUT_NAME";
-      input = archived.inputs.${name} or null;
-      p = if input == null then null else input.path or null;
-    in
-      if p == null then
-        throw "tests: missing archived input path for " + name
-      else
-        p
-  '
-
-  rm -f "${archive_json}"
 }
 
 labs_path="$(resolve_input_path network-labs)"
