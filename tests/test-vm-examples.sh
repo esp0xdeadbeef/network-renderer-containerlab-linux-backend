@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${repo_root}/tests/lib/input-path.sh"
 vm_ssh_port="${CLAB_VM_SSH_PORT:-2222}"
 vm_state_dir="${CLAB_VM_STATE_DIR:-}"
 ephemeral_vm_state_dir=""
@@ -115,29 +116,6 @@ ssh_vm_once() {
     | ssh "${ssh_opts[@]}" root@localhost /run/current-system/sw/bin/bash --noprofile --norc -s
 }
 
-resolve_input_path() {
-  local input_name="$1"
-  local archive_json
-  archive_json="$(mktemp)"
-
-  nix flake archive --json "path:${repo_root}" > "${archive_json}"
-
-  INPUT_NAME="${input_name}" ARCHIVE_JSON="${archive_json}" nix eval --impure --raw --expr '
-    let
-      archived = builtins.fromJSON (builtins.readFile (builtins.getEnv "ARCHIVE_JSON"));
-      name = builtins.getEnv "INPUT_NAME";
-      input = archived.inputs.${name} or null;
-      p = if input == null then null else input.path or null;
-    in
-      if p == null then
-        throw "tests: missing archived input path for " + name
-      else
-        p
-  '
-
-  rm -f "${archive_json}"
-}
-
 cleanup_vm() {
   if [[ -n "${vm_state_dir}" ]]; then
     pkill -f "${vm_state_dir}/vm.nix" >/dev/null 2>&1 || true
@@ -149,8 +127,8 @@ cleanup_vm() {
       "${vm_state_dir}/vm-state.log" \
       >/dev/null 2>&1 || true
   else
-    pkill -f '/home/deadbeef/github/network-renderer-containerlab-linux-backend/vm.nix' >/dev/null 2>&1 || true
-    pkill -f 'qemu-system-x86_64 .*network-renderer-containerlab-linux-backend/nixos.qcow2' >/dev/null 2>&1 || true
+    pkill -f "${repo_root}/vm.nix" >/dev/null 2>&1 || true
+    pkill -f "qemu-system-x86_64 .*${repo_root}/nixos.qcow2" >/dev/null 2>&1 || true
   fi
   sleep 2
 }
@@ -226,21 +204,21 @@ stage_rendered_topology() {
   log "staging rendered topology into the VM"
   scp_vm_file \
     "${vm_state_dir}/fabric.clab.yml" \
-    "/home/deadbeef/github/network-renderer-containerlab-linux-backend/fabric.clab.yml"
+    "${repo_root}/fabric.clab.yml"
 }
 
 run_in_vm_validation() {
   log "running run-in-vm.sh inside the VM"
   stage_tooling_cache_into_vm
-  ssh_vm '
+  ssh_vm "
     set -euo pipefail
-    cd /home/deadbeef/github/network-renderer-containerlab-linux-backend
+    cd '${repo_root}'
     timeout 900 env \
-      CLAB_TOPO_FILE=/home/deadbeef/github/network-renderer-containerlab-linux-backend/fabric.clab.yml \
-      CLAB_FRR_TOOLING_CACHE_TAR='"${vm_image_cache_tar}"' \
-      CLAB_FRR_TOOLING_CACHE_IMAGE_ID_FILE='"${vm_image_cache_id}"' \
+      CLAB_TOPO_FILE='${repo_root}/fabric.clab.yml' \
+      CLAB_FRR_TOOLING_CACHE_TAR='${vm_image_cache_tar}' \
+      CLAB_FRR_TOOLING_CACHE_IMAGE_ID_FILE='${vm_image_cache_id}' \
       ./run-in-vm.sh
-  '
+  "
   log "run-in-vm.sh completed"
 }
 
@@ -292,7 +270,7 @@ if example == "single-wan":
     emit("MGMT_TENANT_IFACE", tenant_iface or "")
 elif example == "dual-wan-branch-overlay":
     _, sitea_core_site, sitea_core, _ = find_rt("s-router-core-isp-a")
-    _, siteb_core_site, siteb_core, _ = find_rt("b-router-core")
+    _, siteb_core_site, siteb_core, _ = find_rt("b-router-core-nebula")
     _, branch_site, branch_access, branch_rt = find_rt("b-router-access-branch")
     _, sitea_mgmt_site, sitea_mgmt, sitea_rt = find_rt("s-router-access-mgmt")
     branch_loop = (((branch_rt.get("effectiveRuntimeRealization") or {}).get("loopback")) or {})
@@ -302,7 +280,7 @@ elif example == "dual-wan-branch-overlay":
     emit("SITEA_CORE_LOGICAL", "s-router-core-isp-a")
     emit("SITEB_CORE_RT", siteb_core)
     emit("SITEB_CORE_SITE", siteb_core_site)
-    emit("SITEB_CORE_LOGICAL", "b-router-core")
+    emit("SITEB_CORE_LOGICAL", "b-router-core-nebula")
     emit("BRANCH_ACCESS_RT", branch_access)
     emit("BRANCH_SITE", branch_site)
     emit("BRANCH_ACCESS_LOGICAL", "b-router-access-branch")
@@ -373,12 +351,18 @@ PY
 load_example_context() {
   local example="$1"
   local cpm_json="$2"
+  local context
+  context="$(extract_example_context "${example}" "${cpm_json}")"
+  if [[ -z "${context}" ]]; then
+    echo "failed to extract example context for ${example}" >&2
+    exit 1
+  fi
 
   while IFS='=' read -r key value; do
     [[ -n "$key" ]] || continue
     printf -v "$key" '%s' "$value"
     export "$key"
-  done < <(extract_example_context "$example" "$cpm_json")
+  done < <(printf '%s\n' "${context}")
 }
 
 resolve_container_name() {
@@ -408,7 +392,7 @@ check_single_wan() {
   local client
   client="$(resolve_client_container_name "${MGMT_SITE}" "${MGMT_LOGICAL}" "${MGMT_TENANT_IFACE}")"
   ssh_vm_once "
-    containerlab inspect -t /home/deadbeef/github/network-renderer-containerlab-linux-backend/fabric.clab.yml >/dev/null
+    containerlab inspect -t "${repo_root}/fabric.clab.yml" >/dev/null
     docker exec '${client}' sh -lc '
     docker exec '${client}' sh -c '
       set -e
@@ -468,7 +452,7 @@ check_dual_wan_overlay() {
   branch_access="$(resolve_container_name "${BRANCH_SITE}" "${BRANCH_ACCESS_LOGICAL}")"
   ssh_vm '
     set -euo pipefail
-    containerlab inspect -t /home/deadbeef/github/network-renderer-containerlab-linux-backend/fabric.clab.yml >/dev/null
+    containerlab inspect -t '"${repo_root}"'/fabric.clab.yml >/dev/null
     docker ps --format "{{.Names}}" | grep -q "^'"${sitea_core}"'$"
     docker ps --format "{{.Names}}" | grep -q "^'"${siteb_core}"'$"
     docker exec "'"${branch_access}"'" sh -c "
@@ -486,7 +470,7 @@ check_dual_wan_overlay_bgp() {
   branch_access="$(resolve_container_name "${BRANCH_ACCESS_SITE}" "${BRANCH_ACCESS_LOGICAL}")"
   ssh_vm '
     set -euo pipefail
-    containerlab inspect -t /home/deadbeef/github/network-renderer-containerlab-linux-backend/fabric.clab.yml >/dev/null
+    containerlab inspect -t '"${repo_root}"'/fabric.clab.yml >/dev/null
     docker exec "'"${branch_access}"'" sh -c "
       set -e
       ip route get '"${SITEA_LOOP4}"' >/dev/null
