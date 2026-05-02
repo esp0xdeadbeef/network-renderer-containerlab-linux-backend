@@ -123,6 +123,7 @@ def inject_clients(site: SiteModel) -> None:
                 name=client_name,
                 role="client",
                 routing_domain=node.routing_domain,
+                routing_mode="static",
                 interfaces={
                     ifname: InterfaceModel(
                         name=ifname,

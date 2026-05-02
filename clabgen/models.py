@@ -40,7 +40,7 @@ class NodeModel:
     role: str
     routing_domain: str
     interfaces: Dict[str, InterfaceModel]
-    routing_mode: str = "static"
+    routing_mode: str
     bgp: Dict[str, Any] = field(default_factory=dict)
     containers: List[str] = field(default_factory=list)
     isolated: bool = False

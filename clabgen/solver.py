@@ -175,10 +175,21 @@ def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(loopback, dict):
             loopback = {}
 
+        routing_mode = rt.get("routingMode")
+        if not isinstance(routing_mode, str) or not routing_mode:
+            raise ValueError(
+                f"control_plane_model runtime target {rt_name!r} must include routingMode"
+            )
+        routing_mode = routing_mode.strip().lower()
+        if routing_mode not in {"static", "bgp"}:
+            raise ValueError(
+                f"control_plane_model runtime target {rt_name!r} has invalid routingMode {routing_mode!r}"
+            )
+
         nodes[node_name] = {
             "role": rt.get("role") or "",
             "routingDomain": rt.get("routingDomain") or "",
-            "routing_mode": rt.get("routingMode") or rt.get("routing_mode") or "static",
+            "routing_mode": routing_mode,
             "bgp": rt.get("bgp") or {},
             "interfaces": iface_out,
             "containers": rt.get("containers") or [],
