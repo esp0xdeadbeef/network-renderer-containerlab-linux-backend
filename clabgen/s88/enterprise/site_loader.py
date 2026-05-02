@@ -184,9 +184,12 @@ def _build_nodes(
         interfaces = _build_interfaces(site, unit, node_obj, tenant_prefix_owners)
         loopback4, loopback6 = _loopback_addrs(node_obj)
 
-        routing_mode = str(node_obj.get("routing_mode", "static")).strip().lower()
+        raw_routing_mode = node_obj.get("routing_mode")
+        if not isinstance(raw_routing_mode, str) or not raw_routing_mode:
+            raise ValueError(f"node {unit!r} missing explicit routing_mode")
+        routing_mode = raw_routing_mode.strip().lower()
         if routing_mode not in {"static", "bgp"}:
-            routing_mode = "static"
+            raise ValueError(f"node {unit!r} has invalid routing_mode {routing_mode!r}")
 
         bgp = node_obj.get("bgp", {})
         if not isinstance(bgp, dict):

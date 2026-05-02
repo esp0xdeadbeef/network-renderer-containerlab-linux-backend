@@ -889,9 +889,9 @@ def render(
         _sh('for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$i"; done'),
     ]
 
-    routing_mode = str(node_data.get("routing_mode", "static")).strip().lower()
+    routing_mode = str(node_data.get("routing_mode") or "").strip().lower()
     if routing_mode not in {"static", "bgp"}:
-        routing_mode = "static"
+        raise ValueError(f"node {node_name!r} has invalid routing_mode {routing_mode!r}")
 
     cmds.extend(_render_interfaces(node_data, eth_map))
     cmds.extend(_render_addressing(node_data, eth_map))
