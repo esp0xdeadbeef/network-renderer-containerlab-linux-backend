@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+"${repo_root}/tests/test-nix-file-loc.sh"
 "${repo_root}/tests/test-passing-fixtures.sh"
 "${repo_root}/tests/test-dual-wan-branch-overlay.sh"
 "${repo_root}/tests/test-bgp-example.sh"
