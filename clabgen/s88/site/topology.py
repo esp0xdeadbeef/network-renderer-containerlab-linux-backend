@@ -1,52 +1,19 @@
 from __future__ import annotations
 
-from typing import Any, Dict
 import copy
+from typing import Any, Dict
 
 from clabgen.models import SiteModel
+from clabgen.s88.site.bridge_networks import renderer_bridge_networks
 from clabgen.s88.site.eth_map import build_eth_maps
 from clabgen.s88.site.links import render_links
 from clabgen.s88.site.nodes import render_nodes
 
 
-def _renderer_bridge_networks(site: SiteModel) -> Dict[str, Any]:
-    deployment = site.renderer_inventory.get("deployment", {})
-    if not isinstance(deployment, dict):
-        return {}
-
-    hosts = deployment.get("hosts", {})
-    if not isinstance(hosts, dict):
-        return {}
-
-    bridge_networks: Dict[str, Any] = {}
-
-    for host in hosts.values():
-        if not isinstance(host, dict):
-            continue
-
-        uplinks = host.get("uplinks", {})
-        if isinstance(uplinks, dict):
-            for uplink in uplinks.values():
-                if not isinstance(uplink, dict):
-                    continue
-                bridge = uplink.get("bridge")
-                if isinstance(bridge, str) and bridge:
-                    bridge_networks[bridge] = dict(uplink)
-
-        bridges = host.get("bridgeNetworks", {})
-        if isinstance(bridges, dict):
-            for bridge_name, bridge in bridges.items():
-                if not isinstance(bridge_name, str) or not bridge_name:
-                    continue
-                if isinstance(bridge, dict) and bridge:
-                    bridge_networks.setdefault(bridge_name, dict(bridge))
-
-    return bridge_networks
-
-
 def render_site_topology(site: SiteModel) -> Dict[str, Any]:
     site = copy.deepcopy(site)
-    bridge_networks = _renderer_bridge_networks(site)
+    bridge_networks = renderer_bridge_networks(site)
+    site.bridge_networks = bridge_networks
     for link in site.links.values():
         if not link.bridge or not link.host_uplink:
             continue
