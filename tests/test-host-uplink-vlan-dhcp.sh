@@ -34,9 +34,21 @@ assert bridge_networks["br-uplink1"]["vlan"] == 5
 required = [
     "- macvlan:eth0.4",
     "- macvlan:eth0.5",
+    "- macvlan:eth0.350",
+    "- macvlan:eth0.351",
+    "- macvlan:eth0.352",
+    "- macvlan:eth0.353",
+    "- macvlan:eth0.354",
+    "- macvlan:eth0.355",
+    "- macvlan:eth0.356",
+    "- macvlan:eth0.357",
     "clab.host.vlan: '4'",
     "clab.host.vlan: '5'",
+    "clab.host.vlan: '350'",
+    "clab.host.vlan: '357'",
     "clab.host.parent: eth0",
+    "clab.link.bridge: mgmt",
+    "clab.link.bridge: streaming",
     "clab.link.bridge: br-uplink0",
     "clab.link.bridge: br-uplink1",
 ]
@@ -47,6 +59,10 @@ if missing:
 
 if "host:veth-br-upl" in topology:
     raise SystemExit("host uplinks must not be rendered as host veth bridge links")
+
+for bridge in ["mgmt", "admin", "client", "client2", "dmz", "branch", "hostile", "streaming"]:
+    if f"clab.link.bridge: {bridge}" not in topology:
+        raise SystemExit(f"missing access bridge marker {bridge}")
 
 if re.search(r"(?m)^\s*type: macvlan$", topology) or re.search(
     r"(?m)^\s*host-interface:", topology
