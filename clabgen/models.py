@@ -49,6 +49,7 @@ class NodeModel:
     route_intents: List[Dict[str, Any]] = field(default_factory=list)
     policy_intents: List[Dict[str, Any]] = field(default_factory=list)
     nat_intents: List[Dict[str, Any]] = field(default_factory=list)
+    services: Dict[str, Any] = field(default_factory=dict)
     loopback4: Optional[str] = None
     loopback6: Optional[str] = None
 

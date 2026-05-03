@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Set, Tuple
+import ipaddress
 import json
 import re
 from collections import deque
@@ -39,6 +40,18 @@ def _members(obj: Any) -> List[str]:
     return []
 
 
+def _endpoint_members(obj: Any, service_tenants: Dict[str, List[str]]) -> List[str]:
+    if isinstance(obj, str) and obj in service_tenants:
+        return list(service_tenants[obj])
+
+    if isinstance(obj, dict) and obj.get("kind") == "service":
+        name = obj.get("name")
+        if isinstance(name, str) and name:
+            return list(service_tenants.get(name, []))
+
+    return _members(obj)
+
+
 def _relation_objects(contract: Dict[str, Any]) -> List[Dict[str, Any]]:
     relations = contract.get("allowedRelations") or contract.get("relations")
     if not isinstance(relations, list):
@@ -71,6 +84,107 @@ def _contract_external_names(contract: Dict[str, Any]) -> List[str]:
                 result.update(_members(endpoint))
 
     return sorted(result)
+
+
+def _service_definitions(contract: Dict[str, Any]) -> List[Dict[str, Any]]:
+    services = contract.get("services")
+    if not isinstance(services, list):
+        return []
+    return [
+        service
+        for service in services
+        if isinstance(service, dict) and isinstance(service.get("name"), str) and service.get("name")
+    ]
+
+
+def _ownership_endpoint_tenants(site: SiteModel) -> Dict[str, str]:
+    endpoints = site.raw_ownership.get("endpoints")
+    if not isinstance(endpoints, list):
+        return {}
+
+    result: Dict[str, str] = {}
+    for endpoint in endpoints:
+        if not isinstance(endpoint, dict):
+            continue
+        name = endpoint.get("name")
+        tenant = endpoint.get("tenant")
+        if isinstance(name, str) and name and isinstance(tenant, str) and tenant:
+            result[name] = tenant
+    return result
+
+
+def _node_dns_service_tenant(node: NodeModel) -> str | None:
+    dns = node.services.get("dns") if isinstance(node.services, dict) else None
+    if not isinstance(dns, dict):
+        return None
+
+    listen = dns.get("listen")
+    if not isinstance(listen, list):
+        return None
+    listen_ips = {value for value in listen if isinstance(value, str) and value}
+
+    for iface in node.interfaces.values():
+        if iface.kind != "tenant" or not isinstance(iface.tenant, str) or not iface.tenant:
+            continue
+
+        for addr in (iface.addr4, iface.addr6):
+            if not isinstance(addr, str) or not addr:
+                continue
+            try:
+                ip = str(ipaddress.ip_interface(addr).ip)
+            except ValueError:
+                continue
+            if ip in listen_ips:
+                return iface.tenant
+
+    return None
+
+
+def _dns_service_provider_tenants(site: SiteModel) -> List[str]:
+    scored: List[tuple[int, str]] = []
+
+    for node in site.nodes.values():
+        tenant = _node_dns_service_tenant(node)
+        if tenant is None:
+            continue
+
+        dns = node.services.get("dns") if isinstance(node.services, dict) else {}
+        allow_from = dns.get("allowFrom") if isinstance(dns, dict) else []
+        score = len(allow_from) if isinstance(allow_from, list) else 0
+        scored.append((score, tenant))
+
+    if not scored:
+        return []
+
+    max_score = max(score for score, _ in scored)
+    return sorted({tenant for score, tenant in scored if score == max_score})
+
+
+def _service_tenants(site: SiteModel, contract: Dict[str, Any]) -> Dict[str, List[str]]:
+    ownership_tenants = _ownership_endpoint_tenants(site)
+    dns_provider_tenants = _dns_service_provider_tenants(site)
+    result: Dict[str, List[str]] = {}
+
+    for service in _service_definitions(contract):
+        name = service["name"]
+        tenants: List[str] = []
+
+        provider_tenants = service.get("providerTenants")
+        if isinstance(provider_tenants, list):
+            tenants.extend(value for value in provider_tenants if isinstance(value, str) and value)
+
+        providers = service.get("providers")
+        if isinstance(providers, list):
+            for provider in providers:
+                if isinstance(provider, str) and provider in ownership_tenants:
+                    tenants.append(ownership_tenants[provider])
+
+        if not tenants and service.get("trafficType") == "dns":
+            tenants.extend(dns_provider_tenants)
+
+        result[name] = sorted(set(tenants))
+
+    return result
 
 
 def _policy_peer_map(site: SiteModel, policy_node_name: str, eth_map: Dict[str, int]):
@@ -624,7 +738,11 @@ def _build_policy_interface_tags(
     return interface_tags
 
 
-def _build_policy_rules(contract: Dict[str, Any], known_tags: set[str]):
+def _build_policy_rules(
+    contract: Dict[str, Any],
+    known_tags: set[str],
+    service_tenants: Dict[str, List[str]],
+):
     rules = []
 
     traffic_types_raw = contract.get("trafficTypes") or []
@@ -642,13 +760,13 @@ def _build_policy_rules(contract: Dict[str, Any], known_tags: set[str]):
             traffic_type_matches[name] = [m for m in matches if isinstance(m, dict)]
 
     for relation in _relation_objects(contract):
-        src_members = _members(relation.get("from"))
+        src_members = _endpoint_members(relation.get("from"), service_tenants)
         dst = relation.get("to")
 
         if dst == "any":
             dst_members = sorted(known_tags)
         else:
-            dst_members = _members(dst)
+            dst_members = _endpoint_members(dst, service_tenants)
 
         action = "accept" if relation.get("action") == "allow" else "drop"
         matches = relation.get("match") or relation.get("matches") or []
@@ -703,8 +821,11 @@ def _build_policy_rules(contract: Dict[str, Any], known_tags: set[str]):
 
 def build_policy_firewall_state(site: SiteModel, policy_node_name: str, eth_map: Dict[str, int]):
     contract = dict(site.raw_policy or {})
+    service_tenants = _service_tenants(site, contract)
 
     tenants = set(_contract_tenant_names(contract))
+    for values in service_tenants.values():
+        tenants.update(values)
     externals = set(_contract_external_names(contract))
 
     interface_tags = _build_policy_interface_tags(
@@ -715,10 +836,11 @@ def build_policy_firewall_state(site: SiteModel, policy_node_name: str, eth_map:
         externals,
     )
 
-    rules = _build_policy_rules(contract, _interface_tag_values(interface_tags))
+    rules = _build_policy_rules(contract, _interface_tag_values(interface_tags), service_tenants)
 
     return {
         "interface_tags": interface_tags,
+        "service_tenants": service_tenants,
         "rules": rules,
     }
 

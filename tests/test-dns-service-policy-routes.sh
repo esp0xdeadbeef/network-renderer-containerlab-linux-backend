@@ -32,6 +32,21 @@ assert_node_contains \
 
 assert_node_contains \
   "${topology}" \
+  "esp0xdeadbeef-site-a-s-router-policy-only" \
+  "oifname \"eth5\" udp dport 53 counter accept"
+
+assert_node_contains \
+  "${topology}" \
+  "esp0xdeadbeef-site-a-s-router-policy-only" \
+  "oifname \"eth5\" tcp dport 53 counter accept"
+
+assert_node_contains \
+  "${topology}" \
+  "esp0xdeadbeef-site-a-s-router-access-mgmt" \
+  "clabgen-dns-proxy.py"
+
+assert_node_contains \
+  "${topology}" \
   "esp0xdeadbeef-site-c-c-router-policy" \
   "ip route replace 10.90.20.0/24 via 10.80.0.14 dev eth2 onlink"
 

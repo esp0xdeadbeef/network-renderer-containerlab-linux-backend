@@ -44,6 +44,7 @@ def build_node_data(
             if ifname in eth_map
         },
         "route_intents": list(node.route_intents),
+        "services": copy.deepcopy(node.services),
         "loopback": {
             "ipv4": node.loopback4,
             "ipv6": node.loopback6,

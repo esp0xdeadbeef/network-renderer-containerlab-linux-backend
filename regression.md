@@ -28,6 +28,13 @@ Current verified state as of 2026-05-03.
   `ssh s-router-clab id` returned `uid=1000(deadbeef)`.
 - The normal repo runner passed after wiring in the copied tests:
   `./tests/test.sh`.
+- Service endpoints in firewall policy now follow the NixOS renderer shape:
+  service names resolve through explicit `providerTenants`, ownership endpoint
+  providers, and the runtime DNS service tenant when the current CLAB fixture
+  lacks explicit DNS provider tenants.
+- Containerlab runtime nodes now render DNS services from CPM runtime targets.
+  The generated DNS process listens on the modeled service addresses, forwards
+  to the modeled upstreams/forwarders, and serves modeled local records.
 - `s-router-clab` now exposes direct SSH into the nested container on port
   2222. The verified path is:
   `ssh -p 2222 root@s-router-clab`.
@@ -61,9 +68,15 @@ Current verified state as of 2026-05-03.
     `10.60.10.1 via 100.96.10.2 dev eth4`
   - peer overlay host routes:
     `100.96.10.1 dev eth3` and `100.96.10.2 dev eth4`
-- Live traffic is partially green: site-A client to branch access succeeded
-  (`10.20.10.1` to `10.60.10.1`). Branch access to site-A client still drops
-  and remains the next live blocker.
+- Live traffic is green for the overlay and DNS service contracts currently
+  checked here:
+  - Site-A client to branch access succeeded
+    (`10.20.10.1` to `10.60.10.1`).
+  - Branch access TCP to site-A DNS connected:
+    `10.60.10.1` to `10.20.10.1:53`.
+  - Branch access UDP DNS to site-A DNS returned a DNS response from
+    `10.20.10.1` with `rcode=2` after the modeled public forwarders timed out
+    in the CLAB environment.
 - Remaining nonfatal Containerlab environment issue:
   `failed to create hosts file: open /etc/hosts: read-only file system`.
 
@@ -79,5 +92,6 @@ Current verified state as of 2026-05-03.
 
 ## next concrete target
 
-- Fix the remaining branch-to-site live traffic drop, then rerun the direct-SSH
-  `s-router-clab` deploy/probe pass.
+- Continue copying applicable `network-renderer-nixos` service/firewall tests
+  into this backend, especially around DNS access-control and direct DNS egress
+  denial where those contracts apply to Containerlab.
