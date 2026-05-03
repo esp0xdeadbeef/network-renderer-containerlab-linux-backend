@@ -19,8 +19,12 @@ def render(input_data: Dict[str, Any]) -> List[str]:
 
     if disable_eth0:
         if enable_ipv4:
-            cmds.append("sysctl -w net.ipv4.conf.eth0.forwarding=0")
+            cmds.append(
+                "test ! -d /proc/sys/net/ipv4/conf/eth0 || sysctl -w net.ipv4.conf.eth0.forwarding=0"
+            )
         if enable_ipv6:
-            cmds.append("sysctl -w net.ipv6.conf.eth0.forwarding=0")
+            cmds.append(
+                "test ! -d /proc/sys/net/ipv6/conf/eth0 || sysctl -w net.ipv6.conf.eth0.forwarding=0"
+            )
 
     return cmds

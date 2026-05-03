@@ -81,5 +81,6 @@ def render_linux_node(
     return {
         "kind": "linux",
         "image": "clab-frr-plus-tooling:latest",
+        "network-mode": "none",
         "exec": exec_cmds,
     }
