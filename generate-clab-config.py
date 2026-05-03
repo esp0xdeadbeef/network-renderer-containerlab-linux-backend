@@ -60,7 +60,10 @@ def _normalized_solver_input(input_path: Path) -> Path:
         if candidate.exists():
             return candidate
 
-    searched = "\n".join(f"  - {candidate}" for candidate in _candidate_control_plane_model_paths(input_path))
+    searched = "\n".join(
+        f"  - {candidate}"
+        for candidate in _candidate_control_plane_model_paths(input_path)
+    )
     raise RuntimeError(
         "generate-clab-config.py does not parse intent.nix.\n"
         "Provide a prebuilt control-plane-model JSON and point to it directly, or place one at one of:\n"

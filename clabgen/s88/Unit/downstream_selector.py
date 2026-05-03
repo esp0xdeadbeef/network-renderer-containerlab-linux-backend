@@ -20,4 +20,3 @@ def render(
         eth_map=eth_map,
         extra=extra,
     )
-

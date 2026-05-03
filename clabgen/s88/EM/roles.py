@@ -3,8 +3,12 @@ from __future__ import annotations
 from typing import Dict, Any, List, Tuple
 
 
+def _eth_index(item: Tuple[str, int]) -> int:
+    return item[1]
+
+
 def _sorted_ifaces(eth_map: Dict[str, int]) -> List[Tuple[str, int]]:
-    return sorted(eth_map.items(), key=lambda x: x[1])
+    return sorted(eth_map.items(), key=_eth_index)
 
 
 def _link(ifname: str, eth: int) -> Dict[str, Any]:
@@ -24,7 +28,10 @@ def _maybe_link(items: List[Tuple[str, int]], index: int) -> Dict[str, Any] | No
 
 
 def _links(items: List[Tuple[str, int]]) -> List[Dict[str, Any]]:
-    return [_link(ifname, eth) for ifname, eth in items]
+    links: List[Dict[str, Any]] = []
+    for ifname, eth in items:
+        links.append(_link(ifname, eth))
+    return links
 
 
 def parse_access(

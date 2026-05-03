@@ -55,12 +55,19 @@ def inject_emulated_wan_peers(site: SiteModel) -> None:
     for link_name, link in list(site.links.items()):
         if getattr(link, "kind", None) != "wan":
             continue
+        if getattr(link, "host_uplink", None):
+            continue
 
         endpoints = dict(getattr(link, "endpoints", {}) or {})
         if len(endpoints) != 1:
             continue
 
-        local_node_name, local_ep = next(iter(endpoints.items()))
+        local_node_name = ""
+        local_ep: Dict[str, Any] = {}
+        for endpoint_node_name, endpoint_data in endpoints.items():
+            local_node_name = endpoint_node_name
+            local_ep = endpoint_data
+            break
 
         if not isinstance(local_ep, dict):
             continue

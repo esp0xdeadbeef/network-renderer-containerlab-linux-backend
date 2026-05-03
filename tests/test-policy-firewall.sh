@@ -27,9 +27,9 @@ import os
 from pathlib import Path
 
 from clabgen.s88.enterprise.site_loader import load_sites
-from clabgen.s88.Unit.base import _build_eth_maps
-from clabgen.s88.Unit.firewall_context import build_policy_firewall_state
 from clabgen.s88.CM.policy_firewall import render as render_policy_firewall
+from clabgen.s88.site.eth_map import build_eth_maps
+from clabgen.s88.site.policy_context import build_policy_firewall_state
 
 p = Path(os.environ["TMP_DIR"]) / "cpm.json"
 sites = load_sites(p)
@@ -38,7 +38,7 @@ assert sites, "no sites loaded"
 site = next(iter(sites.values()))
 assert site.policy_node_name, "site.policy_node_name missing"
 
-eth_maps = _build_eth_maps(site)
+eth_maps = build_eth_maps(site)
 eth_map = eth_maps.get(site.policy_node_name) or {}
 assert eth_map, "eth_map missing for policy node"
 

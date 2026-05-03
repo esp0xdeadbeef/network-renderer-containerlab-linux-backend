@@ -16,6 +16,29 @@ let
   generated = import generatedBridgesFile { inherit lib; };
 
   bridges = generated.bridges;
+  bridgeNetworks = generated.bridgeNetworks or { };
+  bridgeNames = lib.unique (bridges ++ builtins.attrNames bridgeNetworks);
+  bridgeNetworkNames = builtins.attrNames bridgeNetworks;
+  physicalUplinks = lib.filterAttrs (
+    _name: uplink:
+      builtins.isAttrs uplink
+      && builtins.isString (uplink.bridge or null)
+      && builtins.isString (uplink.parent or null)
+      && builtins.isString (uplink.mode or null)
+  ) bridgeNetworks;
+  physicalUplinkNames = builtins.attrNames physicalUplinks;
+
+  vlanIfNameFor = uplink: "${uplink.parent}.${toString uplink.vlan}";
+
+  vlanUplinkNames = lib.filter (
+    name:
+      let uplink = physicalUplinks.${name};
+      in (uplink.mode or "") == "vlan" && builtins.isInt (uplink.vlan or null)
+  ) physicalUplinkNames;
+
+  parentIfNames = lib.unique (
+    lib.filter builtins.isString (map (name: physicalUplinks.${name}.parent or null) physicalUplinkNames)
+  );
 
   mkNetdev = name: {
     netdevConfig = {
@@ -24,14 +47,95 @@ let
     };
   };
 
-  mkNetwork = name: {
+  mkBridgeNetwork = name: {
     matchConfig.Name = name;
+    linkConfig = {
+      ActivationPolicy = "always-up";
+      RequiredForOnline = "no";
+    };
     networkConfig = {
       ConfigureWithoutCarrier = true;
       LinkLocalAddressing = "no";
       IPv6AcceptRA = false;
+      DHCP =
+        let cfg = bridgeNetworks.${name} or { };
+        in if name == "vlan2" || cfg.name or null == "management" then "ipv4" else "no";
     };
+    dhcpV4Config = lib.optionalAttrs (name == "vlan2") { UseDNS = false; };
   };
+
+  vlanNetdevs = builtins.listToAttrs (
+    map (
+      name:
+      let
+        uplink = physicalUplinks.${name};
+        vlanIfName = vlanIfNameFor uplink;
+      in
+      {
+        name = "11-${vlanIfName}";
+        value = {
+          netdevConfig = {
+            Name = vlanIfName;
+            Kind = "vlan";
+          };
+          vlanConfig.Id = uplink.vlan;
+        };
+      }
+    ) vlanUplinkNames
+  );
+
+  parentNetworks = builtins.listToAttrs (
+    map (
+      parentIf:
+      let
+        vlanChildren = map (
+          name: vlanIfNameFor physicalUplinks.${name}
+        ) (lib.filter (name: physicalUplinks.${name}.parent == parentIf) vlanUplinkNames);
+      in
+      {
+        name = "20-${parentIf}";
+        value = {
+          matchConfig.Name = parentIf;
+          linkConfig = {
+            ActivationPolicy = "always-up";
+            RequiredForOnline = "no";
+          };
+          networkConfig = {
+            ConfigureWithoutCarrier = true;
+            LinkLocalAddressing = "no";
+            IPv6AcceptRA = false;
+            VLAN = vlanChildren;
+          };
+        };
+      }
+    ) parentIfNames
+  );
+
+  vlanAttachmentNetworks = builtins.listToAttrs (
+    map (
+      name:
+      let
+        uplink = physicalUplinks.${name};
+        vlanIfName = vlanIfNameFor uplink;
+      in
+      {
+        name = "21-${vlanIfName}";
+        value = {
+          matchConfig.Name = vlanIfName;
+          linkConfig = {
+            ActivationPolicy = "always-up";
+            RequiredForOnline = "no";
+          };
+          networkConfig = {
+            Bridge = uplink.bridge;
+            ConfigureWithoutCarrier = true;
+            LinkLocalAddressing = "no";
+            IPv6AcceptRA = false;
+          };
+        };
+      }
+    ) vlanUplinkNames
+  );
 in
 {
   system.stateVersion = "25.11";
@@ -55,8 +159,11 @@ in
 
   boot.kernelModules = [ "br_netfilter" ];
 
-  systemd.network.netdevs = lib.genAttrs bridges mkNetdev;
-  systemd.network.networks = lib.genAttrs bridges mkNetwork;
+  systemd.network.netdevs = (lib.genAttrs bridgeNames mkNetdev) // vlanNetdevs;
+  systemd.network.networks =
+    (lib.genAttrs bridgeNames mkBridgeNetwork)
+    // parentNetworks
+    // vlanAttachmentNetworks;
 
   virtualisation.docker.enable = true;
 

@@ -34,7 +34,7 @@ render_clab_example() {
   (
     cd "${repo_root}"
     nix eval --impure --json --expr \
-      "let inv = import ${inventory_path}; in { containerlab = inv.containerlab or {}; }" \
+      "import ${inventory_path}" \
       > "${tmp_dir}/renderer-inventory.json"
 
     CLABGEN_RENDERER_INVENTORY_JSON="${tmp_dir}/renderer-inventory.json" \
@@ -66,6 +66,22 @@ assert_node_contains() {
 
   if ! grep -Fq -- "${needle}" <<<"${block}"; then
     echo "missing in ${node}: ${needle}" >&2
+    echo "--- ${node} ---" >&2
+    printf '%s\n' "${block}" >&2
+    exit 1
+  fi
+}
+
+assert_node_matches() {
+  local topology="$1"
+  local node="$2"
+  local regex="$3"
+  local block
+
+  block="$(node_block "${topology}" "${node}")"
+
+  if ! grep -Eq -- "${regex}" <<<"${block}"; then
+    echo "missing in ${node}: regex ${regex}" >&2
     echo "--- ${node} ---" >&2
     printf '%s\n' "${block}" >&2
     exit 1
