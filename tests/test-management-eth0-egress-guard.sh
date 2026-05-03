@@ -60,6 +60,12 @@ for site_name, site in sites.items():
         assert 'nft add rule inet clab_guard forward oifname "eth0" drop' in commands, (
             f"{site_name}/{node_name} missing eth0 forward drop"
         )
+        assert "test ! -d /proc/sys/net/ipv4/conf/eth0 || sysctl" not in exec_commands, (
+            f"{site_name}/{node_name} has unwrapped shell operator in IPv4 forwarding guard"
+        )
+        assert "test ! -d /proc/sys/net/ipv6/conf/eth0 || sysctl" not in exec_commands, (
+            f"{site_name}/{node_name} has unwrapped shell operator in IPv6 forwarding guard"
+        )
 
 print("PASS management-eth0-egress-guard")
 PY
