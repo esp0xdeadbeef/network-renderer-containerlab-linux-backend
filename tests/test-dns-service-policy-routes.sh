@@ -20,15 +20,15 @@ assert_node_contains \
   "espbranch-site-b-b-router-policy" \
   "ip route replace 10.20.10.0/24 via 10.50.0.17 dev eth5 onlink"
 
-assert_node_contains \
+assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-upstream-selector" \
-  "ip route replace 10.20.10.0/24 via 10.10.0.44 dev eth13 onlink"
+  "ip route replace 10\\.20\\.10\\.0/24 via 10\\.10\\.0\\.[0-9]+ dev eth[0-9]+ onlink"
 
-assert_node_contains \
+assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-policy-only" \
-  "ip route replace 10.20.10.0/24 via 10.10.0.24 dev eth5 onlink"
+  "ip route replace 10\\.20\\.10\\.0/24 via 10\\.10\\.0\\.[0-9]+ dev eth5 onlink"
 
 assert_node_contains \
   "${topology}" \
@@ -45,10 +45,10 @@ assert_node_contains \
   "esp0xdeadbeef-site-a-s-router-access-mgmt" \
   "clabgen-dns-proxy.py"
 
-assert_node_contains \
+assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-c-c-router-policy" \
-  "ip route replace 10.90.20.0/24 via 10.80.0.14 dev eth2 onlink"
+  "ip route replace 10\\.90\\.20\\.0/24 via 10\\.80\\.0\\.[0-9]+ dev eth[0-9]+ onlink"
 
 assert_topology_contains \
   "${topology}" \

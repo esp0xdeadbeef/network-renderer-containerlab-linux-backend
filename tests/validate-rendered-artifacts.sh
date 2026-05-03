@@ -48,6 +48,13 @@ if links_with_endpoints < 1:
 endpoint_lines = re.findall(r'(?m)^\s*-\s+"?[^"\s:]+:[^"\s:]+"?\s*$', raw)
 if len(endpoint_lines) < (links_with_endpoints * 2):
     raise SystemExit(f"validator: YAML links do not define two endpoint entries per link: {p}")
+
+host_endpoints = re.findall(r'(?m)^\s*-\s+"?host:([^"\s:]+)"?\s*$', raw)
+duplicates = sorted({ep for ep in host_endpoints if host_endpoints.count(ep) > 1})
+if duplicates:
+    raise SystemExit(
+        f"validator: host endpoints must be unique for Containerlab: {', '.join(duplicates)}"
+    )
 PY
 
 validation_json="$(
@@ -65,21 +72,29 @@ validation_json="$(
       lib = pkgs.lib;
       generated = import bridgesPath { inherit lib; };
       bridges = generated.bridges or (throw "generated bridges file must export attribute bridges");
+      bridgeNetworks = generated.bridgeNetworks or {};
       vmModule = import vmNixPath {
         inherit lib pkgs;
         config = { };
       };
       netdevNames = builtins.attrNames (vmModule.systemd.network.netdevs or { });
       networkNames = builtins.attrNames (vmModule.systemd.network.networks or { });
+      missingNetdevBridges = builtins.filter (bridge: !(builtins.elem bridge netdevNames)) bridges;
+      missingNetworkBridges = builtins.filter (bridge: !(builtins.elem bridge networkNames)) bridges;
     in
     {
       bridgeCount = builtins.length bridges;
       uniqueBridgeCount = builtins.length (lib.unique bridges);
       nonStringCount = builtins.length (builtins.filter (v: !builtins.isString v) bridges);
+      bridgeNetworkCount = builtins.length (builtins.attrNames bridgeNetworks);
       netdevCount = builtins.length netdevNames;
       networkCount = builtins.length networkNames;
-      namesMatch = (lib.sort builtins.lessThan netdevNames) == (lib.sort builtins.lessThan bridges)
-        && (lib.sort builtins.lessThan networkNames) == (lib.sort builtins.lessThan bridges);
+      namesMatch =
+        if bridgeNetworks == {} then
+          (lib.sort builtins.lessThan netdevNames) == (lib.sort builtins.lessThan bridges)
+          && (lib.sort builtins.lessThan networkNames) == (lib.sort builtins.lessThan bridges)
+        else
+          missingNetdevBridges == [] && missingNetworkBridges == [];
     }
   '
 )"
@@ -96,10 +111,6 @@ if result["uniqueBridgeCount"] != result["bridgeCount"]:
     raise SystemExit("validator: generated bridges contain duplicates")
 if result["nonStringCount"] != 0:
     raise SystemExit("validator: generated bridges must all be strings")
-if result["netdevCount"] != result["bridgeCount"]:
-    raise SystemExit("validator: vm.nix netdev count does not match generated bridges")
-if result["networkCount"] != result["bridgeCount"]:
-    raise SystemExit("validator: vm.nix network count does not match generated bridges")
 if not result["namesMatch"]:
     raise SystemExit("validator: vm.nix bridge names do not match generated bridges")
 PY

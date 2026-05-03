@@ -1,0 +1,120 @@
+from __future__ import annotations
+
+from typing import Any, Dict, List
+import copy
+
+from clabgen.models import SiteModel
+from clabgen.s88.enterprise.naming import scoped_node_name
+from clabgen.s88.site.naming import bridge_name, host_ifname
+from clabgen.s88.site.topology import render_site_topology
+
+
+def _rewrite_endpoint(
+    endpoint: str, node_name_map: Dict[str, str], site: SiteModel
+) -> str:
+    if not isinstance(endpoint, str) or ":" not in endpoint:
+        return endpoint
+
+    endpoint_node_name, ifname = endpoint.split(":", 1)
+    if endpoint_node_name == "host":
+        return f"host:{host_ifname(f'{site.enterprise}-{site.site}-{ifname}')}"
+
+    rendered_node_name = node_name_map.get(endpoint_node_name)
+    if rendered_node_name is None:
+        raise ValueError(
+            f"link references unknown rendered node '{endpoint_node_name}'"
+        )
+
+    return f"{rendered_node_name}:{ifname}"
+
+
+def _rewrite_link(
+    link_def: Dict[str, Any], node_name_map: Dict[str, str], site: SiteModel
+) -> Dict[str, Any]:
+    link_copy = copy.deepcopy(link_def)
+
+    if "endpoints" in link_copy:
+        endpoints: List[str] = []
+        for endpoint in list(link_copy.get("endpoints", [])):
+            endpoints.append(_rewrite_endpoint(endpoint, node_name_map, site))
+        link_copy["endpoints"] = endpoints
+
+    endpoint = link_copy.get("endpoint")
+    if isinstance(endpoint, dict):
+        node_name = endpoint.get("node")
+        if isinstance(node_name, str) and node_name in node_name_map:
+            endpoint["node"] = node_name_map[node_name]
+
+    return link_copy
+
+
+def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
+    merged_nodes: Dict[str, Any] = {}
+    merged_links: List[Dict[str, Any]] = []
+    merged_bridges: List[str] = []
+    merged_bridge_networks: Dict[str, Any] = {}
+    overlay_links: Dict[str, List[str]] = {}
+    defaults: Dict[str, Any] | None = None
+    solver_meta: Dict[str, Any] | None = None
+
+    for site_key in sorted(sites.keys()):
+        site = sites[site_key]
+        topo = render_site_topology(site)
+
+        defaults = defaults or topo["topology"]["defaults"]
+        solver_meta = solver_meta or dict(topo.get("solver_meta", {}) or {})
+        node_name_map: Dict[str, str] = {}
+
+        for node_name in sorted(topo["topology"]["nodes"].keys()):
+            rendered_node_name = scoped_node_name(site, node_name)
+            if rendered_node_name in merged_nodes:
+                raise ValueError(f"duplicate rendered node '{rendered_node_name}'")
+            node_name_map[node_name] = rendered_node_name
+            merged_nodes[rendered_node_name] = copy.deepcopy(
+                topo["topology"]["nodes"][node_name]
+            )
+
+        for link_def in topo["topology"]["links"]:
+            link_copy = _rewrite_link(link_def, node_name_map, site)
+            labels = dict(link_copy.get("labels", {}) or {})
+            if labels.get("clab.link.type") == "overlay":
+                overlay_name = labels.get("clab.overlay")
+                if isinstance(overlay_name, str) and overlay_name:
+                    overlay_links.setdefault(overlay_name, []).extend(
+                        link_copy.get("endpoints", [])
+                    )
+                    continue
+            merged_links.append(link_copy)
+
+        merged_bridges.extend(list(topo.get("bridges", [])))
+        merged_bridge_networks.update(dict(topo.get("bridge_networks", {}) or {}))
+
+    for overlay_name in sorted(overlay_links.keys()):
+        endpoints = sorted(set(overlay_links[overlay_name]))
+        if len(endpoints) < 2:
+            continue
+        bridge = bridge_name(f"overlay-{overlay_name}")
+        merged_bridges.append(bridge)
+        merged_links.append(
+            {
+                "endpoints": endpoints,
+                "labels": {
+                    "clab.link.type": "overlay",
+                    "clab.overlay": overlay_name,
+                    "clab.link.bridge": bridge,
+                },
+            }
+        )
+
+    return {
+        "name": "fabric",
+        "topology": {
+            "defaults": defaults or {},
+            "nodes": merged_nodes,
+            "links": merged_links,
+        },
+        "bridges": sorted(set(merged_bridges)),
+        "bridge_networks": merged_bridge_networks,
+        "bridge_control_modules": {},
+        "solver_meta": solver_meta or {},
+    }

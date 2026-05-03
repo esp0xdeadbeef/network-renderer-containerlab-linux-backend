@@ -22,15 +22,15 @@ def render(input_data: Dict[str, Any]) -> List[str]:
         'nft add rule ip nat postrouting oifname "eth0" masquerade',
     ]
 
-    for r in routes_v4:
-        dst = r.get("dst")
-        via = r.get("via4")
+    for route in routes_v4:
+        dst = route.get("dst")
+        via = route.get("via4")
         if isinstance(dst, str) and isinstance(via, str):
             cmds.append(f"ip route replace {dst} via {via}")
 
-    for r in routes_v6:
-        dst = r.get("dst")
-        via = r.get("via6")
+    for route in routes_v6:
+        dst = route.get("dst")
+        via = route.get("via6")
         if isinstance(dst, str) and isinstance(via, str):
             cmds.append(f"ip -6 route replace {dst} via {via}")
 

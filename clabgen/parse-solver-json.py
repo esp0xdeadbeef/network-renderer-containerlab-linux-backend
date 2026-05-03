@@ -147,14 +147,17 @@ def write_outputs(
     topology_out.write_text(f"{comment}\n# fabric.clab.yml\n{topo_yaml}")
 
     bridges = list(merged.get("bridges", []))
+    bridge_networks = dict(merged.get("bridge_networks", {}) or {})
 
     bridges_body = (
         "{ lib, ... }:\n"
         "{\n"
-        "  bridges = [\n"
-        + "\n".join(f'    "{b}"' for b in bridges)
-        + "\n"
+        "  bridges = [\n" + "\n".join(f'    "{b}"' for b in bridges) + "\n"
         "  ];\n"
+        "  bridgeNetworks = builtins.fromJSON ''\n"
+        + json.dumps(bridge_networks, sort_keys=True)
+        + "\n"
+        "  '';\n"
         "}\n"
     )
 

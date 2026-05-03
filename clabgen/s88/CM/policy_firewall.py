@@ -22,7 +22,10 @@ def _dports(match: Dict[str, Any]) -> List[int]:
         return [value]
 
     if isinstance(value, list):
-        return [int(v) for v in value]
+        ports: List[int] = []
+        for raw_port in value:
+            ports.append(int(raw_port))
+        return ports
 
     raise RuntimeError("invalid dports")
 
@@ -44,7 +47,10 @@ def _tenant_interfaces(interface_tags: Dict[str, Any], tenant: str) -> List[str]
 def _set_expr(values: List[str]) -> str:
     if len(values) == 1:
         return f'"{values[0]}"'
-    return "{ " + ", ".join(f'"{value}"' for value in values) + " }"
+    quoted_values: List[str] = []
+    for value in values:
+        quoted_values.append(f'"{value}"')
+    return "{ " + ", ".join(quoted_values) + " }"
 
 
 def _rule_for_match(
@@ -71,7 +77,10 @@ def _rule_for_match(
         if len(dports) == 1:
             rule += f" dport {dports[0]}"
         else:
-            ports = ", ".join(str(p) for p in dports)
+            port_values: List[str] = []
+            for destination_port in dports:
+                port_values.append(str(destination_port))
+            ports = ", ".join(port_values)
             rule += f" dport {{ {ports} }}"
 
     rule += f" counter {action}"

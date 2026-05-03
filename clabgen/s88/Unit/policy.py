@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Dict, Any
 
 from clabgen.models import NodeModel, SiteModel
+from clabgen.s88.site.policy_context import build_node_firewall_state
 from clabgen.s88.Unit.common import render_linux_node
-from clabgen.s88.Unit.firewall_context import build_node_firewall_state
 
 
 def render(

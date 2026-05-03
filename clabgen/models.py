@@ -32,6 +32,8 @@ class InterfaceModel:
     upstream: Optional[str] = None
     tenant: Optional[str] = None
     overlay: Optional[str] = None
+    attach_bridge: Optional[str] = None
+    host_uplink: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -59,6 +61,8 @@ class LinkModel:
     name: str
     kind: str
     endpoints: Dict[str, Dict[str, Any]]
+    bridge: Optional[str] = None
+    host_uplink: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

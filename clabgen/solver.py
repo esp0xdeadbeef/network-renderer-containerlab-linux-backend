@@ -122,6 +122,8 @@ def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
 
     nodes: Dict[str, Any] = {}
     links: Dict[str, Any] = {}
+    link_bridges: Dict[str, str] = {}
+    link_host_uplinks: Dict[str, Dict[str, Any]] = {}
 
     # Nodes + their realized interfaces.
     for rt_name, rt in runtime_targets.items():
@@ -154,6 +156,17 @@ def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
             if not isinstance(backing_ref, dict):
                 backing_ref = {}
             kind = iface.get("sourceKind") or iface.get("kind")
+            attach = iface.get("attach") or {}
+            if not isinstance(attach, dict):
+                attach = {}
+            attach_bridge = attach.get("bridge")
+            if not isinstance(attach_bridge, str) or not attach_bridge:
+                attach_bridge = None
+
+            host_uplink = iface.get("hostUplink") or {}
+            if not isinstance(host_uplink, dict):
+                host_uplink = {}
+
             overlay = iface.get("overlay")
             if not isinstance(overlay, str) or not overlay:
                 if kind == "overlay":
@@ -169,7 +182,16 @@ def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
                 "upstream": iface.get("upstream") or iface.get("uplink"),
                 "tenant": iface.get("tenant"),
                 "overlay": overlay,
+                "attachBridge": attach_bridge,
+                "hostUplink": host_uplink,
             }
+
+            if attach_bridge:
+                link_name = str(backing_ref.get("name") or if_key)
+                if link_name:
+                    link_bridges[link_name] = attach_bridge
+                    if host_uplink:
+                        link_host_uplinks[link_name] = dict(host_uplink)
 
         loopback = realized.get("loopback") or {}
         if not isinstance(loopback, dict):
@@ -210,6 +232,9 @@ def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
 
             links[link_name] = {
                 "kind": "wan",
+                "bridge": iface.get("attachBridge") or link_bridges.get(if_key),
+                "hostUplink": iface.get("hostUplink")
+                or link_host_uplinks.get(if_key, {}),
                 "endpoints": {
                     node_name: {
                         "node": node_name,
@@ -257,6 +282,8 @@ def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
 
         links[link_name] = {
             "kind": adj.get("kind") or "p2p",
+            "bridge": link_bridges.get(link_name),
+            "hostUplink": link_host_uplinks.get(link_name, {}),
             "endpoints": endpoints_out,
         }
 
@@ -268,7 +295,9 @@ def _cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def extract_enterprise_sites(data: Dict[str, Any]) -> Iterable[Tuple[str, str, Dict[str, Any]]]:
+def extract_enterprise_sites(
+    data: Dict[str, Any],
+) -> Iterable[Tuple[str, str, Dict[str, Any]]]:
     enterprise_root = data.get("enterprise")
     if not isinstance(enterprise_root, dict):
         raise ValueError("'enterprise' must be an object")
@@ -289,13 +318,13 @@ def extract_enterprise_sites(data: Dict[str, Any]) -> Iterable[Tuple[str, str, D
             yield enterprise_name, site_name, site_obj
 
 
-def validate_site_invariants(site: Dict[str, Any], context: Dict[str, str] | None = None) -> None:
+def validate_site_invariants(
+    site: Dict[str, Any], context: Dict[str, str] | None = None
+) -> None:
     ctx = context or {}
 
     if "nodes" not in site or "links" not in site:
-        raise ValueError(
-            f"Invalid site schema for {ctx}: missing 'nodes' or 'links'"
-        )
+        raise ValueError(f"Invalid site schema for {ctx}: missing 'nodes' or 'links'")
 
     if not isinstance(site.get("nodes"), dict):
         raise ValueError(f"Invalid site schema for {ctx}: 'nodes' must be an object")
@@ -318,7 +347,9 @@ def validate_site_invariants(site: Dict[str, Any], context: Dict[str, str] | Non
             f"Invalid site schema for {ctx}: 'uplinkNames' must be an array"
         )
 
-    if "tenantPrefixOwners" in site and not isinstance(site.get("tenantPrefixOwners"), dict):
+    if "tenantPrefixOwners" in site and not isinstance(
+        site.get("tenantPrefixOwners"), dict
+    ):
         raise ValueError(
             f"Invalid site schema for {ctx}: 'tenantPrefixOwners' must be an object"
         )
@@ -328,7 +359,9 @@ def validate_site_invariants(site: Dict[str, Any], context: Dict[str, str] | Non
             f"Invalid site schema for {ctx}: 'policyNodeName' must be a string"
         )
 
-    if "upstreamSelectorNodeName" in site and not isinstance(site.get("upstreamSelectorNodeName"), str):
+    if "upstreamSelectorNodeName" in site and not isinstance(
+        site.get("upstreamSelectorNodeName"), str
+    ):
         raise ValueError(
             f"Invalid site schema for {ctx}: 'upstreamSelectorNodeName' must be a string"
         )
@@ -336,6 +369,4 @@ def validate_site_invariants(site: Dict[str, Any], context: Dict[str, str] | Non
 
 def validate_routing_assumptions(site: Dict[str, Any]) -> Dict[str, Any]:
     _ = site
-    return {
-        "singleAccess": ""
-    }
+    return {"singleAccess": ""}

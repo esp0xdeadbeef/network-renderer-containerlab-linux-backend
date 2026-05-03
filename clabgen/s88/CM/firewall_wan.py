@@ -39,7 +39,11 @@ def render(input_data: Dict[str, Any]) -> List[str]:
     oifnames = masquerade.get("oifnames", [])
     if not isinstance(oifnames, list):
         oifnames = []
-    oifnames = [x for x in oifnames if isinstance(x, str) and x]
+    normalized_oifnames: List[str] = []
+    for interface_name in oifnames:
+        if isinstance(interface_name, str) and interface_name:
+            normalized_oifnames.append(interface_name)
+    oifnames = normalized_oifnames
 
     enable_nat4 = bool(masquerade.get("ipv4", False))
     enable_nat6 = bool(masquerade.get("ipv6", False))
@@ -50,12 +54,20 @@ def render(input_data: Dict[str, Any]) -> List[str]:
     )
     if not isinstance(saddr4, list):
         saddr4 = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
-    saddr4 = [x for x in saddr4 if isinstance(x, str) and x]
+    normalized_saddr4: List[str] = []
+    for source_prefix in saddr4:
+        if isinstance(source_prefix, str) and source_prefix:
+            normalized_saddr4.append(source_prefix)
+    saddr4 = normalized_saddr4
 
     saddr6 = masquerade.get("saddr6", ["fc00::/7"])
     if not isinstance(saddr6, list):
         saddr6 = ["fc00::/7"]
-    saddr6 = [x for x in saddr6 if isinstance(x, str) and x]
+    normalized_saddr6: List[str] = []
+    for source_prefix in saddr6:
+        if isinstance(source_prefix, str) and source_prefix:
+            normalized_saddr6.append(source_prefix)
+    saddr6 = normalized_saddr6
 
     cmds: List[str] = []
     first = True
