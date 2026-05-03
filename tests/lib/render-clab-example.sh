@@ -80,7 +80,7 @@ assert_node_matches() {
 
   block="$(node_block "${topology}" "${node}")"
 
-  if ! grep -Eq -- "${regex}" <<<"${block}"; then
+  if ! REGEX="${regex}" perl -0ne 'exit($_ =~ /$ENV{REGEX}/m ? 0 : 1)' <<<"${block}"; then
     echo "missing in ${node}: regex ${regex}" >&2
     echo "--- ${node} ---" >&2
     printf '%s\n' "${block}" >&2
