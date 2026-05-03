@@ -12,6 +12,7 @@ from clabgen.s88.CM.linux_routes import (
     _render_uplink_routes,
 )
 from clabgen.s88.CM.linux_shell import _sh
+from clabgen.s88.CM.linux_wan_dynamic import render as render_dynamic_wan
 
 
 def render(
@@ -31,6 +32,7 @@ def render(
         )
 
     cmds.extend(_render_interfaces(node_data, eth_map))
+    cmds.extend(render_dynamic_wan(node_data, eth_map))
     cmds.extend(_render_addressing(node_data, eth_map))
 
     if routing_mode == "bgp" and _is_bgp_router(role):
