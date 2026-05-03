@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
-import ipaddress
 
 from clabgen.models import SiteModel
 from clabgen.s88.site.naming import (
@@ -10,30 +9,7 @@ from clabgen.s88.site.naming import (
     host_uplink_interface,
     link_bridge,
 )
-
-
-def _prefix_sort_key(prefix: str) -> tuple[bool, str]:
-    return (":" in prefix, prefix)
-
-
-def _tenant_group_key(iface_name: str, node_name: str, iface: Any) -> str:
-    prefixes: List[str] = []
-
-    for addr in (iface.addr4, iface.addr6):
-        if not isinstance(addr, str) or not addr:
-            continue
-        try:
-            prefixes.append(str(ipaddress.ip_interface(addr).network))
-        except ValueError:
-            continue
-
-    if prefixes:
-        family_sorted = sorted(prefixes, key=_prefix_sort_key)
-        return family_sorted[0]
-
-    raise ValueError(
-        f"tenant interface has no usable prefix for node={node_name!r} iface={iface_name!r}"
-    )
+from clabgen.s88.site.tenant_links import render_tenant_links
 
 
 def _link_endpoint(
@@ -120,35 +96,6 @@ def _bridge_link(endpoints: List[str], bridge: str) -> Dict[str, Any]:
     }
 
 
-def _tenant_links(
-    site: SiteModel, eth_maps: Dict[str, Dict[str, int]]
-) -> tuple[List[Dict[str, Any]], List[str]]:
-    tenant_groups: Dict[str, List[str]] = {}
-
-    for node_name in sorted(site.nodes.keys()):
-        node = site.nodes[node_name]
-        for ifname, iface in sorted(node.interfaces.items()):
-            if iface.kind != "tenant":
-                continue
-            eth = eth_maps[node_name].get(ifname)
-            if eth is None:
-                continue
-            tenant_key = _tenant_group_key(ifname, node_name, iface)
-            tenant_groups.setdefault(tenant_key, []).append(f"{node_name}:eth{eth}")
-
-    links: List[Dict[str, Any]] = []
-    bridges: List[str] = []
-    for tenant in sorted(tenant_groups.keys()):
-        bridge = bridge_name(f"{site.enterprise}-{site.site}-tenant-{tenant}")
-        endpoints = list(tenant_groups[tenant])
-        if len(endpoints) == 1:
-            endpoints.append(f"host:{host_ifname(f'{bridge}-tenant')}")
-        bridges.append(bridge)
-        links.append(_bridge_link(endpoints, bridge))
-
-    return links, bridges
-
-
 def _overlay_links(
     site: SiteModel, eth_maps: Dict[str, Dict[str, int]]
 ) -> List[Dict[str, Any]]:
@@ -179,7 +126,7 @@ def render_links(
     site: SiteModel, eth_maps: Dict[str, Dict[str, int]]
 ) -> tuple[List[Dict[str, Any]], List[str]]:
     links, bridges = _render_model_links(site, eth_maps)
-    tenant_links, tenant_bridges = _tenant_links(site, eth_maps)
+    tenant_links, tenant_bridges = render_tenant_links(site, eth_maps)
 
     links.extend(tenant_links)
     links.extend(_overlay_links(site, eth_maps))
