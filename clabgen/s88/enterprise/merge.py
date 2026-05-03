@@ -18,6 +18,8 @@ def _rewrite_endpoint(
     endpoint_node_name, ifname = endpoint.split(":", 1)
     if endpoint_node_name == "host":
         return f"host:{host_ifname(f'{site.enterprise}-{site.site}-{ifname}')}"
+    if endpoint_node_name in {"bridge", "macvlan", "mgmt-net"}:
+        return endpoint
 
     rendered_node_name = node_name_map.get(endpoint_node_name)
     if rendered_node_name is None:

@@ -32,9 +32,8 @@ assert bridge_networks["br-uplink1"]["parent"] == "eth0"
 assert bridge_networks["br-uplink1"]["vlan"] == 5
 
 required = [
-    "type: macvlan",
-    "host-interface: eth0.4",
-    "host-interface: eth0.5",
+    "- macvlan:eth0.4",
+    "- macvlan:eth0.5",
     "clab.host.vlan: '4'",
     "clab.host.vlan: '5'",
     "clab.host.parent: eth0",
@@ -48,6 +47,11 @@ if missing:
 
 if "host:veth-br-upl" in topology:
     raise SystemExit("host uplinks must not be rendered as host veth bridge links")
+
+if re.search(r"(?m)^\s*type: macvlan$", topology) or re.search(
+    r"(?m)^\s*host-interface:", topology
+):
+    raise SystemExit("host uplinks must use containerlab macvlan endpoint syntax")
 PY
 
 echo "PASS host-uplink-vlan-dhcp"

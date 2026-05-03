@@ -69,12 +69,10 @@ def _macvlan_link(
         labels["clab.host.vlan"] = str(host_uplink["vlan"])
 
     return {
-        "type": "macvlan",
-        "endpoint": {
-            "node": node_name,
-            "interface": ifname,
-        },
-        "host-interface": host_if,
+        "endpoints": [
+            f"{node_name}:{ifname}",
+            f"macvlan:{host_if}",
+        ],
         "labels": labels,
     }
 
