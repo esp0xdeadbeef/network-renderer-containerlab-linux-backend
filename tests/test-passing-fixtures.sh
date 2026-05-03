@@ -58,6 +58,12 @@ run_one_example() {
       || { echo "--- STDERR (${name}) ---"; cat "${stderr_file}"; fail "FAIL ${name}: renderer failed"; }
   )
 
+  if grep -qE 'WARNING|cannot be mapped to any policy interface tag|injected to the config' "${stderr_file}"; then
+    echo "--- STDERR (${name}) ---"
+    cat "${stderr_file}"
+    fail "FAIL ${name}: renderer emitted warning output"
+  fi
+
   test -s "${tmp_dir}/fabric.clab.yml" || fail "FAIL ${name}: missing fabric.clab.yml"
   test -s "${tmp_dir}/vm-bridges-generated.nix" || fail "FAIL ${name}: missing vm-bridges-generated.nix"
 

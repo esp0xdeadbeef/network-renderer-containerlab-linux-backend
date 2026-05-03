@@ -27,12 +27,18 @@ def _dports(match: Dict[str, Any]) -> List[int]:
     raise RuntimeError("invalid dports")
 
 
-def _tenant_interfaces(interface_tags: Dict[str, str], tenant: str) -> List[str]:
-    return sorted(
-        ifname
-        for ifname, tagged_tenant in interface_tags.items()
-        if tagged_tenant == tenant
-    )
+def _tenant_interfaces(interface_tags: Dict[str, Any], tenant: str) -> List[str]:
+    matches: List[str] = []
+
+    for ifname, tagged_tenant in interface_tags.items():
+        if tagged_tenant == tenant:
+            matches.append(ifname)
+            continue
+
+        if isinstance(tagged_tenant, list) and tenant in tagged_tenant:
+            matches.append(ifname)
+
+    return sorted(matches)
 
 
 def _set_expr(values: List[str]) -> str:

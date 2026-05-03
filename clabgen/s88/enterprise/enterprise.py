@@ -8,8 +8,7 @@ import hashlib
 
 from clabgen.models import SiteModel
 from clabgen.s88.enterprise.site_loader import load_sites
-from clabgen.s88.enterprise.inject_clients import inject_clients
-from clabgen.s88.Unit.base import render_units
+from clabgen.s88.Unit.base import render_units, _bridge_name
 
 
 MAX_NODE_NAME = 64
@@ -78,8 +77,6 @@ def _scoped_node_name(site: SiteModel, node_name: str) -> str:
 def generate_topology(site: SiteModel) -> Dict[str, Any]:
     site = copy.deepcopy(site)
 
-    inject_clients(site)
-
     nodes, links, bridges = render_units(site)
 
     return {
@@ -115,15 +112,17 @@ class Enterprise:
         return cls(sites)
 
     def render(self) -> Dict[str, Any]:
+        sites = self._with_overlay_gateways()
         merged_nodes: Dict[str, Any] = {}
         merged_links: List[Dict[str, Any]] = []
         merged_bridges: List[str] = []
+        overlay_links: Dict[str, List[str]] = {}
 
         defaults: Dict[str, Any] | None = None
         solver_meta: Dict[str, Any] | None = None
 
-        for site_key in sorted(self.sites.keys()):
-            site = self.sites[site_key]
+        for site_key in sorted(sites.keys()):
+            site = sites[site_key]
             topo = generate_topology(site)
 
             if defaults is None:
@@ -172,10 +171,34 @@ class Enterprise:
 
                 link_copy["endpoints"] = rewritten_endpoints
 
+                labels = dict(link_copy.get("labels", {}) or {})
+                if labels.get("clab.link.type") == "overlay":
+                    overlay_name = labels.get("clab.overlay")
+                    if isinstance(overlay_name, str) and overlay_name:
+                        overlay_links.setdefault(overlay_name, []).extend(rewritten_endpoints)
+                        continue
 
                 merged_links.append(link_copy)
 
             merged_bridges.extend(list(topo.get("bridges", [])))
+
+        for overlay_name in sorted(overlay_links.keys()):
+            endpoints = sorted(set(overlay_links[overlay_name]))
+            if len(endpoints) < 2:
+                continue
+
+            bridge = _bridge_name(f"overlay-{overlay_name}")
+            merged_bridges.append(bridge)
+            merged_links.append(
+                {
+                    "endpoints": endpoints,
+                    "labels": {
+                        "clab.link.type": "overlay",
+                        "clab.overlay": overlay_name,
+                        "clab.link.bridge": bridge,
+                    },
+                }
+            )
 
         return {
             "name": "fabric",
@@ -188,3 +211,72 @@ class Enterprise:
             "bridge_control_modules": {},
             "solver_meta": solver_meta or {},
         }
+
+    def _with_overlay_gateways(self) -> Dict[str, SiteModel]:
+        sites = copy.deepcopy(self.sites)
+        overlay_endpoints: Dict[tuple[str, str], List[Dict[str, str]]] = {}
+
+        for site in sites.values():
+            site_id = f"{site.enterprise}.{site.site}"
+            for node_name, node in site.nodes.items():
+                for ifname, iface in node.interfaces.items():
+                    if iface.kind != "overlay":
+                        continue
+
+                    overlay_name = iface.overlay or ifname
+                    endpoint: Dict[str, str] = {
+                        "site": site_id,
+                        "node": node_name,
+                        "interface": ifname,
+                    }
+                    if isinstance(iface.addr4, str) and iface.addr4:
+                        endpoint["addr4"] = iface.addr4.split("/", 1)[0]
+                    if isinstance(iface.addr6, str) and iface.addr6:
+                        endpoint["addr6"] = iface.addr6.split("/", 1)[0]
+                    overlay_endpoints.setdefault((overlay_name, site_id), []).append(endpoint)
+
+        for site in sites.values():
+            site_id = f"{site.enterprise}.{site.site}"
+            overlays = site.raw_transport.get("overlays", {})
+            if not isinstance(overlays, dict):
+                overlays = {}
+
+            for node in site.nodes.values():
+                for iface in node.interfaces.values():
+                    if iface.kind != "overlay":
+                        continue
+
+                    overlay_name = iface.overlay or iface.name
+                    overlay_spec = overlays.get(overlay_name, {})
+                    if not isinstance(overlay_spec, dict):
+                        overlay_spec = {}
+
+                    for family, via_key, addr_key in (
+                        ("ipv4", "via4", "addr4"),
+                        ("ipv6", "via6", "addr6"),
+                    ):
+                        for route in iface.routes.get(family, []):
+                            if not isinstance(route, dict):
+                                continue
+                            if route.get("proto") != "overlay":
+                                continue
+                            if route.get(via_key):
+                                continue
+
+                            peer_site = route.get("peerSite") or overlay_spec.get("peerSite")
+                            if not isinstance(peer_site, str) or not peer_site or peer_site == site_id:
+                                continue
+
+                            candidates = overlay_endpoints.get((overlay_name, peer_site), [])
+                            gateway = next(
+                                (
+                                    candidate.get(addr_key)
+                                    for candidate in candidates
+                                    if isinstance(candidate.get(addr_key), str) and candidate.get(addr_key)
+                                ),
+                                None,
+                            )
+                            if gateway:
+                                route[via_key] = gateway
+
+        return sites
