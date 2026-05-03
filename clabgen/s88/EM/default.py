@@ -913,6 +913,160 @@ def _render_bgp(node_name: str, node: Dict[str, Any], role: str) -> List[str]:
     ]
 
 
+def _render_dns_service(node: Dict[str, Any]) -> List[str]:
+    services = node.get("services")
+    if not isinstance(services, dict):
+        return []
+
+    dns = services.get("dns")
+    if not isinstance(dns, dict):
+        return []
+
+    listen = [value for value in dns.get("listen", []) if isinstance(value, str) and value]
+    if not listen:
+        return []
+
+    forwarders = [
+        value
+        for value in (dns.get("forwarders") or dns.get("upstreams") or [])
+        if isinstance(value, str) and value
+    ]
+
+    payload = {
+        "listen": ["127.0.0.1", "::1"] + listen,
+        "forwarders": forwarders,
+        "localRecords": [
+            record
+            for record in dns.get("localRecords", [])
+            if isinstance(record, dict) and isinstance(record.get("name"), str) and record.get("name")
+        ],
+    }
+    payload_json = json.dumps(payload)
+    script = (
+        "import ipaddress, json, socket, struct, threading, time\n"
+        f"cfg = json.loads(r'''{payload_json}''')\n"
+        "def encode_name(name):\n"
+        "    name = name.rstrip('.')\n"
+        "    if not name:\n"
+        "        return b'\\x00'\n"
+        "    return b''.join(bytes([len(part)]) + part.encode('ascii') for part in name.split('.')) + b'\\x00'\n"
+        "def parse_question(query):\n"
+        "    if len(query) < 12:\n"
+        "        return None\n"
+        "    pos = 12\n"
+        "    labels = []\n"
+        "    while pos < len(query):\n"
+        "        size = query[pos]\n"
+        "        pos += 1\n"
+        "        if size == 0:\n"
+        "            break\n"
+        "        if size & 0xc0 or pos + size > len(query):\n"
+        "            return None\n"
+        "        labels.append(query[pos:pos + size].decode('ascii', 'ignore').lower())\n"
+        "        pos += size\n"
+        "    if pos + 4 > len(query):\n"
+        "        return None\n"
+        "    qtype, qclass = struct.unpack('!HH', query[pos:pos + 4])\n"
+        "    return ('.'.join(labels) + '.', qtype, qclass, query[12:pos + 4])\n"
+        "def local_answer(query):\n"
+        "    question = parse_question(query)\n"
+        "    if question is None:\n"
+        "        return None\n"
+        "    qname, qtype, qclass, question_wire = question\n"
+        "    answers = []\n"
+        "    for rec in cfg.get('localRecords', []):\n"
+        "        name = rec.get('name', '').rstrip('.').lower() + '.'\n"
+        "        if name != qname:\n"
+        "            continue\n"
+        "        if qtype in (1, 255):\n"
+        "            for addr in rec.get('a', []):\n"
+        "                try: answers.append((1, socket.inet_pton(socket.AF_INET, addr)))\n"
+        "                except OSError: pass\n"
+        "        if qtype in (28, 255):\n"
+        "            for addr in rec.get('aaaa', []):\n"
+        "                try: answers.append((28, socket.inet_pton(socket.AF_INET6, addr)))\n"
+        "                except OSError: pass\n"
+        "    if not answers:\n"
+        "        return None\n"
+        "    body = b''\n"
+        "    for rtype, rdata in answers:\n"
+        "        body += encode_name(qname) + struct.pack('!HHIH', rtype, qclass, 60, len(rdata)) + rdata\n"
+        "    return query[:2] + b'\\x81\\x80' + query[4:6] + struct.pack('!H', len(answers)) + b'\\x00\\x00\\x00\\x00' + question_wire + body\n"
+        "def family(addr):\n"
+        "    return socket.AF_INET6 if ipaddress.ip_address(addr).version == 6 else socket.AF_INET\n"
+        "def servfail(query):\n"
+        "    if len(query) < 12:\n"
+        "        return query\n"
+        "    return query[:2] + b'\\x81\\x82' + query[4:6] + b'\\x00\\x00\\x00\\x00\\x00\\x00' + query[12:]\n"
+        "def forward_udp(query, fam):\n"
+        "    answer = local_answer(query)\n"
+        "    if answer is not None:\n"
+        "        return answer\n"
+        "    for fwd in cfg.get('forwarders', []):\n"
+        "        try:\n"
+        "            if family(fwd) != fam:\n"
+        "                continue\n"
+        "            s = socket.socket(fam, socket.SOCK_DGRAM)\n"
+        "            s.settimeout(2)\n"
+        "            s.sendto(query, (fwd, 53))\n"
+        "            data, _ = s.recvfrom(4096)\n"
+        "            s.close()\n"
+        "            return data\n"
+        "        except Exception:\n"
+        "            try: s.close()\n"
+        "            except Exception: pass\n"
+        "    return servfail(query)\n"
+        "def udp_server(addr):\n"
+        "    fam = family(addr)\n"
+        "    s = socket.socket(fam, socket.SOCK_DGRAM)\n"
+        "    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n"
+        "    s.bind((addr, 53))\n"
+        "    while True:\n"
+        "        data, peer = s.recvfrom(4096)\n"
+        "        s.sendto(forward_udp(data, fam), peer)\n"
+        "def tcp_server(addr):\n"
+        "    fam = family(addr)\n"
+        "    s = socket.socket(fam, socket.SOCK_STREAM)\n"
+        "    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n"
+        "    s.bind((addr, 53))\n"
+        "    s.listen(64)\n"
+        "    while True:\n"
+        "        conn, _ = s.accept()\n"
+        "        threading.Thread(target=handle_tcp, args=(conn, fam), daemon=True).start()\n"
+        "def handle_tcp(conn, fam):\n"
+        "    try:\n"
+        "        hdr = conn.recv(2)\n"
+        "        if len(hdr) != 2:\n"
+        "            return\n"
+        "        size = struct.unpack('!H', hdr)[0]\n"
+        "        query = b''\n"
+        "        while len(query) < size:\n"
+        "            chunk = conn.recv(size - len(query))\n"
+        "            if not chunk:\n"
+        "                return\n"
+        "            query += chunk\n"
+        "        answer = forward_udp(query, fam)\n"
+        "        conn.sendall(struct.pack('!H', len(answer)) + answer)\n"
+        "    finally:\n"
+        "        conn.close()\n"
+        "for addr in sorted(set(cfg.get('listen', []))):\n"
+        "    for target in (udp_server, tcp_server):\n"
+        "        threading.Thread(target=target, args=(addr,), daemon=True).start()\n"
+        "while True:\n"
+        "    time.sleep(3600)\n"
+    )
+
+    return [
+        _sh(
+            "pkill -f '^python3 /tmp/clabgen-dns-proxy.py' >/dev/null 2>&1 || true\n"
+            "cat >/tmp/clabgen-dns-proxy.py <<'PY'\n"
+            + script
+            + "PY\n"
+            "nohup python3 /tmp/clabgen-dns-proxy.py >/tmp/clabgen-dns-proxy.log 2>&1 &\n"
+        )
+    ]
+
+
 def render(
     role: str,
     node_name: str,
@@ -940,5 +1094,6 @@ def render(
         cmds.extend(_render_default_routes(node_data, eth_map))
 
     cmds.extend(render_cm(role, node_data.get("_cm_inputs", {})))
+    cmds.extend(_render_dns_service(node_data))
 
     return cmds

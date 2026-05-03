@@ -179,6 +179,18 @@ def _build_nodes(
     tenant_prefix_owners: Dict[str, str],
 ) -> Dict[str, NodeModel]:
     nodes: Dict[str, NodeModel] = {}
+    runtime_services: Dict[str, Dict[str, Any]] = {}
+
+    for rt in (site.get("runtimeTargets", {}) or {}).values():
+        if not isinstance(rt, dict):
+            continue
+        logical = rt.get("logicalNode")
+        if not isinstance(logical, dict):
+            continue
+        logical_name = logical.get("name")
+        services = rt.get("services")
+        if isinstance(logical_name, str) and logical_name and isinstance(services, dict):
+            runtime_services[logical_name] = dict(services)
 
     for unit, node_obj in site.get("nodes", {}).items():
         interfaces = _build_interfaces(site, unit, node_obj, tenant_prefix_owners)
@@ -204,6 +216,7 @@ def _build_nodes(
             bgp=bgp,
             containers=list(node_obj.get("containers", [])),
             isolated=bool(node_obj.get("isolated", False)),
+            services=dict(node_obj.get("services", {}) or runtime_services.get(unit, {}) or {}),
             loopback4=loopback4,
             loopback6=loopback6,
         )
