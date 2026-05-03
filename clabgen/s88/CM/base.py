@@ -7,6 +7,7 @@ from .forwarding import render as render_forwarding
 from .nat import render as render_nat
 from .firewall import render as render_firewall
 from .firewall_wan import render as render_wan_firewall
+from .management_egress_guard import render as render_management_egress_guard
 
 
 CM_BY_ROLE: Dict[str, List[tuple[str, Callable[[Dict[str, Any]], List[str]]]]] = {
@@ -35,4 +36,5 @@ def render(role: str, cm_inputs: Dict[str, Any]) -> List[str]:
                 f"CM input {input_name!r} for role={role!r} must be an object"
             )
         cmds.extend(fn(module_input))
+    cmds.extend(render_management_egress_guard(cm_inputs.get("management_egress", {})))
     return cmds

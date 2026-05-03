@@ -83,6 +83,8 @@ def _default_cm_inputs(
             "disable_eth0": disable_eth0,
         }
 
+    cm_inputs["management_egress"] = {"interface": "eth0"}
+
     if role == "core":
         wan_link = (parsed.get("links") or {}).get("wan") or {}
         wan_eth = wan_link.get("eth")
