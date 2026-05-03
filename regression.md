@@ -77,8 +77,10 @@ Current verified state as of 2026-05-03.
   - Branch access UDP DNS to site-A DNS returned a DNS response from
     `10.20.10.1` with `rcode=2` after the modeled public forwarders timed out
     in the CLAB environment.
-- Remaining nonfatal Containerlab environment issue:
-  `failed to create hosts file: open /etc/hosts: read-only file system`.
+- Containerlab `/etc/hosts` cleanup is a NixOS host realization concern, not a
+  renderer output issue. `s-router-clab` now carries the same mutable hosts-file
+  setting used by older NixOS containerlab hosts; verify it from the live
+  `s-router-clab-container` runtime.
 
 ## still required
 
