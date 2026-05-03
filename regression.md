@@ -2,6 +2,11 @@
 
 Current verified state as of 2026-05-03.
 
+## architecture shape
+
+- state=required | target=s88-style Enterprise/Site/Unit/EquipmentModule/ControlModule layout | reason=renderer code must stay in s88-style responsibility folders; top-level files are limited to flakes, tests, scripts/entrypoints, and thin imports into the renderer structure.
+- state=required | target=no oversized implementation files | reason=Nix implementation files over 200 LOC must be split by concrete renderer responsibility unless they are flake/test wiring or explicitly documented as a temporary regression with a split target.
+
 ## fixed and locally verified
 
 - The pinned fixture sweep passes with warning output treated as a failure:
