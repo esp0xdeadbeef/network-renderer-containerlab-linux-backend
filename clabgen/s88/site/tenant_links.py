@@ -71,23 +71,8 @@ def _macvlan_link(
 
 
 def _bridge_host_uplink(site: SiteModel, bridge: str) -> Dict[str, Any]:
-    deployment = site.renderer_inventory.get("deployment", {})
-    if not isinstance(deployment, dict):
-        return {}
-
-    hosts = deployment.get("hosts", {})
-    if not isinstance(hosts, dict):
-        return {}
-
-    for host in hosts.values():
-        bridges_obj = host.get("bridgeNetworks", {}) if isinstance(host, dict) else {}
-        if not isinstance(bridges_obj, dict):
-            continue
-        bridge_data = bridges_obj.get(bridge)
-        if isinstance(bridge_data, dict):
-            return dict(bridge_data)
-
-    return {}
+    bridge_data = site.bridge_networks.get(bridge)
+    return dict(bridge_data) if isinstance(bridge_data, dict) else {}
 
 
 def render_tenant_links(
