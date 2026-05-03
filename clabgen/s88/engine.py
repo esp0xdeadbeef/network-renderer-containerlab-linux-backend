@@ -99,15 +99,17 @@ def _emit_frr_bootstrap(payload):
     cmds.append("chown -R frr:frr /etc/frr /var/run/frr >/dev/null 2>&1 || true")
     cmds.append("chmod 640 /etc/frr/daemons /etc/frr/frr.conf /etc/frr/vtysh.conf >/dev/null 2>&1 || true")
 
-    cmds.append("pkill -x zebra >/dev/null 2>&1 || true")
-    cmds.append("pkill -x bgpd >/dev/null 2>&1 || true")
-
     cmds.append(
-        "/usr/lib/frr/frrinit.sh restart >/dev/null 2>&1 || "
-        "/etc/init.d/frr restart >/dev/null 2>&1 || "
-        "service frr restart >/dev/null 2>&1 || true"
+        "pgrep -x zebra >/dev/null 2>&1 || /usr/lib/frr/zebra -d -F traditional -A 127.0.0.1 >/dev/null 2>&1 || true"
+    )
+    cmds.append(
+        "pgrep -x bgpd >/dev/null 2>&1 || /usr/lib/frr/bgpd -d -F traditional -A 127.0.0.1 >/dev/null 2>&1 || true"
+    )
+    cmds.append(
+        "pgrep -x staticd >/dev/null 2>&1 || /usr/lib/frr/staticd -d -F traditional -A 127.0.0.1 >/dev/null 2>&1 || true"
     )
 
+    cmds.append("vtysh -b >/dev/null 2>&1 || true")
     cmds.append("sleep 1")
     cmds.append("vtysh -c 'show bgp ipv4 summary' >/dev/null 2>&1 || true")
     cmds.append("vtysh -c 'show bgp ipv6 summary' >/dev/null 2>&1 || true")

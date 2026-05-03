@@ -143,6 +143,19 @@ def _normalize_prefix(dst: str) -> str:
         return dst
 
 
+def _host_prefix(value: str, family: int) -> str | None:
+    try:
+        ip = ipaddress.ip_address(value)
+    except Exception:
+        return None
+
+    if ip.version != family:
+        return None
+
+    prefix = 32 if family == 4 else 128
+    return f"{ip}/{prefix}"
+
+
 def _addr_ip(addr: str | None) -> str | None:
     if not isinstance(addr, str) or not addr:
         return None
@@ -327,6 +340,9 @@ def _effective_via4(node: Dict[str, Any], iface: Dict[str, Any], route: Dict[str
     if via in local4:
         return None
 
+    if iface.get("kind") == "overlay":
+        return via
+
     if not _same_subnet(via, iface.get("addr4")):
         return None
 
@@ -348,6 +364,9 @@ def _effective_via6(node: Dict[str, Any], iface: Dict[str, Any], route: Dict[str
 
     if via in local6:
         return None
+
+    if iface.get("kind") == "overlay":
+        return via
 
     if not _same_subnet(via, iface.get("addr6")):
         return None
@@ -472,6 +491,14 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
             if _route_via_is_local(r, 4, local4, local6):
                 continue
 
+            if iface.get("kind") == "overlay":
+                via_host = _host_prefix(via, 4)
+                if via_host:
+                    via_cmd = f"ip route replace {via_host} dev eth{eth}"
+                    if via_cmd not in seen:
+                        seen.add(via_cmd)
+                        cmds.append(via_cmd)
+
             cmd = f"ip route replace {dst} via {via} dev eth{eth} onlink"
             if cmd not in seen:
                 seen.add(cmd)
@@ -491,6 +518,14 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
                 continue
             if _route_via_is_local(r, 6, local4, local6):
                 continue
+
+            if iface.get("kind") == "overlay":
+                via_host = _host_prefix(via, 6)
+                if via_host:
+                    via_cmd = f"ip -6 route replace {via_host} dev eth{eth}"
+                    if via_cmd not in seen:
+                        seen.add(via_cmd)
+                        cmds.append(via_cmd)
 
             cmd = f"ip -6 route replace {dst} via {via} dev eth{eth} onlink"
             if cmd not in seen:
@@ -852,17 +887,16 @@ def _render_bgp(node_name: str, node: Dict[str, Any], role: str) -> List[str]:
         "(frr_dir / 'vtysh.conf').write_text(payload['vtysh_conf'])\n"
         "subprocess.run(['chown', '-R', 'frr:frr', '/etc/frr', '/var/run/frr'], check=False)\n"
         "subprocess.run(['chmod', '640', '/etc/frr/daemons', '/etc/frr/frr.conf', '/etc/frr/vtysh.conf'], check=False)\n"
-        "subprocess.run(['pkill', '-x', 'zebra'], check=False)\n"
-        "subprocess.run(['pkill', '-x', 'bgpd'], check=False)\n"
-        "restart_cmds = [\n"
-        "    ['/usr/lib/frr/frrinit.sh', 'restart'],\n"
-        "    ['/etc/init.d/frr', 'restart'],\n"
-        "    ['service', 'frr', 'restart'],\n"
-        "]\n"
-        "for cmd in restart_cmds:\n"
-        "    result = subprocess.run(cmd, check=False)\n"
-        "    if result.returncode == 0:\n"
-        "        break\n"
+        "def running(name):\n"
+        "    return subprocess.run(['pgrep', '-x', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0\n"
+        "def start_daemon(name):\n"
+        "    if running(name):\n"
+        "        return\n"
+        "    daemon = f'/usr/lib/frr/{name}'\n"
+        "    subprocess.run([daemon, '-d', '-F', 'traditional', '-A', '127.0.0.1'], check=False)\n"
+        "for daemon in ['zebra', 'bgpd', 'staticd']:\n"
+        "    start_daemon(daemon)\n"
+        "subprocess.run(['vtysh', '-b'], check=False)\n"
         "subprocess.run(['vtysh', '-c', 'show bgp ipv4 summary'], check=False)\n"
         "subprocess.run(['vtysh', '-c', 'show bgp ipv6 summary'], check=False)\n"
     )

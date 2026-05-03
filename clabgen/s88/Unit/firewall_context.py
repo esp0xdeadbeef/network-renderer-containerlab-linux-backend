@@ -422,14 +422,50 @@ def _resolve_external_via_overlay(
     return eth_ifname
 
 
+def _add_interface_tag(
+    interface_tags: Dict[str, Any],
+    iface_name: str,
+    tag: str,
+) -> None:
+    if not isinstance(tag, str) or not tag:
+        return
+
+    current = interface_tags.get(iface_name)
+    if current is None:
+        interface_tags[iface_name] = tag
+        return
+
+    if isinstance(current, str):
+        values = [current]
+    elif isinstance(current, list):
+        values = [value for value in current if isinstance(value, str) and value]
+    else:
+        values = []
+
+    if tag not in values:
+        values.append(tag)
+
+    interface_tags[iface_name] = values[0] if len(values) == 1 else sorted(values)
+
+
+def _interface_tag_values(interface_tags: Dict[str, Any]) -> Set[str]:
+    values: Set[str] = set()
+    for raw in interface_tags.values():
+        if isinstance(raw, str) and raw:
+            values.add(raw)
+        elif isinstance(raw, list):
+            values.update(item for item in raw if isinstance(item, str) and item)
+    return values
+
+
 def _build_policy_interface_tags(
     site: SiteModel,
     policy_node_name: str,
     eth_map: Dict[str, int],
     required_tenants: set[str],
     required_externals: set[str],
-) -> Dict[str, str]:
-    interface_tags: Dict[str, str] = {}
+) -> Dict[str, Any]:
+    interface_tags: Dict[str, Any] = {}
     peer_map = _policy_peer_map(site, policy_node_name, eth_map)
 
     def _lane_access_unit(link_name: Any) -> str | None:
@@ -440,6 +476,12 @@ def _build_policy_interface_tags(
         #   ...--access-<accessUnit>--uplink-*  (policy<->upstream-selector lanes)
         tail = link_name.split("--access-", 1)[1]
         return tail.split("--uplink-", 1)[0]
+
+    def _lane_uplink(link_name: Any) -> str | None:
+        if not isinstance(link_name, str) or "--uplink-" not in link_name:
+            return None
+        uplink = link_name.rsplit("--uplink-", 1)[1]
+        return uplink if uplink else None
 
     for peer in peer_map:
         peer_node = site.nodes.get(peer["peer_name"])
@@ -466,11 +508,11 @@ def _build_policy_interface_tags(
                         default=str,
                     )
                 )
-            interface_tags[iface_name] = tenants[0]
+            _add_interface_tag(interface_tags, iface_name, tenants[0])
             continue
 
         if peer_node.role == "upstream-selector":
-            interface_tags[iface_name] = "wan"
+            _add_interface_tag(interface_tags, iface_name, _lane_uplink(peer.get("link")) or "wan")
             continue
 
         if peer_node.role == "downstream-selector":
@@ -481,11 +523,10 @@ def _build_policy_interface_tags(
                 access_node = site.nodes.get(access_unit)
                 if access_node is not None and access_node.role == "access":
                     tenants = _access_node_tenants(site, access_node)
-                    if len(tenants) == 1:
-                        interface_tags[iface_name] = tenants[0]
+                    if tenants:
+                        for tenant in tenants:
+                            _add_interface_tag(interface_tags, iface_name, tenant)
                         continue
-            # If lanes are not enabled, one interface can cover multiple tenants; we can't tag
-            # it precisely without inference. Leave it unmapped and let downstream checks warn.
             continue
 
         if peer_node.role == "core":
@@ -498,7 +539,8 @@ def _build_policy_interface_tags(
                     wan_uplinks.append(uplink)
 
             wan_uplinks = sorted(set(wan_uplinks))
-            interface_tags[iface_name] = wan_uplinks[0] if wan_uplinks else "wan"
+            for uplink in (wan_uplinks or ["wan"]):
+                _add_interface_tag(interface_tags, iface_name, uplink)
             continue
 
     if not interface_tags:
@@ -507,7 +549,7 @@ def _build_policy_interface_tags(
             + json.dumps(peer_map, indent=2, default=str)
         )
 
-    available_tags = set(interface_tags.values())
+    available_tags = _interface_tag_values(interface_tags)
 
     if "wan" not in available_tags and required_externals == {"wan"} and len(available_tags) == 1:
         only_if = next(iter(interface_tags.keys()))
@@ -532,8 +574,8 @@ def _build_policy_interface_tags(
             external=external,
         )
         if resolved_iface is None:
-            print(
-                "WARNING: external has no policy-local tag and no overlay realization:\n"
+            raise RuntimeError(
+                "external has no policy-local tag and no overlay realization:\n"
                 + json.dumps(
                     {
                         "external": external,
@@ -546,13 +588,13 @@ def _build_policy_interface_tags(
             )
             continue
 
-        interface_tags[resolved_iface] = external
-        available_tags = set(interface_tags.values())
+        _add_interface_tag(interface_tags, resolved_iface, external)
+        available_tags = _interface_tag_values(interface_tags)
 
     for tenant in required_tenants:
         if tenant not in available_tags:
-            print(
-                "WARNING: tenant cannot be mapped to any policy interface tag:\n"
+            raise RuntimeError(
+                "tenant cannot be mapped to any policy interface tag:\n"
                 + json.dumps(
                     {
                         "tenant": tenant,
@@ -566,8 +608,8 @@ def _build_policy_interface_tags(
 
     for external in required_externals:
         if external not in available_tags:
-            print(
-                "WARNING: external cannot be mapped to any policy interface tag:\n"
+            raise RuntimeError(
+                "external cannot be mapped to any policy interface tag:\n"
                 + json.dumps(
                     {
                         "external": external,
@@ -673,7 +715,7 @@ def build_policy_firewall_state(site: SiteModel, policy_node_name: str, eth_map:
         externals,
     )
 
-    rules = _build_policy_rules(contract, set(interface_tags.values()))
+    rules = _build_policy_rules(contract, _interface_tag_values(interface_tags))
 
     return {
         "interface_tags": interface_tags,

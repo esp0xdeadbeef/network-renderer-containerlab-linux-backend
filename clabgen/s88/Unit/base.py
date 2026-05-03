@@ -74,7 +74,7 @@ def _build_eth_maps(site: SiteModel) -> Dict[str, Dict[str, int]]:
         node = site.nodes[node_name]
         for ifname in sorted(node.interfaces.keys()):
             iface = node.interfaces[ifname]
-            if iface.kind == "tenant" and ifname not in eth_maps[node_name]:
+            if iface.kind in {"tenant", "overlay"} and ifname not in eth_maps[node_name]:
                 eth_maps[node_name][ifname] = counters[node_name]
                 counters[node_name] += 1
 
@@ -239,5 +239,26 @@ def render_units(site: SiteModel) -> Tuple[Dict[str, Any], List[Dict[str, Any]],
                 },
             }
         )
+
+    for node_name in sorted(site.nodes.keys()):
+        node = site.nodes[node_name]
+        for ifname, iface in sorted(node.interfaces.items()):
+            if iface.kind != "overlay":
+                continue
+
+            overlay_name = iface.overlay or ifname
+            eth = eth_maps[node_name].get(ifname)
+            if eth is None:
+                continue
+
+            links.append(
+                {
+                    "endpoints": [f"{node_name}:eth{eth}"],
+                    "labels": {
+                        "clab.link.type": "overlay",
+                        "clab.overlay": overlay_name,
+                    },
+                }
+            )
 
     return nodes, links, sorted(set(bridges))
