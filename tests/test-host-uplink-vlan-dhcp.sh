@@ -51,6 +51,9 @@ required = [
     "clab.link.bridge: streaming",
     "clab.link.bridge: br-uplink0",
     "clab.link.bridge: br-uplink1",
+    "net.ipv6.conf.eth2.accept_ra=2",
+    "net.ipv6.conf.eth2.autoconf=1",
+    "udhcpc -b -i eth2",
 ]
 
 missing = [needle for needle in required if needle not in topology]
