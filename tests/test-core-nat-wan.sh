@@ -28,7 +28,7 @@ nix run --show-trace "${cpm_path}#compile-and-build-control-plane-model" -- \
 build_cpm "${inventory_clab}" "${tmp_dir}/cpm.clab.json"
 
 # Renderer inventory is derived from the flake-locked containerlab inventory input.
-nix eval --impure --json --expr "let inv = import ${inventory_clab}; in { containerlab = inv.containerlab or {}; }" > "${tmp_dir}/cpm.clab.json.renderer-inventory.json"
+nix eval --impure --json --expr "import ${inventory_clab}" > "${tmp_dir}/cpm.clab.json.renderer-inventory.json"
 
 TMP_DIR="${tmp_dir}" python3 - <<'PY'
 from pathlib import Path
@@ -62,12 +62,12 @@ def _render_execs(cpm_path: Path) -> list[str]:
 
 execs_clab = _render_execs(tmp / "cpm.clab.json")
 
-want = 'oifname "eth0" masquerade'
-want6 = 'oifname "eth0" masquerade'
+want = 'oifname "eth2" masquerade'
+want6 = 'oifname "eth2" masquerade'
 
-assert any(want in c for c in execs_clab), "expected NAT44 on eth0 via inventory-clab.nix"
+assert any(want in c for c in execs_clab), "expected NAT44 on resolved CLAB WAN port via inventory-clab.nix"
 assert any("ip6 nat" in c for c in execs_clab), "expected NAT66 table via inventory-clab.nix"
-assert any('ip6 saddr' in c and 'oifname "eth0" masquerade' in c for c in execs_clab), "expected NAT66 on eth0 via inventory-clab.nix"
+assert any('ip6 saddr' in c and 'oifname "eth2" masquerade' in c for c in execs_clab), "expected NAT66 on resolved CLAB WAN port via inventory-clab.nix"
 
 print("PASS core-nat-inventory")
 PY
