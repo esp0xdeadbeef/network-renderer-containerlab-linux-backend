@@ -35,6 +35,11 @@ def render_dns_service(node: Dict[str, Any]) -> List[str]:
     return [
         _sh(
             "pkill -f '^python3 /tmp/clabgen-dns-proxy.py' >/dev/null 2>&1 || true\n"
+            "cat >/etc/resolv.conf <<'RESOLV'\n"
+            "nameserver 127.0.0.1\n"
+            "nameserver ::1\n"
+            "options timeout:1 attempts:2\n"
+            "RESOLV\n"
             "cat >/tmp/clabgen-dns-proxy.json <<'JSON'\n"
             + json.dumps(payload, indent=2, sort_keys=True)
             + "\nJSON\n"

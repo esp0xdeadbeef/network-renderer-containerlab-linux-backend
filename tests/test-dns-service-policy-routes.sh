@@ -45,6 +45,16 @@ assert_node_contains \
   "esp0xdeadbeef-site-a-s-router-access-mgmt" \
   "clabgen-dns-proxy.py"
 
+assert_node_contains \
+  "${topology}" \
+  "esp0xdeadbeef-site-a-s-router-access-mgmt" \
+  "nameserver 127.0.0.1"
+
+assert_node_matches \
+  "${topology}" \
+  "esp0xdeadbeef-site-a-s-router-access-mgmt" \
+  "nameserver[[:space:]]+::1\\\\noptions timeout:1 attempts:2"
+
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-c-c-router-policy" \
