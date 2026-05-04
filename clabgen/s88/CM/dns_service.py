@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List
 import json
+import shlex
 
 
 RUNTIME_SCRIPT = Path(__file__).with_name("dns_proxy_runtime.py")
@@ -10,7 +11,7 @@ PROTOCOL_SCRIPT = Path(__file__).with_name("dns_proxy_protocol.py")
 
 
 def _sh(script: str) -> str:
-    return "/bin/sh -lc " + json.dumps(script)
+    return "sh -c " + shlex.quote(script)
 
 
 def render_dns_service(node: Dict[str, Any]) -> List[str]:
