@@ -40,6 +40,16 @@ assert_node_contains \
   "esp0xdeadbeef-site-a-s-router-policy-only" \
   "oifname \"eth5\" tcp dport 53 counter accept"
 
+assert_node_matches \
+  "${topology}" \
+  "esp0xdeadbeef-site-a-s-router-policy-only" \
+  "iifname \"eth2\" oifname \\{ \"eth10\", \"eth13\", \"eth16\",[[:space:]]+\"eth7\" \\} counter accept"
+
+assert_node_matches \
+  "${topology}" \
+  "esp0xdeadbeef-site-a-s-router-policy-only" \
+  "iifname \"eth5\" oifname \\{ \"eth10\", \"eth13\", \"eth16\",[[:space:]]+\"eth7\" \\} counter accept"
+
 assert_node_contains \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-access-mgmt" \

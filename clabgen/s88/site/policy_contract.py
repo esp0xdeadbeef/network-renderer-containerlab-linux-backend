@@ -29,7 +29,18 @@ def members(obj: Any) -> List[str]:
             return result
         name = obj.get("name")
         return [name] if isinstance(name, str) else []
-    if kind in {"external", "service"}:
+    if kind == "external":
+        uplinks = obj.get("uplinks")
+        if isinstance(uplinks, list):
+            result: List[str] = []
+            for uplink in uplinks:
+                if isinstance(uplink, str) and uplink:
+                    result.append(uplink)
+            if result:
+                return result
+        name = obj.get("name")
+        return [name] if isinstance(name, str) else []
+    if kind == "service":
         name = obj.get("name")
         return [name] if isinstance(name, str) else []
     return []
