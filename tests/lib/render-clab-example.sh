@@ -20,9 +20,17 @@ render_clab_example() {
   example_dir="$(resolve_labs_model_dir "${labs_path}" "${example_name}")"
   local intent_path="${example_dir}/intent.nix"
   local inventory_path="${example_dir}/inventory-clab.nix"
+  local resolved_inventory_path="${tmp_dir}/inventory-clab-resolved.nix"
 
   [[ -f "${intent_path}" ]] || fail "missing intent: ${intent_path}"
   [[ -f "${inventory_path}" ]] || fail "missing inventory-clab: ${inventory_path}"
+
+  if [[ -f "${example_dir}/getResolvedInventory.nix" ]]; then
+    cat >"${resolved_inventory_path}" <<EOF
+import ${example_dir}/getResolvedInventory.nix { renderer = "clab"; }
+EOF
+    inventory_path="${resolved_inventory_path}"
+  fi
 
   (
     cd "${tmp_dir}"

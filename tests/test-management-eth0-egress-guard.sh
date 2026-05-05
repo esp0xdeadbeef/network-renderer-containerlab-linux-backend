@@ -15,6 +15,14 @@ inventory_clab="${example_dir}/inventory-clab.nix"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "'"${tmp_dir}"'"' EXIT
 
+if [[ -f "${example_dir}/getResolvedInventory.nix" ]]; then
+  resolved_inventory="${tmp_dir}/inventory-clab-resolved.nix"
+  cat >"${resolved_inventory}" <<EOF
+import ${example_dir}/getResolvedInventory.nix { renderer = "clab"; }
+EOF
+  inventory_clab="${resolved_inventory}"
+fi
+
 nix run --show-trace "${cpm_path}#compile-and-build-control-plane-model" -- \
   "${intent}" \
   "${inventory_clab}" \
