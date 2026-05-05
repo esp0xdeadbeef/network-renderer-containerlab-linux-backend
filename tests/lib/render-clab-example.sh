@@ -16,7 +16,8 @@ render_clab_example() {
   labs_path="$(resolve_input_path network-labs)"
   cpm_path="$(resolve_input_path network-control-plane-model)"
 
-  local example_dir="${labs_path}/examples/${example_name}"
+  local example_dir
+  example_dir="$(resolve_labs_model_dir "${labs_path}" "${example_name}")"
   local intent_path="${example_dir}/intent.nix"
   local inventory_path="${example_dir}/inventory-clab.nix"
 

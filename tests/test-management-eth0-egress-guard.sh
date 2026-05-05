@@ -8,7 +8,7 @@ source "${repo_root}/tests/lib/input-path.sh"
 cpm_path="$(resolve_input_path network-control-plane-model)"
 labs_path="$(resolve_input_path network-labs)"
 
-example_dir="${labs_path}/examples/s-router-test-three-site"
+example_dir="$(resolve_labs_model_dir "${labs_path}" "s-router-test-three-site")"
 intent="${example_dir}/intent.nix"
 inventory_clab="${example_dir}/inventory-clab.nix"
 

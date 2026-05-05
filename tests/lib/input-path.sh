@@ -96,3 +96,23 @@ resolve_input_path() {
   printf '%s
 ' "${input_path}"
 }
+
+resolve_labs_model_dir() {
+  local labs_path="$1"
+  local model_name="$2"
+
+  local example_dir="${labs_path}/examples/${model_name}"
+  if [[ -f "${example_dir}/intent.nix" ]]; then
+    printf '%s\n' "${example_dir}"
+    return 0
+  fi
+
+  local lab_dir="${labs_path}/labs/lab-s-sigma/${model_name}"
+  if [[ -f "${lab_dir}/intent.nix" ]]; then
+    printf '%s\n' "${lab_dir}"
+    return 0
+  fi
+
+  echo "tests: missing model ${model_name} under examples/ or labs/lab-s-sigma/" >&2
+  return 1
+}
