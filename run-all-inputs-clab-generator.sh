@@ -21,7 +21,7 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-out_root="${1:-$repo_root/out}"
+out_root="${1:-$(mktemp -d "${TMPDIR:-/tmp}/clabgen-all.XXXXXX")}"
 
 resolve_input_path() {
   local input_name="$1"

@@ -25,7 +25,7 @@ jq '
 
 renderer_inv="${tmp_dir}/renderer-inventory.json"
 nix eval --impure --json --expr \
-  "let inv = import ${example_dir}/inventory-clab.nix; in { containerlab = inv.containerlab or {}; }" \
+  "import ${example_dir}/inventory-clab.nix" \
   > "${renderer_inv}"
 
 set +e

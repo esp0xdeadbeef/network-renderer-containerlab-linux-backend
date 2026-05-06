@@ -50,7 +50,7 @@ run_one_example() {
   # noise from Nix when evaluating a path-based flake.
   (
     cd "${repo_root}"
-    nix eval --impure --json --expr "let inv = import ${inventory}; in { containerlab = inv.containerlab or {}; }" > "${renderer_inv}"
+    nix eval --impure --json --expr "import ${inventory}" > "${renderer_inv}"
     CLABGEN_RENDERER_INVENTORY_JSON="${renderer_inv}" nix run --show-trace "path:${repo_root}#generate-clab-config" -- \
       "${tmp_dir}/cpm.json" \
       "${tmp_dir}/fabric.clab.yml" \
