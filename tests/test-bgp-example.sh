@@ -29,7 +29,7 @@ trap 'rm -rf "'"${tmp_dir}"'"' EXIT
 (
   cd "${repo_root}"
   renderer_inv="${tmp_dir}/renderer-inventory.json"
-  nix eval --impure --json --expr "let inv = import ${inventory_path}; in { containerlab = inv.containerlab or {}; }" > "${renderer_inv}"
+  nix eval --impure --json --expr "import ${inventory_path}" > "${renderer_inv}"
   CLABGEN_RENDERER_INVENTORY_JSON="${renderer_inv}" nix run --show-trace "path:${repo_root}#generate-clab-config" -- \
     "${tmp_dir}/cpm.json" \
     "${tmp_dir}/fabric.clab.yml" \
