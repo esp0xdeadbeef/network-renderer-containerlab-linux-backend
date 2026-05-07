@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${repo_root}/tests/lib/input-path.sh"
+source "${repo_root}/tests/lib/example-output-contract.sh"
 
 labs_path="$(resolve_input_path network-labs)"
 cpm_path="$(resolve_input_path network-control-plane-model)"
@@ -77,6 +78,11 @@ run_one_example() {
     "${renderer_inv}" \
     "${tmp_dir}/fabric.clab.yml" \
     || fail "FAIL ${name}: topology conformance validation failed"
+
+  assert_clab_example_output_contract \
+    "${name}" \
+    "${tmp_dir}/fabric.clab.yml" \
+    "${tmp_dir}/vm-bridges-generated.nix"
 
   echo "PASS ${name}"
 

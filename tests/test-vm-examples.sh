@@ -393,7 +393,6 @@ check_single_wan() {
   client="$(resolve_client_container_name "${MGMT_SITE}" "${MGMT_LOGICAL}" "${MGMT_TENANT_IFACE}")"
   ssh_vm_once "
     containerlab inspect -t "${repo_root}/fabric.clab.yml" >/dev/null
-    docker exec '${client}' sh -lc '
     docker exec '${client}' sh -c '
       set -e
       gw=\$(ip route | awk \"/^default via / { print \\\$3; exit }\")
