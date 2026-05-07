@@ -34,11 +34,11 @@
         "nixpkgs-network": "nixpkgs-network_3"
       },
       "locked": {
-        "lastModified": 1778125689,
-        "narHash": "sha256-kedB1ADDJjfX2kbbP1TLjvVG6MUFMTn3TOXg9RoxGEU=",
+        "lastModified": 1778132130,
+        "narHash": "sha256-0RE67+iJdFgggjrM8QxC/6CTaWHAXEtrYMclbJB5YMo=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "3829096fa454ede7599efbb3fd38bccb67ebca07",
+        "rev": "97c79c12ac0e4633acdeaf77a7dc181a01a2840f",
         "type": "github"
       },
       "original": {
