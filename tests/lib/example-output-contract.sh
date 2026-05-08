@@ -52,8 +52,8 @@ assert_clab_example_output_contract() {
   case "$label" in
     single-wan-with-nebula)
       require_text "$label" "$topology" "esp0xdeadbeef-site-a-s-router-core-nebula"
-      require_text "$label" "$topology" "clab.link.bridge: br-site-a-core-nebula-uplink"
-      require_text "$label" "$topology" "clab.link.bridge: br-site-a-policy-upstream-access-admin-nebula"
+      require_regex "$label" "$topology" 'clab\.link\.bridge: br-[0-9a-f]{12}'
+      require_regex "$label" "$topology" 'core-nebula|nebula-core'
       ;;
   esac
 

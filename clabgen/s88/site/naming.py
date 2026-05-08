@@ -13,6 +13,12 @@ def bridge_name(seed: str) -> str:
     return f"br-{digest}"[:MAX_BRIDGE_NAME]
 
 
+def realized_bridge_name(name: str) -> str:
+    if len(name) <= MAX_BRIDGE_NAME:
+        return name
+    return bridge_name(name)
+
+
 def host_ifname(seed: str) -> str:
     digest = hashlib.blake2s(seed.encode(), digest_size=5).hexdigest()
     return f"veth-{digest}"[:MAX_BRIDGE_NAME]
@@ -20,7 +26,7 @@ def host_ifname(seed: str) -> str:
 
 def link_bridge(site: SiteModel, link: LinkModel, link_name: str) -> str:
     if link.bridge:
-        return link.bridge
+        return realized_bridge_name(link.bridge)
     return bridge_name(f"{site.enterprise}-{site.site}-{link_name}")
 
 

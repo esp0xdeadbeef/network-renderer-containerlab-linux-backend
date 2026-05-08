@@ -14,4 +14,14 @@ grep -q "grep '^clab-fabric-'" "${run_in_vm}" || {
   exit 1
 }
 
+grep -q 'wait_for_required_bridges' "${run_in_vm}" || {
+  echo "run-in-vm.sh must wait for generated VM bridges before Containerlab deploy" >&2
+  exit 1
+}
+
+grep -q 'missing required host bridges after' "${run_in_vm}" || {
+  echo "run-in-vm.sh must fail with explicit missing bridge names" >&2
+  exit 1
+}
+
 echo "PASS vm-example-lab-cleanup"
