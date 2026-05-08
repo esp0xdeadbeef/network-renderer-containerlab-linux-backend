@@ -31,6 +31,10 @@ def render_site_topology(site: SiteModel) -> Dict[str, Any]:
         if link.bridge and link.host_uplink:
             bridge_networks.setdefault(link.bridge, dict(link.host_uplink))
 
+    for bridge in bridges:
+        if bridge in bridge_networks:
+            nodes.setdefault(bridge, {"kind": "bridge"})
+
     return {
         "name": f"{site.enterprise}-{site.site}",
         "topology": {

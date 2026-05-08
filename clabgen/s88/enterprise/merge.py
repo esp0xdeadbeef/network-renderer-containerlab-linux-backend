@@ -68,13 +68,24 @@ def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
         node_name_map: Dict[str, str] = {}
 
         for node_name in sorted(topo["topology"]["nodes"].keys()):
-            rendered_node_name = scoped_node_name(site, node_name)
+            node_def = topo["topology"]["nodes"][node_name]
+            if isinstance(node_def, dict) and node_def.get("kind") == "bridge":
+                rendered_node_name = node_name
+            else:
+                rendered_node_name = scoped_node_name(site, node_name)
             if rendered_node_name in merged_nodes:
+                existing = merged_nodes[rendered_node_name]
+                if (
+                    isinstance(existing, dict)
+                    and isinstance(node_def, dict)
+                    and existing.get("kind") == "bridge"
+                    and node_def.get("kind") == "bridge"
+                ):
+                    node_name_map[node_name] = rendered_node_name
+                    continue
                 raise ValueError(f"duplicate rendered node '{rendered_node_name}'")
             node_name_map[node_name] = rendered_node_name
-            merged_nodes[rendered_node_name] = copy.deepcopy(
-                topo["topology"]["nodes"][node_name]
-            )
+            merged_nodes[rendered_node_name] = copy.deepcopy(node_def)
 
         for link_def in topo["topology"]["links"]:
             link_copy = _rewrite_link(link_def, node_name_map, site)
@@ -96,17 +107,26 @@ def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
         if len(endpoints) < 2:
             continue
         bridge = bridge_name(f"overlay-{overlay_name}")
+        if bridge in merged_nodes:
+            raise ValueError(
+                f"overlay bridge node collides with rendered node '{bridge}'"
+            )
+        merged_nodes[bridge] = {"kind": "bridge"}
         merged_bridges.append(bridge)
-        merged_links.append(
-            {
-                "endpoints": endpoints,
-                "labels": {
-                    "clab.link.type": "overlay",
-                    "clab.overlay": overlay_name,
-                    "clab.link.bridge": bridge,
-                },
-            }
-        )
+        for index, endpoint in enumerate(endpoints):
+            merged_links.append(
+                {
+                    "endpoints": [
+                        endpoint,
+                        f"{bridge}:eth{index + 1}",
+                    ],
+                    "labels": {
+                        "clab.link.type": "overlay",
+                        "clab.overlay": overlay_name,
+                        "clab.link.bridge": bridge,
+                    },
+                }
+            )
 
     return {
         "name": "fabric",

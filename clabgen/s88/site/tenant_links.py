@@ -44,30 +44,23 @@ def _bridge_link(endpoints: List[str], bridge: str) -> Dict[str, Any]:
     }
 
 
-def _macvlan_link(
-    endpoint: str, bridge: str, host_uplink: Dict[str, Any]
+def _host_bridge_link(
+    endpoint: str, bridge: str, tenant_key: str, host_uplink: Dict[str, Any]
 ) -> Dict[str, Any]:
-    host_if = host_uplink_interface(host_uplink)
-    if host_if is None:
-        raise ValueError(f"host uplink is not renderable as macvlan: {host_uplink!r}")
-
-    labels = {
-        "clab.link.type": "macvlan",
-        "clab.host.parent": str(host_uplink.get("parent") or ""),
-        "clab.host.uplink": str(host_uplink.get("upstream") or ""),
-        "clab.host.interface": host_if,
-        "clab.link.bridge": bridge,
-    }
+    link = _bridge_link(
+        [
+            endpoint,
+            f"{bridge}:{host_ifname(f'{bridge}-{tenant_key}-{endpoint}')}",
+        ],
+        bridge,
+    )
+    labels = link["labels"]
+    labels["clab.host.parent"] = str(host_uplink.get("parent") or "")
+    labels["clab.host.uplink"] = str(host_uplink.get("upstream") or "")
+    labels["clab.host.interface"] = host_uplink_interface(host_uplink) or ""
     if isinstance(host_uplink.get("vlan"), int):
         labels["clab.host.vlan"] = str(host_uplink["vlan"])
-
-    return {
-        "endpoints": [
-            endpoint,
-            f"macvlan:{host_if}",
-        ],
-        "labels": labels,
-    }
+    return link
 
 
 def _bridge_host_uplink(site: SiteModel, bridge: str) -> Dict[str, Any]:
@@ -104,7 +97,8 @@ def render_tenant_links(
         endpoints = list(tenant_groups[tenant])
         host_uplink = _bridge_host_uplink(site, bridge)
         if len(endpoints) == 1 and host_uplink_interface(host_uplink):
-            links.append(_macvlan_link(endpoints[0], bridge, host_uplink))
+            bridges.append(bridge)
+            links.append(_host_bridge_link(endpoints[0], bridge, tenant, host_uplink))
             continue
         if len(endpoints) == 1:
             endpoints.append(f"host:{host_ifname(f'{bridge}-tenant')}")

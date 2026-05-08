@@ -16,7 +16,10 @@ let
   generated = import generatedBridgesFile { inherit lib; };
 
   bridges = generated.bridges;
-  bridgeNetworks = generated.bridgeNetworks or { };
+  bridgeNetworks = lib.mapAttrs (
+    name: network:
+    if builtins.isAttrs network then network // { bridge = network.bridge or name; } else network
+  ) (generated.bridgeNetworks or { });
   bridgeNames = lib.unique (bridges ++ builtins.attrNames bridgeNetworks);
   bridgeNetworkNames = builtins.attrNames bridgeNetworks;
   physicalUplinks = lib.filterAttrs (
@@ -104,8 +107,10 @@ let
             ConfigureWithoutCarrier = true;
             LinkLocalAddressing = "no";
             IPv6AcceptRA = false;
+            DHCP = lib.mkIf (parentIf == "eth0") "ipv4";
             VLAN = vlanChildren;
           };
+          dhcpV4Config = lib.optionalAttrs (parentIf == "eth0") { UseDNS = false; };
         };
       }
     ) parentIfNames

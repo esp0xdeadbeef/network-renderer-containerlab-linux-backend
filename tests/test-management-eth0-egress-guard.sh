@@ -48,6 +48,8 @@ sites = load_sites(cpm_path, renderer_inventory=renderer_inventory)
 for site_name, site in sites.items():
     nodes, _links, _bridges = render_units(site)
     for node_name, node in nodes.items():
+        if node.get("kind") == "bridge":
+            continue
         assert node.get("network-mode") == "none", (
             f"{site_name}/{node_name} must disable Containerlab management networking"
         )

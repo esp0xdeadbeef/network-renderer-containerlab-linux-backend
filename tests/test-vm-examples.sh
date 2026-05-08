@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${repo_root}/tests/lib/input-path.sh"
 vm_ssh_port="${CLAB_VM_SSH_PORT:-2222}"
+vm_ssh_host="${CLAB_VM_SSH_HOST:-127.0.0.1}"
 vm_state_dir="${CLAB_VM_STATE_DIR:-}"
 ephemeral_vm_state_dir=""
 host_cache_root="${CLAB_VM_HOST_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/network-renderer-containerlab-linux-backend}"
@@ -90,7 +91,7 @@ ensure_host_tooling_image_cache() {
 }
 
 ssh_vm_ready() {
-  ssh "${ssh_opts[@]}" root@localhost true >/dev/null 2>&1
+  ssh "${ssh_opts[@]}" "root@${vm_ssh_host}" true >/dev/null 2>&1
 }
 
 ssh_vm() {
@@ -101,7 +102,7 @@ ssh_vm() {
 
   for try in $(seq 1 "$attempts"); do
     if printf '%s\n' "set -euo pipefail" "$remote_cmd" \
-      | ssh "${ssh_opts[@]}" root@localhost /run/current-system/sw/bin/bash --noprofile --norc -s
+      | ssh "${ssh_opts[@]}" "root@${vm_ssh_host}" /run/current-system/sw/bin/bash --noprofile --norc -s
     then
       return 0
     fi
@@ -117,7 +118,7 @@ ssh_vm() {
 ssh_vm_once() {
   local remote_cmd="$*"
   printf '%s\n' "set -euo pipefail" "$remote_cmd" \
-    | ssh "${ssh_opts[@]}" root@localhost /run/current-system/sw/bin/bash --noprofile --norc -s
+    | ssh "${ssh_opts[@]}" "root@${vm_ssh_host}" /run/current-system/sw/bin/bash --noprofile --norc -s
 }
 
 cleanup_vm() {
@@ -177,7 +178,7 @@ shutdown_vm() {
 scp_vm_file() {
   local src="$1"
   local dst="$2"
-  scp "${scp_opts[@]}" "${src}" "root@localhost:${dst}" >/dev/null
+  scp "${scp_opts[@]}" "${src}" "root@${vm_ssh_host}:${dst}" >/dev/null
 }
 
 stage_tooling_cache_into_vm() {
@@ -352,6 +353,28 @@ for enterprise, sites in data.items():
 PY
 }
 
+extract_runtime_target_dataplane_checks() {
+  local cpm_json="$1"
+
+  python3 - <<'PY' "$cpm_json"
+import json
+import sys
+
+data = json.load(open(sys.argv[1]))["control_plane_model"]["data"]
+for enterprise, sites in data.items():
+    for site, site_data in sites.items():
+        for runtime_name, rt in sorted(site_data.get("runtimeTargets", {}).items()):
+            logical = rt.get("logicalNode") or {}
+            logical_name = logical.get("name")
+            realization = rt.get("effectiveRuntimeRealization") or {}
+            loopback = realization.get("loopback") or {}
+            loop4 = (loopback.get("addr4") or "").split("/", 1)[0]
+            loop6 = (loopback.get("addr6") or "").split("/", 1)[0]
+            if logical_name and (loop4 or loop6):
+                print(f"{site}\t{logical_name}\t{loop4}\t{loop6}")
+PY
+}
+
 load_example_context() {
   local example="$1"
   local cpm_json="$2"
@@ -446,6 +469,42 @@ check_runtime_target_suffixes_present() {
   done
 }
 
+check_runtime_target_dataplane() {
+  local check
+  local site
+  local logical_name
+  local loop4
+  local loop6
+  local container
+
+  for check in "$@"; do
+    IFS=$'\t' read -r site logical_name loop4 loop6 <<<"${check}"
+    container="$(resolve_container_name "${site}" "${logical_name}")"
+    log "checking ${container} loopback/routes from CPM runtime target ${site}:${logical_name}"
+    ssh_vm_once "
+      docker exec '${container}' sh -c '
+        set -e
+        ip -br link
+        ip -br addr
+        ip route
+        ip -6 route
+        if [ -n \"${loop4}\" ]; then
+          ip route get \"${loop4}\" | grep -F \"dev lo\"
+        fi
+        if [ -n \"${loop6}\" ]; then
+          ip -6 route get \"${loop6}\" | grep -F \"dev lo\"
+        fi
+        case \"${logical_name}\" in
+          *-access-*)
+            ip route get 8.8.8.8 >/dev/null
+            ip -6 route get 2001:db8::1 >/dev/null
+            ;;
+        esac
+      '
+    "
+  done
+}
+
 check_dual_wan_overlay() {
   local sitea_core
   local siteb_core
@@ -524,6 +583,14 @@ run_example() {
   log "running VM-backed validation for ${example}"
   stage_rendered_topology
   run_in_vm_validation
+  mapfile -t runtime_target_suffixes < <(extract_runtime_target_suffixes "${tmp_dir}/cpm.json")
+  if ! check_runtime_target_suffixes_present "${runtime_target_suffixes[@]}"; then
+    return 1
+  fi
+  mapfile -t runtime_dataplane_checks < <(extract_runtime_target_dataplane_checks "${tmp_dir}/cpm.json")
+  if ! check_runtime_target_dataplane "${runtime_dataplane_checks[@]}"; then
+    return 1
+  fi
 
   case "$example" in
     single-wan)

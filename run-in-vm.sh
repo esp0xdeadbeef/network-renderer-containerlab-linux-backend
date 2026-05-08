@@ -10,7 +10,8 @@ docker-clab-frr-plus-tooling/build.sh
 # set changes across examples, so clear the existing lab first.
 containerlab destroy --name fabric -c >/dev/null 2>&1 || true
 
-containerlab deploy -t "${topo_file}" -d --reconfigure
+containerlab deploy -t "${topo_file}" --reconfigure
+containerlab inspect -t "${topo_file}" >/dev/null
 
 for c in $(docker ps --format '{{.Names}}' | grep clab-fabric | sort )
 do
@@ -45,7 +46,7 @@ do
   echo
 
   echo "[ ip route get 8.8.8.8 ]"
-  docker exec "$c" ip route get 8.8.8.8
+  docker exec "$c" ip route get 8.8.8.8 || true
   echo
 
   #echo "[ traceroute -> s-router-access (10.10.0.0) ]"
