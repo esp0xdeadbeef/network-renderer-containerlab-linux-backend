@@ -42,8 +42,24 @@ if not re.search(r"(?m)^\s*links:\s*$", raw):
     raise SystemExit(f"validator: YAML missing topology.links section: {p}")
 
 links_with_endpoints = len(re.findall(r"(?m)^\s*-\s+endpoints:\s*$", raw))
+if re.search(r"(?m)^\s*-\s+type:\s+macvlan\s*$", raw):
+    raise SystemExit(f"validator: host attachment links must use bridge-kind endpoints, not macvlan: {p}")
+
 if links_with_endpoints < 1:
-    raise SystemExit(f"validator: YAML contains no links with endpoints: {p}")
+    raise SystemExit(f"validator: YAML contains no renderable links: {p}")
+
+link_blocks = re.findall(
+    r"(?ms)^\s*-\s+endpoints:\s*$"
+    r"(.*?)(?=^\s*-\s+endpoints:|\Z)",
+    raw,
+)
+for index, block in enumerate(link_blocks, start=1):
+    endpoints = re.findall(r'(?m)^\s*-\s+"?([^"\s][^"\n]*)"?\s*$', block)
+    endpoints = [ep.strip() for ep in endpoints if ":" in ep]
+    if len(endpoints) != 2:
+        raise SystemExit(
+            f"validator: Containerlab link {index} must have exactly 2 endpoints, got {len(endpoints)}: {endpoints}"
+        )
 
 endpoint_lines = re.findall(r'(?m)^\s*-\s+"?[^"\s:]+:[^"\s:]+"?\s*$', raw)
 if len(endpoint_lines) < (links_with_endpoints * 2):
@@ -81,6 +97,24 @@ validation_json="$(
       networkNames = builtins.attrNames (vmModule.systemd.network.networks or { });
       missingNetdevBridges = builtins.filter (bridge: !(builtins.elem bridge netdevNames)) bridges;
       missingNetworkBridges = builtins.filter (bridge: !(builtins.elem bridge networkNames)) bridges;
+      expectedVlanIfNames =
+        lib.filter builtins.isString (
+          lib.mapAttrsToList (
+            _name: network:
+            if
+              builtins.isAttrs network
+              && (network.mode or "") == "vlan"
+              && builtins.isString (network.parent or null)
+              && builtins.isInt (network.vlan or null)
+            then
+              "${network.parent}.${toString network.vlan}"
+            else
+              null
+          ) bridgeNetworks
+        );
+      missingVlanNetdevs = builtins.filter (
+        ifName: !(builtins.elem "11-${ifName}" netdevNames)
+      ) expectedVlanIfNames;
     in
     {
       bridgeCount = builtins.length bridges;
@@ -89,6 +123,7 @@ validation_json="$(
       bridgeNetworkCount = builtins.length (builtins.attrNames bridgeNetworks);
       netdevCount = builtins.length netdevNames;
       networkCount = builtins.length networkNames;
+      missingVlanNetdevs = missingVlanNetdevs;
       namesMatch =
         if bridgeNetworks == {} then
           (lib.sort builtins.lessThan netdevNames) == (lib.sort builtins.lessThan bridges)
@@ -113,4 +148,9 @@ if result["nonStringCount"] != 0:
     raise SystemExit("validator: generated bridges must all be strings")
 if not result["namesMatch"]:
     raise SystemExit("validator: vm.nix bridge names do not match generated bridges")
+if result["missingVlanNetdevs"]:
+    raise SystemExit(
+        "validator: vm.nix does not create VLAN netdevs for host bridge networks: "
+        + ", ".join(result["missingVlanNetdevs"])
+    )
 PY

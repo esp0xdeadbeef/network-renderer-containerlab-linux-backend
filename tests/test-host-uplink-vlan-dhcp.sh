@@ -9,7 +9,7 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 
 render_clab_example "s-router-test-three-site" "${tmp_dir}"
 
-python3 - "${tmp_dir}/fabric.clab.yml" "${tmp_dir}/vm-bridges-generated.nix" <<'PY'
+python3 - "${tmp_dir}/fabric.clab.yml" "${tmp_dir}/vm-bridges-generated.nix" "${repo_root}/vm.nix" <<'PY'
 import json
 import re
 import sys
@@ -17,6 +17,7 @@ from pathlib import Path
 
 topology = Path(sys.argv[1]).read_text()
 bridges = Path(sys.argv[2]).read_text()
+vm_nix = Path(sys.argv[3]).read_text()
 
 match = re.search(r"bridgeNetworks = builtins\.fromJSON ''\n(.*)\n  '';", bridges, re.S)
 if not match:
@@ -32,16 +33,23 @@ assert bridge_networks["br-uplink1"]["parent"] == "eth0"
 assert bridge_networks["br-uplink1"]["vlan"] == 5
 
 required = [
-    "- macvlan:eth0.4",
-    "- macvlan:eth0.5",
-    "- macvlan:eth0.350",
-    "- macvlan:eth0.351",
-    "- macvlan:eth0.352",
-    "- macvlan:eth0.353",
-    "- macvlan:eth0.354",
-    "- macvlan:eth0.355",
-    "- macvlan:eth0.356",
-    "- macvlan:eth0.357",
+    "- admin:",
+    "- client:",
+    "- client2:",
+    "- dmz:",
+    "- branch:",
+    "- hostile:",
+    "- streaming:",
+    "clab.host.interface: eth0.4",
+    "clab.host.interface: eth0.5",
+    "clab.host.interface: eth0.350",
+    "clab.host.interface: eth0.351",
+    "clab.host.interface: eth0.352",
+    "clab.host.interface: eth0.353",
+    "clab.host.interface: eth0.354",
+    "clab.host.interface: eth0.355",
+    "clab.host.interface: eth0.356",
+    "clab.host.interface: eth0.357",
     "clab.host.vlan: '4'",
     "clab.host.vlan: '5'",
     "clab.host.vlan: '350'",
@@ -67,10 +75,14 @@ for bridge in ["mgmt", "admin", "client", "client2", "dmz", "branch", "hostile",
     if f"clab.link.bridge: {bridge}" not in topology:
         raise SystemExit(f"missing access bridge marker {bridge}")
 
-if re.search(r"(?m)^\s*type: macvlan$", topology) or re.search(
-    r"(?m)^\s*host-interface:", topology
-):
-    raise SystemExit("host uplinks must use containerlab macvlan endpoint syntax")
+if re.search(r"(?m)^\s*-\s*macvlan:", topology):
+    raise SystemExit("host uplinks must use explicit Containerlab bridge-kind links")
+
+if 'DHCP = lib.mkIf (parentIf == "eth0") "ipv4";' not in vm_nix:
+    raise SystemExit("VM eth0 lab-parent config must preserve DHCP for SSH hostfwd")
+
+if 'dhcpV4Config = lib.optionalAttrs (parentIf == "eth0") { UseDNS = false; };' not in vm_nix:
+    raise SystemExit("VM eth0 DHCP must avoid taking resolver state from QEMU usernet")
 PY
 
 echo "PASS host-uplink-vlan-dhcp"

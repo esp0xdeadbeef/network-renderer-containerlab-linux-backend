@@ -4,6 +4,7 @@ set -euo pipefail
 example="${1:-single-wan}"
 
 ssh_port="${CLAB_VM_SSH_PORT:-2222}"
+ssh_host="${CLAB_VM_SSH_HOST:-127.0.0.1}"
 vm_state_dir="${CLAB_VM_STATE_DIR:-}"
 ephemeral_vm_state_dir=""
 
@@ -21,8 +22,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-export QEMU_NET_OPTS="hostfwd=tcp::${ssh_port}-:22"
-echo "ssh -o 'StrictHostKeyChecking no' -p${ssh_port} root@localhost # to connect to the vm."
+export QEMU_NET_OPTS="hostfwd=tcp:${ssh_host}:${ssh_port}-:22"
+echo "ssh -o 'StrictHostKeyChecking no' -p${ssh_port} root@${ssh_host} # to connect to the vm."
 
 FLAKE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VM_WORK_DIR="${vm_state_dir}"

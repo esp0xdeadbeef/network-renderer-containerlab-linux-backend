@@ -26,31 +26,23 @@ def _link_endpoint(
     return f"{node_name}:eth{eth_maps[node_name][iface]}"
 
 
-def _macvlan_link(
-    endpoint: str, bridge: str, host_uplink: Dict[str, Any]
+def _host_bridge_link(
+    endpoint: str, bridge: str, link_name: str, host_uplink: Dict[str, Any]
 ) -> Dict[str, Any]:
-    node_name, ifname = endpoint.split(":", 1)
-    host_if = host_uplink_interface(host_uplink)
-    if host_if is None:
-        raise ValueError(f"host uplink is not renderable as macvlan: {host_uplink!r}")
-
-    labels = {
-        "clab.link.type": "macvlan",
-        "clab.host.parent": str(host_uplink.get("parent") or ""),
-        "clab.host.uplink": str(host_uplink.get("upstream") or ""),
-        "clab.host.interface": host_if,
-        "clab.link.bridge": bridge,
-    }
+    link = _bridge_link(
+        [
+            endpoint,
+            f"{bridge}:{host_ifname(f'{bridge}-{link_name}-{endpoint}')}",
+        ],
+        bridge,
+    )
+    labels = link["labels"]
+    labels["clab.host.parent"] = str(host_uplink.get("parent") or "")
+    labels["clab.host.uplink"] = str(host_uplink.get("upstream") or "")
+    labels["clab.host.interface"] = host_uplink_interface(host_uplink) or ""
     if isinstance(host_uplink.get("vlan"), int):
         labels["clab.host.vlan"] = str(host_uplink["vlan"])
-
-    return {
-        "endpoints": [
-            f"{node_name}:{ifname}",
-            f"macvlan:{host_if}",
-        ],
-        "labels": labels,
-    }
+    return link
 
 
 def _render_model_links(
@@ -70,7 +62,10 @@ def _render_model_links(
         if len(endpoints) == 1:
             bridge = link_bridge(site, link, link_name)
             if host_uplink_interface(link.host_uplink):
-                links.append(_macvlan_link(endpoints[0], bridge, link.host_uplink))
+                bridges.append(bridge)
+                links.append(
+                    _host_bridge_link(endpoints[0], bridge, link_name, link.host_uplink)
+                )
                 continue
 
             bridges.append(bridge)
