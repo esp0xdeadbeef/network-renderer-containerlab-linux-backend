@@ -6,9 +6,10 @@ topo_file="${CLAB_TOPO_FILE:-fabric.clab.yml}"
 docker-clab-frr-plus-tooling/build.sh
 
 # Example switching reuses the same VM and lab name (`fabric`).
-# A plain deploy --reconfigure can leave stale containers behind when the node
-# set changes across examples, so clear the existing lab first.
-containerlab destroy --name fabric -c >/dev/null 2>&1 || true
+# This script runs inside a dedicated test VM, so clear any stale lab state
+# before deploying the next rendered topology.
+containerlab destroy --all --cleanup --yes >/dev/null 2>&1 || true
+docker ps --format '{{.Names}}' | grep '^clab-fabric-' | xargs -r docker rm -f >/dev/null 2>&1 || true
 
 containerlab deploy -t "${topo_file}" --reconfigure
 containerlab inspect -t "${topo_file}" >/dev/null
