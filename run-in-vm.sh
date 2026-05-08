@@ -2,6 +2,46 @@
 set -euo pipefail
 
 topo_file="${CLAB_TOPO_FILE:-fabric.clab.yml}"
+bridge_wait_seconds="${CLAB_BRIDGE_WAIT_SECONDS:-120}"
+
+required_bridges() {
+  awk '
+    $1 == "clab.link.bridge:" && $2 != "" { print $2 }
+  ' "${topo_file}" | sort -u
+}
+
+wait_for_required_bridges() {
+  local deadline=$((SECONDS + bridge_wait_seconds))
+  local missing=()
+  local bridge
+
+  mapfile -t missing < <(
+    while read -r bridge; do
+      [[ -n "${bridge}" ]] || continue
+      if ! ip link show "${bridge}" >/dev/null 2>&1; then
+        printf '%s\n' "${bridge}"
+      fi
+    done < <(required_bridges)
+  )
+
+  while ((${#missing[@]} > 0)) && ((SECONDS < deadline)); do
+    sleep 1
+    mapfile -t missing < <(
+      while read -r bridge; do
+        [[ -n "${bridge}" ]] || continue
+        if ! ip link show "${bridge}" >/dev/null 2>&1; then
+          printf '%s\n' "${bridge}"
+        fi
+      done < <(required_bridges)
+    )
+  done
+
+  if ((${#missing[@]} > 0)); then
+    printf 'missing required host bridges after %ss:\n' "${bridge_wait_seconds}" >&2
+    printf '  %s\n' "${missing[@]}" >&2
+    exit 1
+  fi
+}
 
 docker-clab-frr-plus-tooling/build.sh
 
@@ -11,6 +51,7 @@ docker-clab-frr-plus-tooling/build.sh
 containerlab destroy --all --cleanup --yes >/dev/null 2>&1 || true
 docker ps --format '{{.Names}}' | grep '^clab-fabric-' | xargs -r docker rm -f >/dev/null 2>&1 || true
 
+wait_for_required_bridges
 containerlab deploy -t "${topo_file}" --reconfigure
 containerlab inspect -t "${topo_file}" >/dev/null
 

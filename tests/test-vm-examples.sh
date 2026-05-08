@@ -395,13 +395,7 @@ load_example_context() {
 resolve_container_name() {
   local site="$1"
   local logical_name="$2"
-  local pattern
-
-  if [[ "${logical_name}" == *-core-wan ]]; then
-    pattern="^clab-fabric-.*-${site}-s-router-core-.*$"
-  else
-    pattern="^clab-fabric-.*-${site}-${logical_name}$"
-  fi
+  local pattern="^clab-fabric-.*-${site}-${logical_name}$"
 
   ssh_vm "docker ps --format '{{.Names}}' | grep -E '${pattern}' | head -n1"
 }
@@ -444,11 +438,7 @@ check_runtime_target_suffixes_present() {
   for suffix in "$@"; do
     site="${suffix%%:*}"
     logical_name="${suffix#*:}"
-    if [[ "${logical_name}" == *-core-wan ]]; then
-      pattern="^clab-fabric-.*-${site}-s-router-core-.*\$"
-    else
-      pattern="^clab-fabric-.*-${site}-${logical_name}\$"
-    fi
+    pattern="^clab-fabric-.*-${site}-${logical_name}\$"
     log "checking runtime target container pattern ${pattern}"
     deadline=$((SECONDS + 60))
     found=0

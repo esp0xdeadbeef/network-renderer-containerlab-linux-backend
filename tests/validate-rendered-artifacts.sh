@@ -95,6 +95,14 @@ if duplicates:
     raise SystemExit(
         f"validator: host endpoints must be unique for Containerlab: {', '.join(duplicates)}"
     )
+
+bridge_labels = sorted(set(re.findall(r"(?m)^\s*clab\.link\.bridge:\s+(\S+)\s*$", raw)))
+too_long = [bridge for bridge in bridge_labels if len(bridge) > 15]
+if too_long:
+    raise SystemExit(
+        "validator: rendered Linux bridge names exceed IFNAMSIZ: "
+        + ", ".join(too_long)
+    )
 PY
 
 validation_json="$(
@@ -141,6 +149,7 @@ validation_json="$(
       ) expectedVlanIfNames;
     in
     {
+      bridges = bridges;
       bridgeCount = builtins.length bridges;
       uniqueBridgeCount = builtins.length (lib.unique bridges);
       nonStringCount = builtins.length (builtins.filter (v: !builtins.isString v) bridges);
@@ -170,6 +179,12 @@ if result["uniqueBridgeCount"] != result["bridgeCount"]:
     raise SystemExit("validator: generated bridges contain duplicates")
 if result["nonStringCount"] != 0:
     raise SystemExit("validator: generated bridges must all be strings")
+too_long = [name for name in result.get("bridges", []) if len(name) > 15]
+if too_long:
+    raise SystemExit(
+        "validator: generated VM bridge names exceed IFNAMSIZ: "
+        + ", ".join(too_long)
+    )
 if not result["namesMatch"]:
     raise SystemExit("validator: vm.nix bridge names do not match generated bridges")
 if result["missingVlanNetdevs"]:

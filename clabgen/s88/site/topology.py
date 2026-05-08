@@ -7,12 +7,32 @@ from clabgen.models import SiteModel
 from clabgen.s88.site.bridge_networks import renderer_bridge_networks
 from clabgen.s88.site.eth_map import build_eth_maps
 from clabgen.s88.site.links import render_links
+from clabgen.s88.site.naming import realized_bridge_name
 from clabgen.s88.site.nodes import render_nodes
+
+
+def _normalize_bridge_references(site: SiteModel) -> None:
+    for link in site.links.values():
+        if link.bridge:
+            link.bridge = realized_bridge_name(link.bridge)
+        if isinstance(link.host_uplink, dict):
+            bridge = link.host_uplink.get("bridge")
+            if isinstance(bridge, str) and bridge:
+                link.host_uplink["bridge"] = realized_bridge_name(bridge)
+
+    for node in site.nodes.values():
+        for iface in node.interfaces.values():
+            if iface.attach_bridge:
+                iface.attach_bridge = realized_bridge_name(iface.attach_bridge)
+            bridge = iface.host_uplink.get("bridge")
+            if isinstance(bridge, str) and bridge:
+                iface.host_uplink["bridge"] = realized_bridge_name(bridge)
 
 
 def render_site_topology(site: SiteModel) -> Dict[str, Any]:
     site = copy.deepcopy(site)
     bridge_networks = renderer_bridge_networks(site)
+    _normalize_bridge_references(site)
     site.bridge_networks = bridge_networks
     for link in site.links.values():
         if not link.bridge or not link.host_uplink:

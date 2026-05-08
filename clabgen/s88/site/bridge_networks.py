@@ -3,6 +3,21 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from clabgen.models import SiteModel
+from clabgen.s88.site.naming import realized_bridge_name
+
+
+def _add_bridge_network(
+    bridge_networks: Dict[str, Any], bridge_name: str, bridge_data: Dict[str, Any]
+) -> None:
+    rendered_bridge = realized_bridge_name(bridge_name)
+    rendered_data = dict(bridge_data)
+    rendered_data["bridge"] = rendered_bridge
+    existing = bridge_networks.get(rendered_bridge)
+    if existing is not None and existing != rendered_data:
+        raise ValueError(
+            f"multiple bridge network definitions render to {rendered_bridge!r}"
+        )
+    bridge_networks[rendered_bridge] = rendered_data
 
 
 def _host_bridge_networks(host_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -15,7 +30,7 @@ def _host_bridge_networks(host_data: Dict[str, Any]) -> Dict[str, Any]:
                 continue
             bridge_name = uplink_data.get("bridge")
             if isinstance(bridge_name, str) and bridge_name:
-                bridge_networks[bridge_name] = dict(uplink_data)
+                _add_bridge_network(bridge_networks, bridge_name, uplink_data)
 
     bridges = host_data.get("bridgeNetworks", {})
     if isinstance(bridges, dict):
@@ -23,7 +38,9 @@ def _host_bridge_networks(host_data: Dict[str, Any]) -> Dict[str, Any]:
             if not isinstance(bridge_name, str) or not bridge_name:
                 continue
             if isinstance(bridge_data, dict) and bridge_data:
-                bridge_networks.setdefault(bridge_name, dict(bridge_data))
+                rendered_bridge = realized_bridge_name(bridge_name)
+                if rendered_bridge not in bridge_networks:
+                    _add_bridge_network(bridge_networks, bridge_name, bridge_data)
 
     return bridge_networks
 
