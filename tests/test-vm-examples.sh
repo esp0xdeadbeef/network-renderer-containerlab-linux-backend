@@ -27,6 +27,8 @@ fi
 ssh_opts=(
   -T
   -o BatchMode=yes
+  -o ConnectTimeout="${VM_SSH_CONNECT_TIMEOUT_SECONDS:-5}"
+  -o ConnectionAttempts=1
   -o LogLevel=ERROR
   -o StrictHostKeyChecking=no
   -o GlobalKnownHostsFile=/dev/null
@@ -37,6 +39,8 @@ ssh_opts=(
 
 scp_opts=(
   -o BatchMode=yes
+  -o ConnectTimeout="${VM_SSH_CONNECT_TIMEOUT_SECONDS:-5}"
+  -o ConnectionAttempts=1
   -o LogLevel=ERROR
   -o StrictHostKeyChecking=no
   -o GlobalKnownHostsFile=/dev/null
