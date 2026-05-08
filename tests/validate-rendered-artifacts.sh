@@ -61,6 +61,30 @@ for index, block in enumerate(link_blocks, start=1):
             f"validator: Containerlab link {index} must have exactly 2 endpoints, got {len(endpoints)}: {endpoints}"
         )
 
+bridge_nodes = set()
+node_blocks = re.findall(
+    r"(?ms)^    ([A-Za-z0-9_.-]+):\n(.*?)(?=^    [A-Za-z0-9_.-]+:|\n  links:|\Z)",
+    raw,
+)
+for name, block in node_blocks:
+    if re.search(r"(?m)^      kind:\s+bridge\s*$", block):
+        bridge_nodes.add(name)
+
+bridge_ifaces = {}
+for endpoint in re.findall(r'(?m)^\s*-\s+"?([^"\s][^"\n]*)"?\s*$', raw):
+    endpoint = endpoint.strip()
+    if ":" not in endpoint:
+        continue
+    node, iface = endpoint.split(":", 1)
+    if node not in bridge_nodes:
+        continue
+    if iface in bridge_ifaces:
+        raise SystemExit(
+            "validator: Containerlab bridge-kind root endpoint "
+            f"{iface!r} is reused by {bridge_ifaces[iface]!r} and {node!r}"
+        )
+    bridge_ifaces[iface] = node
+
 endpoint_lines = re.findall(r'(?m)^\s*-\s+"?[^"\s:]+:[^"\s:]+"?\s*$', raw)
 if len(endpoint_lines) < (links_with_endpoints * 2):
     raise SystemExit(f"validator: YAML links do not define two endpoint entries per link: {p}")

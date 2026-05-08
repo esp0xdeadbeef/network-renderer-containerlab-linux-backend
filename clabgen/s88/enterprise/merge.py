@@ -118,7 +118,7 @@ def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
                 {
                     "endpoints": [
                         endpoint,
-                        f"{bridge}:eth{index + 1}",
+                        f"{bridge}:{host_ifname(f'{bridge}-{overlay_name}-{endpoint}')}",
                     ],
                     "labels": {
                         "clab.link.type": "overlay",
