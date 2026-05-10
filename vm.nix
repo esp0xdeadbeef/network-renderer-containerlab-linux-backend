@@ -14,6 +14,16 @@ let
     if fromEnv != "" then builtins.toPath fromEnv else ./vm-bridges-generated.nix;
 
   generated = import generatedBridgesFile { inherit lib; };
+  vmMemorySize =
+    let
+      fromEnv = builtins.getEnv "CLAB_VM_MEMORY_MB";
+    in
+    if fromEnv != "" then builtins.fromJSON fromEnv else 1024 * 24;
+  vmCores =
+    let
+      fromEnv = builtins.getEnv "CLAB_VM_CORES";
+    in
+    if fromEnv != "" then builtins.fromJSON fromEnv else 22;
 
   bridges = generated.bridges;
   bridgeNetworks = lib.mapAttrs (
@@ -188,8 +198,8 @@ in
 
   users.users.root.shell = pkgs.bash;
 
-  virtualisation.memorySize = 1024 * 24;
-  virtualisation.cores = 22;
+  virtualisation.memorySize = vmMemorySize;
+  virtualisation.cores = vmCores;
   environment.etc.hosts.enable = false;
   services.openssh.enable = true;
 
