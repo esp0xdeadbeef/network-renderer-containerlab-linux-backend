@@ -69,6 +69,7 @@ for w in $(seq 0 $((workers - 1))); do
     echo 'export CLAB_VM_STATE_DIR="$state_dir"'
     printf 'export CLAB_VM_MEMORY_MB=%q\n' "${worker_memory_mb}"
     printf 'export CLAB_VM_CORES=%q\n' "${worker_cores}"
+    printf 'export NETWORK_INPUT_PATH_NETWORK_LABS=%q\n' "${labs_path}"
     printf 'export XDG_CACHE_HOME=%q\n' "${state_dir}/.cache"
     printf 'export TMPDIR=%q\n' "${state_dir}/tmp"
     printf 'mkdir -p %q %q\n' "${state_dir}/.cache" "${state_dir}/tmp"

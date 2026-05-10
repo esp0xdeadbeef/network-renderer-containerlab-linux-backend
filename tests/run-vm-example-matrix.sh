@@ -59,6 +59,7 @@ start_worker() {
     export CLAB_VM_STATE_DIR="${state_dir}"
     export CLAB_VM_MEMORY_MB="${worker_memory_mb}"
     export CLAB_VM_CORES="${worker_cores}"
+    export NETWORK_INPUT_PATH_NETWORK_LABS="${labs_path}"
     export XDG_CACHE_HOME="${state_dir}/.cache"
     export TMPDIR="${state_dir}/tmp"
     mkdir -p "${XDG_CACHE_HOME}" "${TMPDIR}"
