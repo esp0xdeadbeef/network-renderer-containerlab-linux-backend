@@ -3,6 +3,7 @@ set -euo pipefail
 
 topo_file="${CLAB_TOPO_FILE:-fabric.clab.yml}"
 bridge_wait_seconds="${CLAB_BRIDGE_WAIT_SECONDS:-120}"
+docker_wait_seconds="${CLAB_DOCKER_WAIT_SECONDS:-120}"
 
 required_bridges() {
   awk '
@@ -43,6 +44,24 @@ wait_for_required_bridges() {
   fi
 }
 
+wait_for_docker() {
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl start docker >/dev/null 2>&1 || true
+  fi
+
+  local deadline=$((SECONDS + docker_wait_seconds))
+  while ((SECONDS < deadline)); do
+    if docker info >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  printf 'docker did not become ready after %ss\n' "${docker_wait_seconds}" >&2
+  exit 1
+}
+
+wait_for_docker
 docker-clab-frr-plus-tooling/build.sh
 
 # Example switching reuses the same VM and lab name (`fabric`).
