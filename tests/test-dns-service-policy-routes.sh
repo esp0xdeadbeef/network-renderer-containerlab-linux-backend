@@ -7,7 +7,7 @@ source "${repo_root}/tests/lib/render-clab-example.sh"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-render_clab_example "s-router-test-three-site" "${tmp_dir}"
+render_clab_example "s-router-overlay-dns-lane-policy" "${tmp_dir}"
 topology="${tmp_dir}/fabric.clab.yml"
 
 assert_node_contains \

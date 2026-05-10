@@ -121,12 +121,6 @@ resolve_labs_model_dir() {
     return 0
   fi
 
-  local lab_dir="${labs_path}/labs/lab-s-sigma/${model_name}"
-  if [[ -f "${lab_dir}/intent.nix" ]]; then
-    printf '%s\n' "${lab_dir}"
-    return 0
-  fi
-
-  echo "tests: missing model ${model_name} under examples/ or labs/lab-s-sigma/" >&2
+  echo "tests: missing example ${model_name} under examples/" >&2
   return 1
 }
