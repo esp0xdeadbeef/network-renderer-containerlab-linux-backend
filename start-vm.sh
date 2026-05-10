@@ -36,6 +36,7 @@ mkdir -p "${VM_WORK_DIR}"
 
 if [[ "${VM_WORK_DIR}" != "${FLAKE_DIR}" ]]; then
   cp "${FLAKE_DIR}/vm.nix" "${VM_WORK_DIR}/vm.nix"
+  cp "${FLAKE_DIR}/vm-network.nix" "${VM_WORK_DIR}/vm-network.nix"
 fi
 
 TOPO_FILE="${VM_WORK_DIR}/fabric.clab.yml"
