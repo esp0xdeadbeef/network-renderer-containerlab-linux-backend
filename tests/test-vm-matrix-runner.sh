@@ -24,6 +24,11 @@ grep -F 'NETWORK_INPUT_PATH_NETWORK_LABS="${labs_path}"' "${runner}" >/dev/null 
   exit 1
 }
 
+grep -F 'cp "${FLAKE_DIR}/vm-network.nix" "${VM_WORK_DIR}/vm-network.nix"' "${repo_root}/start-vm.sh" >/dev/null || {
+  echo "start-vm must copy vm-network.nix next to vm.nix in isolated worker state" >&2
+  exit 1
+}
+
 grep -F 'tee "${log_file}"' "${runner}" >/dev/null || {
   echo "VM matrix runner must stream worker output into the parent log" >&2
   exit 1
