@@ -19,6 +19,11 @@ grep -F 'CLAB_VM_CORES="${worker_cores}"' "${runner}" >/dev/null || {
   exit 1
 }
 
+grep -F 'NETWORK_INPUT_PATH_NETWORK_LABS="${labs_path}"' "${runner}" >/dev/null || {
+  echo "VM matrix runner must pass the resolved labs path to workers" >&2
+  exit 1
+}
+
 grep -F 'tee "${log_file}"' "${runner}" >/dev/null || {
   echo "VM matrix runner must stream worker output into the parent log" >&2
   exit 1

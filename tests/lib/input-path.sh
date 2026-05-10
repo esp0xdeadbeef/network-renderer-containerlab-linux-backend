@@ -45,9 +45,23 @@ require_github_input_origin() {
 
 resolve_input_path() {
   local input_name="$1"
+  local override_var
+  local override_path
   local archive_json
   local archive_stderr
   local input_path
+
+  override_var="NETWORK_INPUT_PATH_${input_name^^}"
+  override_var="${override_var//-/_}"
+  override_path="${!override_var:-}"
+  if [[ -n "${override_path}" ]]; then
+    [[ -d "${override_path}" ]] || {
+      echo "tests: invalid ${override_var} for ${input_name}: ${override_path}" >&2
+      return 1
+    }
+    printf '%s\n' "${override_path}"
+    return 0
+  fi
 
   require_github_input_origin "${input_name}"
 
