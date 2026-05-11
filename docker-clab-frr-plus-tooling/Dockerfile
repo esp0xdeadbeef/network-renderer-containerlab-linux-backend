@@ -1,4 +1,4 @@
-ARG CLAB_FRR_BASE_IMAGE=frrouting/frr:latest
+ARG CLAB_FRR_BASE_IMAGE=frrouting/frr@sha256:990e83490108b686fd6df3b1cafa6bdbb2714acb00eedb9a89693946f46f45ce
 FROM ${CLAB_FRR_BASE_IMAGE}
 
 USER root
