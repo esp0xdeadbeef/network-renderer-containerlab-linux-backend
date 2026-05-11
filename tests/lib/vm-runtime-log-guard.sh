@@ -9,7 +9,7 @@ guard_vm_runtime_log() {
     return 1
   fi
 
-  if grep -Eq '(^|[[:space:]])ERRO([[:space:]]|$)|containers not found|cannot exec in a stopped state|Cannot find device|No such container' "${log_file}"; then
+  if grep -Eq '(^|[[:space:]])ERRO([[:space:]]|$)|containers not found|cannot exec in a stopped state|Cannot find device|No such container|invalid container name or ID: value is empty|already in use by container|error response from daemon: conflict|file exists|cannot.*rename link' "${log_file}"; then
     cat >&2 <<EOF
 FATAL VM-backed Containerlab validation emitted runtime errors.
 

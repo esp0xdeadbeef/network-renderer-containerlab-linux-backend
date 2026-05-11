@@ -63,8 +63,14 @@ resolve_container_name() {
   local site="$1"
   local logical_name="$2"
   local pattern="^clab-fabric-.*-${site}-${logical_name}$"
+  local container
 
-  ssh_vm "docker ps --format '{{.Names}}' | grep -E '${pattern}' | head -n1"
+  container="$(ssh_vm "docker ps --format '{{.Names}}' | grep -E '${pattern}' | head -n1")" || return 1
+  if [[ -z "${container}" ]]; then
+    echo "resolve_container_name: no container matched pattern ${pattern}" >&2
+    return 1
+  fi
+  printf '%s\n' "${container}"
 }
 
 resolve_client_container_name() {
@@ -72,8 +78,14 @@ resolve_client_container_name() {
   local logical_name="$2"
   local tenant_ifname="$3"
   local pattern="^clab-fabric-.*-${site}-client-${logical_name}-${tenant_ifname}$"
+  local container
 
-  ssh_vm "docker ps --format '{{.Names}}' | grep -E '${pattern}' | head -n1"
+  container="$(ssh_vm "docker ps --format '{{.Names}}' | grep -E '${pattern}' | head -n1")" || return 1
+  if [[ -z "${container}" ]]; then
+    echo "resolve_client_container_name: no container matched pattern ${pattern}" >&2
+    return 1
+  fi
+  printf '%s\n' "${container}"
 }
 
 check_runtime_target_suffixes_present() {
