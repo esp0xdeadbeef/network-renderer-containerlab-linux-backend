@@ -19,6 +19,11 @@ grep -F 'CLAB_VM_CORES="${worker_cores}"' "${runner}" >/dev/null || {
   exit 1
 }
 
+grep -F 'CLAB_VM_HOST_CACHE_DIR="${host_cache_dir}"' "${runner}" >/dev/null || {
+  echo "VM matrix runner must share the host Docker image cache across workers" >&2
+  exit 1
+}
+
 grep -F 'NETWORK_INPUT_PATH_NETWORK_LABS="${labs_path}"' "${runner}" >/dev/null || {
   echo "VM matrix runner must pass the resolved labs path to workers" >&2
   exit 1
@@ -29,13 +34,18 @@ grep -F 'cp "${FLAKE_DIR}/vm-network.nix" "${VM_WORK_DIR}/vm-network.nix"' "${re
   exit 1
 }
 
-grep -F 'tee "${log_file}"' "${runner}" >/dev/null || {
-  echo "VM matrix runner must stream worker output into the parent log" >&2
+grep -F ') > "${log_file}" 2>&1 &' "${runner}" >/dev/null || {
+  echo "VM matrix runner must bind each worker stdout to its own log" >&2
   exit 1
 }
 
-grep -F 'one or more workers failed. Full logs:' "${runner}" >/dev/null || {
-  echo "VM matrix runner must point at full worker logs on failure" >&2
+if grep -F 'sed -u "s/^/[worker-${worker}] /"' "${runner}" >/dev/null; then
+  echo "VM matrix runner must not multiplex worker stdout through the parent stream" >&2
+  exit 1
+fi
+
+grep -F 'one or more workers failed. Worker logs:' "${runner}" >/dev/null || {
+  echo "VM matrix runner must point at worker-bound logs on failure" >&2
   exit 1
 }
 

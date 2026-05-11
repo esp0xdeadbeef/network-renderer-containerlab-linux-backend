@@ -26,7 +26,7 @@ fi
 
 CACHE_TAR="${CLAB_FRR_TOOLING_CACHE_TAR:-${CACHE_DIR}/clab-frr-plus-tooling-${CACHE_KEY}.tar}"
 CACHE_ID_FILE="${CLAB_FRR_TOOLING_CACHE_IMAGE_ID_FILE:-${CACHE_TAR}.image-id}"
-BASE_IMAGE="${CLAB_FRR_TOOLING_BASE_IMAGE:-frrouting/frr:latest}"
+BASE_IMAGE="${CLAB_FRR_TOOLING_BASE_IMAGE:-frrouting/frr@sha256:990e83490108b686fd6df3b1cafa6bdbb2714acb00eedb9a89693946f46f45ce}"
 
 current_id() {
     docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null || true
