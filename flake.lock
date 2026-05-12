@@ -34,11 +34,11 @@
         "nixpkgs-network": "nixpkgs-network_3"
       },
       "locked": {
-        "lastModified": 1778542431,
-        "narHash": "sha256-5wMm95grlEgJSBSMr7BRmx1ZZoq/piPGv4wu7P89eLU=",
+        "lastModified": 1778556873,
+        "narHash": "sha256-sMivn6SZsnVToF7fIi+0TshfSdamE8F7X7Bs5iYvhZ0=",
         "owner": "esp0xdeadbeef",
         "repo": "network-control-plane-model",
-        "rev": "eaccc7b75a19aea167a9e732a61a9c686c855483",
+        "rev": "fa1443864a131f2338f17266fcca8e55e20f5d20",
         "type": "github"
       },
       "original": {
@@ -58,11 +58,11 @@
         "nixpkgs-network": "nixpkgs-network_2"
       },
       "locked": {
-        "lastModified": 1778538603,
-        "narHash": "sha256-wlgvgnbNuRu/rAIFQ0+sTJ77LZ6c6QwTObu3op2dz5w=",
+        "lastModified": 1778556834,
+        "narHash": "sha256-xtLNLpkh12PuzRTeEEFSgfvc5RWvV9YElMYBWwoWANw=",
         "owner": "esp0xdeadbeef",
         "repo": "network-forwarding-model",
-        "rev": "65107fde3b59101c84e17beba7ad7cad237bce78",
+        "rev": "346910b6041b726abb1ae853174dcef0463f182d",
         "type": "github"
       },
       "original": {
