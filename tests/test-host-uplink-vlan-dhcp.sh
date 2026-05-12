@@ -9,7 +9,7 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 
 render_clab_example "s-router-overlay-dns-lane-policy" "${tmp_dir}"
 
-python3 - "${tmp_dir}/fabric.clab.yml" "${tmp_dir}/vm-bridges-generated.nix" "${repo_root}/vm.nix" <<'PY'
+python3 - "${tmp_dir}/fabric.clab.yml" "${tmp_dir}/vm-bridges-generated.nix" "${repo_root}/vm-network.nix" <<'PY'
 import json
 import re
 import sys
@@ -17,7 +17,7 @@ from pathlib import Path
 
 topology = Path(sys.argv[1]).read_text()
 bridges = Path(sys.argv[2]).read_text()
-vm_nix = Path(sys.argv[3]).read_text()
+vm_network_nix = Path(sys.argv[3]).read_text()
 
 match = re.search(r"bridgeNetworks = builtins\.fromJSON ''\n(.*)\n  '';", bridges, re.S)
 if not match:
@@ -78,10 +78,10 @@ for bridge in ["mgmt", "admin", "client", "client2", "dmz", "branch", "hostile",
 if re.search(r"(?m)^\s*-\s*macvlan:", topology):
     raise SystemExit("host uplinks must use explicit Containerlab bridge-kind links")
 
-if 'DHCP = lib.mkIf (parentIf == "eth0") "ipv4";' not in vm_nix:
+if 'DHCP = lib.mkIf (parentIf == "eth0") "ipv4";' not in vm_network_nix:
     raise SystemExit("VM eth0 lab-parent config must preserve DHCP for SSH hostfwd")
 
-if 'dhcpV4Config = lib.optionalAttrs (parentIf == "eth0") { UseDNS = false; };' not in vm_nix:
+if 'dhcpV4Config = lib.optionalAttrs (parentIf == "eth0") { UseDNS = false; };' not in vm_network_nix:
     raise SystemExit("VM eth0 DHCP must avoid taking resolver state from QEMU usernet")
 PY
 
