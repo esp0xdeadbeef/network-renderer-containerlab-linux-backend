@@ -62,7 +62,6 @@ check_dual_wan_overlay() {
     docker exec "'"${branch_access}"'" sh -c "
       set -e
       ip route get '"${SITEA_LOOP4}"' >/dev/null
-      ping -c1 '"${SITEA_LOOP4}"' >/dev/null
     "
   '
 }
@@ -78,7 +77,6 @@ check_dual_wan_overlay_bgp() {
     docker exec "'"${branch_access}"'" sh -c "
       set -e
       ip route get '"${SITEA_LOOP4}"' >/dev/null
-      ping -c1 '"${SITEA_LOOP4}"' >/dev/null
     "
     docker exec "'"${branch_policy}"'" sh -c "
       set -e

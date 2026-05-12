@@ -31,6 +31,7 @@ fi
 "${repo_root}/tests/test-host-uplink-vlan-dhcp.sh"
 "${repo_root}/tests/test-nat-uplink-runtime-addressing.sh"
 "${repo_root}/tests/test-vm-nat-uplink.sh"
+"${repo_root}/tests/test-vm-physical-overlay-post-checks.sh"
 "${repo_root}/tests/test-s-router-clab-overlay-parity.sh"
 "${repo_root}/tests/test-single-overlay-interface-link.sh"
 "${repo_root}/tests/test-vm-example-lab-cleanup.sh"
