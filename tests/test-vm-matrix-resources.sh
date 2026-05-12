@@ -25,10 +25,16 @@ grep -F 'worker_cores="${CLAB_VM_MATRIX_CORES:-4}"' "${matrix_script}" >/dev/nul
   exit 1
 }
 
+grep -F 'status_dir="${CLAB_VM_MATRIX_STATUS_DIR:-${matrix_root}/status}"' "${matrix_script}" >/dev/null || {
+  echo "FAIL vm matrix resources: matrix must expose a status directory" >&2
+  exit 1
+}
+
 grep -F 'export CLAB_VM_MEMORY_MB' "${matrix_script}" >/dev/null
 grep -F 'export CLAB_VM_CORES' "${matrix_script}" >/dev/null
 grep -F 'export CLAB_VM_WORKER_ID' "${matrix_script}" >/dev/null
 grep -F 'export CLAB_VM_HOST_CACHE_DIR' "${matrix_script}" >/dev/null
+grep -F 'printf "%s\n" "$status" >"$status_file"' "${matrix_script}" >/dev/null
 grep -F 'clab-worker-${w}' "${matrix_script}" >/dev/null
 grep -F 'tmux new-window -t "${session}" -n "clab-worker-${w}"' "${matrix_script}" >/dev/null
 grep -F 'exec > >(tee -a "$log_file") 2>&1' "${matrix_script}" >/dev/null

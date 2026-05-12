@@ -12,6 +12,7 @@ worker_memory_mb="${CLAB_VM_MATRIX_MEMORY_MB:-4096}"
 worker_cores="${CLAB_VM_MATRIX_CORES:-4}"
 matrix_root="${CLAB_VM_MATRIX_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/network-renderer-containerlab-linux-backend/clab-vm-matrix}"
 host_cache_dir="${CLAB_VM_HOST_CACHE_DIR:-${matrix_root}/host-cache}"
+status_dir="${CLAB_VM_MATRIX_STATUS_DIR:-${matrix_root}/status}"
 
 cleanup_legacy_tmp_state() {
   find /tmp -maxdepth 1 -type d \
@@ -41,6 +42,8 @@ if tmux has-session -t "${session}" 2>/dev/null; then
 fi
 
 mkdir -p "${matrix_root}"
+rm -rf "${status_dir}"
+mkdir -p "${status_dir}"
 cleanup_legacy_tmp_state
 
 # tmux has no true "infinite" history; use a very large limit for worker inspection.
@@ -63,12 +66,14 @@ for w in $(seq 0 $((workers - 1))); do
 
   log_file="$(mktemp "${matrix_root}/clab-worker-${w}.XXXXXX.log")"
   worker_script="$(mktemp "${matrix_root}/clab-worker-${w}.XXXXXX.sh")"
+  status_file="${status_dir}/worker-${w}.status"
   {
     echo '#!/usr/bin/env bash'
     echo 'set -uo pipefail'
     printf 'worker_script=%q\n' "${worker_script}"
     printf 'state_dir=%q\n' "${state_dir}"
     printf 'log_file=%q\n' "${log_file}"
+    printf 'status_file=%q\n' "${status_file}"
     echo 'exec > >(tee -a "$log_file") 2>&1'
     echo 'cleanup() {'
     echo '  rm -rf "$state_dir" >/dev/null 2>&1 || true'
@@ -98,6 +103,7 @@ for w in $(seq 0 $((workers - 1))); do
     done
     printf '\n'
     echo 'status=$?'
+    echo 'printf "%s\n" "$status" >"$status_file"'
     printf 'printf "\\nworker %s exit status: %%s\\n" "$status"\n' "$w"
     echo 'if [[ "$status" -ne 0 ]]; then'
     printf '  printf "worker %s failed; leaving pane open for inspection\\n"\n' "$w"
