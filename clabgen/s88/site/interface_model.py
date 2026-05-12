@@ -18,6 +18,8 @@ def _dict_list(value: Any, field_name: str) -> List[Dict[str, Any]]:
             raise ValueError(f"{field_name} entries must be objects")
         dst = item.get("dst")
         if not isinstance(dst, str) or not dst:
+            if isinstance(item.get("sourceFile"), str) and item.get("sourceFile"):
+                continue
             raise ValueError(f"{field_name} route missing non-empty 'dst'")
         result.append(dict(item))
     return result
