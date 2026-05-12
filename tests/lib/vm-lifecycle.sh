@@ -24,6 +24,8 @@ cleanup_ephemeral_state() {
   fi
 }
 
+vm_remote_topology_file="${CLAB_VM_REMOTE_TOPO_FILE:-/tmp/clab-vm/fabric.clab.yml}"
+
 shutdown_vm() {
   ssh_vm 'shutdown -h now' >/dev/null 2>&1 || true
   sleep 5
@@ -36,9 +38,10 @@ stage_rendered_topology() {
   fi
 
   log "staging rendered topology into the VM"
+  ssh_vm_once "mkdir -p '$(dirname "${vm_remote_topology_file}")'"
   scp_vm_file \
     "${vm_state_dir}/fabric.clab.yml" \
-    "${repo_root}/fabric.clab.yml"
+    "${vm_remote_topology_file}"
 }
 
 run_in_vm_validation() {
@@ -50,7 +53,7 @@ run_in_vm_validation() {
     set -euo pipefail
     cd '${repo_root}'
     timeout 900 env \
-      CLAB_TOPO_FILE='${repo_root}/fabric.clab.yml' \
+      CLAB_TOPO_FILE='${vm_remote_topology_file}' \
       CLAB_FRR_TOOLING_CACHE_TAR='${vm_image_cache_tar}' \
       CLAB_FRR_TOOLING_CACHE_IMAGE_ID_FILE='${vm_image_cache_id}' \
       ./run-in-vm.sh
