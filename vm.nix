@@ -15,6 +15,8 @@ let
 
   generated = import generatedBridgesFile { inherit lib; };
   vmNetwork = import ./vm-network.nix { inherit lib generated; };
+  natBridgeNames = vmNetwork.natBridgeNames or [ ];
+  natBridgeSet = "{ " + lib.concatMapStringsSep ", " (name: ''"${name}"'') natBridgeNames + " }";
   vmMemorySize =
     let
       fromEnv = builtins.getEnv "CLAB_VM_MEMORY_MB";
@@ -58,6 +60,7 @@ in
     // vmNetwork.vlanAttachmentNetworks;
 
   virtualisation.docker.enable = true;
+  networking.firewall.enable = false;
 
   environment.systemPackages = with pkgs; [
     containerlab
@@ -72,6 +75,20 @@ in
   ];
 
   networking.nftables.enable = true;
+  networking.nftables.ruleset = lib.optionalString (natBridgeNames != [ ]) ''
+    table ip clab_vm_nat {
+      chain forward {
+        type filter hook forward priority filter; policy accept;
+        iifname ${natBridgeSet} oifname "eth0" accept
+        iifname "eth0" oifname ${natBridgeSet} ct state established,related accept
+      }
+
+      chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        iifname ${natBridgeSet} oifname "eth0" masquerade
+      }
+    }
+  '';
 
   users.users.root.shell = pkgs.bash;
 

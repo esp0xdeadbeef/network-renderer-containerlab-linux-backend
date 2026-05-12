@@ -37,7 +37,7 @@ def host_uplink_interface(host_uplink: Dict[str, Any]) -> str | None:
     if not isinstance(mode, str) or not isinstance(parent, str) or not parent:
         return None
 
-    if mode == "native":
+    if mode == "native" or mode == "nat":
         return parent
 
     vlan = host_uplink.get("vlan")

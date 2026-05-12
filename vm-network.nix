@@ -5,10 +5,26 @@
 
 let
   bridges = generated.bridges;
-  bridgeNetworks = lib.mapAttrs (
-    name: network:
-    if builtins.isAttrs network then network // { bridge = network.bridge or name; } else network
-  ) (generated.bridgeNetworks or { });
+  rawBridgeNetworks = generated.bridgeNetworks or { };
+  bridgeNetworks = builtins.listToAttrs (
+    lib.mapAttrsToList (
+      name: network:
+      let
+        normalized =
+          if builtins.isAttrs network then
+            network // {
+              bridge = network.bridge or name;
+              inventoryName = name;
+            }
+          else
+            network;
+      in
+      {
+        name = normalized.bridge or name;
+        value = normalized;
+      }
+    ) rawBridgeNetworks
+  );
   bridgeNames = lib.unique (bridges ++ builtins.attrNames bridgeNetworks);
   physicalUplinks = lib.filterAttrs (
     _name: uplink:
@@ -40,7 +56,14 @@ let
     };
   };
 
-  mkBridgeNetwork = name: {
+  nat = import ./vm-network-nat.nix { inherit lib bridgeNetworks; };
+
+  mkBridgeNetwork =
+    name:
+    let
+      cfg = bridgeNetworks.${name} or { };
+    in
+    {
     matchConfig.Name = name;
     linkConfig = {
       ActivationPolicy = "always-up";
@@ -50,13 +73,10 @@ let
       ConfigureWithoutCarrier = true;
       LinkLocalAddressing = "no";
       IPv6AcceptRA = false;
-      DHCP =
-        let
-          cfg = bridgeNetworks.${name} or { };
-        in
-        if name == "vlan2" || cfg.name or null == "management" then "ipv4" else "no";
-    };
+      DHCP = if name == "vlan2" || cfg.name or null == "management" then "ipv4" else "no";
+    } // nat.networkConfigFor cfg;
     dhcpV4Config = lib.optionalAttrs (name == "vlan2") { UseDNS = false; };
+    dhcpServerConfig = nat.dhcpServerConfigFor cfg;
   };
 
   vlanNetdevs = builtins.listToAttrs (
@@ -143,4 +163,5 @@ in
     vlanAttachmentNetworks
     vlanNetdevs
     ;
+  inherit (nat) natBridgeNames;
 }

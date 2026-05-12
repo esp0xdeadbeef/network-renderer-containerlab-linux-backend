@@ -29,8 +29,18 @@ grep -F 'NETWORK_INPUT_PATH_NETWORK_LABS="${labs_path}"' "${runner}" >/dev/null 
   exit 1
 }
 
+grep -F 'override_var="NETWORK_INPUT_PATH_${input_name^^}"' "${repo_root}/start-vm.sh" >/dev/null || {
+  echo "start-vm must honor NETWORK_INPUT_PATH_* overrides when rendering the VM topology" >&2
+  exit 1
+}
+
 grep -F 'cp "${FLAKE_DIR}/vm-network.nix" "${VM_WORK_DIR}/vm-network.nix"' "${repo_root}/start-vm.sh" >/dev/null || {
   echo "start-vm must copy vm-network.nix next to vm.nix in isolated worker state" >&2
+  exit 1
+}
+
+grep -F 'cp "${FLAKE_DIR}/vm-network-nat.nix" "${VM_WORK_DIR}/vm-network-nat.nix"' "${repo_root}/start-vm.sh" >/dev/null || {
+  echo "start-vm must copy vm-network-nat.nix next to vm.nix in isolated worker state" >&2
   exit 1
 }
 

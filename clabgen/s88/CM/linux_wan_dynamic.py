@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import ipaddress
 from typing import Any, Dict, List
 
 from clabgen.s88.CM.linux_shell import _sh
 
 
-def _wan_interfaces(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+def _wan_interfaces(
+    node: Dict[str, Any], eth_map: Dict[str, int]
+) -> List[Dict[str, Any]]:
     interfaces = node.get("interfaces", {})
     if not isinstance(interfaces, dict):
         return []
 
-    wan_interfaces: List[str] = []
+    wan_interfaces: List[Dict[str, Any]] = []
     for logical_name in sorted(interfaces.keys()):
         iface = interfaces[logical_name]
         if not isinstance(iface, dict):
@@ -20,7 +23,12 @@ def _wan_interfaces(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
         eth_index = eth_map.get(logical_name)
         if eth_index is None:
             continue
-        wan_interfaces.append(f"eth{eth_index}")
+        wan_interfaces.append(
+            {
+                "name": f"eth{eth_index}",
+                "host_uplink": iface.get("hostUplink") or {},
+            }
+        )
 
     return wan_interfaces
 
@@ -41,11 +49,44 @@ def _slaac_command(interface_name: str) -> str:
     )
 
 
+def _nat4_commands(interface_name: str, host_uplink: Dict[str, Any]) -> List[str]:
+    ipv4 = host_uplink.get("ipv4")
+    if not isinstance(ipv4, dict):
+        return []
+
+    address = ipv4.get("address")
+    if not isinstance(address, str) or not address:
+        return []
+
+    try:
+        gateway = ipaddress.ip_interface(address)
+    except ValueError:
+        return []
+
+    network = gateway.network
+    if gateway.ip.version != 4 or network.num_addresses < 4:
+        return []
+
+    client_ip = str(ipv4.get("clientAddress") or network[2])
+    prefixlen = gateway.network.prefixlen
+    gateway_ip = str(gateway.ip)
+    return [
+        f"ip addr replace {client_ip}/{prefixlen} dev {interface_name}",
+        f"ip route replace default via {gateway_ip} dev {interface_name} onlink",
+    ]
+
+
 def render(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
     cmds: List[str] = []
 
-    for interface_name in _wan_interfaces(node, eth_map):
+    for interface_data in _wan_interfaces(node, eth_map):
+        interface_name = interface_data["name"]
+        host_uplink = interface_data["host_uplink"]
         cmds.append(_sh(_slaac_command(interface_name)))
-        cmds.append(_sh(_dhcp4_command(interface_name)))
+        if isinstance(host_uplink, dict) and host_uplink.get("mode") == "nat":
+            for command in _nat4_commands(interface_name, host_uplink):
+                cmds.append(_sh(command))
+        else:
+            cmds.append(_sh(_dhcp4_command(interface_name)))
 
     return cmds

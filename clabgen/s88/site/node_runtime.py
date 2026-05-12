@@ -47,6 +47,7 @@ def build_node_data(
             "addr6": iface.addr6,
             "ll6": iface.ll6,
             "kind": iface.kind,
+            "hostUplink": copy.deepcopy(iface.host_uplink),
             "tenant": iface.tenant,
             "overlay": iface.overlay,
             "upstream": iface.upstream,
