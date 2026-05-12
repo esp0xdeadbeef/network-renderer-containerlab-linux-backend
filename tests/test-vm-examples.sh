@@ -125,15 +125,19 @@ run_example() {
   case "$example" in
     single-wan)
       log "running single-wan post-check"
-      check_single_wan
+      check_single_wan || return 1
+      ;;
+    single-wan-any-to-any-fw|single-wan-bgp|single-wan-uplink-static-egress|single-wan-with-nebula)
+      log "running WAN core egress post-check"
+      check_site_a_wan_core_egress || return 1
       ;;
     dual-wan-branch-overlay)
       log "running dual-wan-branch-overlay post-check"
-      check_dual_wan_overlay
+      check_dual_wan_overlay || return 1
       ;;
     dual-wan-branch-overlay-bgp)
       log "running dual-wan-branch-overlay-bgp post-check"
-      check_dual_wan_overlay_bgp
+      check_dual_wan_overlay_bgp || return 1
       ;;
     *)
       log "no bespoke post-check defined for ${example}; runtime target presence only"

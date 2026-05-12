@@ -29,6 +29,8 @@ fi
 "${repo_root}/tests/test-dns-service-policy-routes.sh"
 "${repo_root}/tests/test-hostile-gua-advertisements.sh"
 "${repo_root}/tests/test-host-uplink-vlan-dhcp.sh"
+"${repo_root}/tests/test-nat-uplink-runtime-addressing.sh"
+"${repo_root}/tests/test-vm-nat-uplink.sh"
 "${repo_root}/tests/test-s-router-clab-overlay-parity.sh"
 "${repo_root}/tests/test-single-overlay-interface-link.sh"
 "${repo_root}/tests/test-vm-example-lab-cleanup.sh"

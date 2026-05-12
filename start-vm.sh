@@ -37,6 +37,7 @@ mkdir -p "${VM_WORK_DIR}"
 if [[ "${VM_WORK_DIR}" != "${FLAKE_DIR}" ]]; then
   cp "${FLAKE_DIR}/vm.nix" "${VM_WORK_DIR}/vm.nix"
   cp "${FLAKE_DIR}/vm-network.nix" "${VM_WORK_DIR}/vm-network.nix"
+  cp "${FLAKE_DIR}/vm-network-nat.nix" "${VM_WORK_DIR}/vm-network-nat.nix"
 fi
 
 TOPO_FILE="${VM_WORK_DIR}/fabric.clab.yml"
@@ -45,6 +46,20 @@ VM_NIX="${VM_WORK_DIR}/vm.nix"
 
 resolve_input_path() {
   local input_name="$1"
+  local override_var
+  local override_path
+  override_var="NETWORK_INPUT_PATH_${input_name^^}"
+  override_var="${override_var//-/_}"
+  override_path="${!override_var:-}"
+  if [[ -n "${override_path}" ]]; then
+    [[ -d "${override_path}" ]] || {
+      echo "start-vm: invalid ${override_var} for ${input_name}: ${override_path}" >&2
+      exit 1
+    }
+    printf '%s\n' "${override_path}"
+    return 0
+  fi
+
   local archive_json
   archive_json="$(mktemp)"
 
@@ -82,7 +97,7 @@ fi
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-echo "[*] Building control-plane model from flake-locked network-labs (${example})..."
+echo "[*] Building control-plane model from resolved network-labs input (${example})..."
 (
   # Some upstream tools write debug artifacts to CWD; keep this repo clean.
   cd "${tmp_dir}"

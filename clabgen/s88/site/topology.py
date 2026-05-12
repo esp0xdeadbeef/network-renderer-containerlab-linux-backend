@@ -43,6 +43,16 @@ def render_site_topology(site: SiteModel) -> Dict[str, Any]:
             merged.update(link.host_uplink)
             link.host_uplink = merged
 
+    for node in site.nodes.values():
+        for iface in node.interfaces.values():
+            if not iface.attach_bridge or not iface.host_uplink:
+                continue
+            bridge_network = bridge_networks.get(iface.attach_bridge)
+            if isinstance(bridge_network, dict):
+                merged = dict(bridge_network)
+                merged.update(iface.host_uplink)
+                iface.host_uplink = merged
+
     eth_maps = build_eth_maps(site)
     nodes = render_nodes(site, eth_maps)
     links, bridges = render_links(site, eth_maps)

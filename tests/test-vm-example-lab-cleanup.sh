@@ -24,6 +24,21 @@ grep -q 'missing required host bridges after' "${run_in_vm}" || {
   exit 1
 }
 
+grep -q 'networking.firewall.enable = false;' "${repo_root}/vm.nix" || {
+  echo "VM host firewall must not block explicit CLAB NAT bridge forwarding" >&2
+  exit 1
+}
+
+grep -q 'table ip clab_vm_nat' "${repo_root}/vm.nix" || {
+  echo "VM host must install explicit nft NAT for generated CLAB NAT bridges" >&2
+  exit 1
+}
+
+grep -q 'iifname ${natBridgeSet} oifname "eth0" masquerade' "${repo_root}/vm.nix" || {
+  echo "VM host NAT must masquerade traffic from generated NAT bridges to eth0" >&2
+  exit 1
+}
+
 lifecycle="${repo_root}/tests/lib/vm-lifecycle.sh"
 checks="${repo_root}/tests/lib/vm-example-checks.sh"
 

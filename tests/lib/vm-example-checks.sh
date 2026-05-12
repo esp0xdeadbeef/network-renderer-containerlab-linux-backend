@@ -2,12 +2,16 @@
 set -euo pipefail
 
 check_single_wan() {
-  local client
+  local access
+  local core
   local topo_file="${vm_remote_topology_file:-${repo_root}/fabric.clab.yml}"
-  client="$(resolve_client_container_name "${MGMT_SITE}" "${MGMT_LOGICAL}" "${MGMT_TENANT_IFACE}")"
+  access="$(resolve_container_name "${MGMT_SITE}" "${MGMT_LOGICAL}")"
+  core="$(resolve_container_name "${MGMT_SITE}" "s-router-core-wan")"
+  test -n "${access}"
+  test -n "${core}"
   ssh_vm_once "
     containerlab inspect -t '${topo_file}' >/dev/null
-    docker exec '${client}' sh -c '
+    docker exec '${access}' sh -c '
       set -e
       gw=\$(ip route | awk \"/^default via / { print \\\$3; exit }\")
       ip -4 addr
@@ -17,7 +21,31 @@ check_single_wan() {
       ping -c1 -W 2 \"\$gw\"
       ip route | grep -q \"^default via \"
     '
-  "
+    docker exec '${core}' sh -c '
+      set -e
+      ip -4 addr show dev eth2
+      ip route
+      ip route get 8.8.8.8
+      ping -c1 -W 3 8.8.8.8
+    '
+  " || return 1
+}
+
+check_site_a_wan_core_egress() {
+  local core
+  local topo_file="${vm_remote_topology_file:-${repo_root}/fabric.clab.yml}"
+  core="$(resolve_container_name "site-a" "s-router-core-wan")"
+  test -n "${core}"
+  ssh_vm_once "
+    containerlab inspect -t '${topo_file}' >/dev/null
+    docker exec '${core}' sh -c '
+      set -e
+      ip -4 addr show dev eth2
+      ip route
+      ip route get 8.8.8.8
+      ping -c1 -W 3 8.8.8.8
+    '
+  " || return 1
 }
 
 check_dual_wan_overlay() {
