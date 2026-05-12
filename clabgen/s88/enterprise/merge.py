@@ -104,7 +104,7 @@ def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
 
     for overlay_name in sorted(overlay_links.keys()):
         endpoints = sorted(set(overlay_links[overlay_name]))
-        if len(endpoints) < 2:
+        if not endpoints:
             continue
         bridge = bridge_name(f"overlay-{overlay_name}")
         if bridge in merged_nodes:
