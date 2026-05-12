@@ -24,14 +24,16 @@ fi
 topology_file="$(realpath "${topology_file}")"
 bridges_file="$(realpath "${bridges_file}")"
 
+scratch_dir="${CLAB_VALIDATE_SCRATCH_DIR:-${repo_root}/clab-fabric}"
+
 created_clab_fabric=0
-if [[ ! -d "${repo_root}/clab-fabric" ]]; then
-  mkdir -p "${repo_root}/clab-fabric"
+if [[ ! -d "${scratch_dir}" ]]; then
+  mkdir -p "${scratch_dir}"
   created_clab_fabric=1
 fi
 cleanup_clab_fabric() {
   if [[ "${created_clab_fabric}" -eq 1 ]]; then
-    rmdir "${repo_root}/clab-fabric" >/dev/null 2>&1 || true
+    rmdir "${scratch_dir}" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup_clab_fabric EXIT
