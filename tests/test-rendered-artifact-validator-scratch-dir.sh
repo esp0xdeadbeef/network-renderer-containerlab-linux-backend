@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-scratch_dir="${repo_root}/clab-fabric"
 tmp_dir="$(mktemp -d)"
+scratch_dir="${tmp_dir}/clab-fabric"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
 fail() {
@@ -40,7 +40,8 @@ cat > "${tmp_dir}/vm-bridges-generated.nix" <<'EOF'
 }
 EOF
 
-"${repo_root}/tests/validate-rendered-artifacts.sh" \
+CLAB_VALIDATE_SCRATCH_DIR="${scratch_dir}" \
+  "${repo_root}/tests/validate-rendered-artifacts.sh" \
   "${tmp_dir}/fabric.clab.yml" \
   "${tmp_dir}/vm-bridges-generated.nix"
 
