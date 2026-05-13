@@ -39,6 +39,8 @@ def _git_dirty(repo: Path) -> bool:
         return False
     except subprocess.CalledProcessError:
         return True
+    except FileNotFoundError:
+        return True
 
 
 def _render_meta_comment(meta: Dict[str, Any]) -> str:

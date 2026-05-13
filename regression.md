@@ -1,6 +1,6 @@
 # network-renderer-containerlab-linux-backend regression
 
-Current verified state as of 2026-05-03.
+Current verified state as of 2026-05-13.
 
 ## architecture shape
 
@@ -55,6 +55,15 @@ Current verified state as of 2026-05-03.
   because there is no trunk here.
 - Like the `s-router-test` workflow, shutting down/restarting `s-router-clab`
   is expected to pick up the latest NixOS config on that box.
+- state=still-broken | target=current s-router-clab live lab | evidence=2026-05-13 s-router-clab host was reachable and IPv4 default via vlan2 worked, host IPv6 route lookup for 2606:4700:4700::1111 failed with network unreachable, and host-level `docker ps -a` / `containerlab inspect --all` did not show a fabric; the nested `s-router-clab-container` still had 26 `clab-fabric-*` containers running from an older deploy | reason=current CLAB box has a stale nested fabric, but the current host render/deploy path is not green.
+- state=still-broken | target=fast current s-router-clab refresh | evidence=2026-05-13 fast matrix `/tmp/s-router-fast-enum-20260513T212251Z/summary/fast.tsv` captured 28 CLAB rows: the host and nested container public IPv4 classify as home-WAN management egress, while every `clab-fabric-*` container has no public IPv4 route and DNS returns network unreachable. | reason=CLAB is currently not a valid data-plane validation surface; the renderer deploy path must first stop crashing and recreate a usable fabric.
+- state=still-broken | target=nested s-router-clab fabric egress | evidence=2026-05-13 all 26 nested `clab-fabric-*` containers returned zero global IPv4 addresses, zero global IPv6 addresses, and `RTNETLINK answers: Network unreachable` for route lookup to 1.1.1.1 and 2606:4700:4700::1111; compact evidence is in `/tmp/s-router-clab-docker-compact.tsv` on the operator box. | reason=even the currently running nested fabric is not a usable public-egress or route-policy validation target.
+- state=still-broken | target=s-router-clab-render-live.service | evidence=2026-05-13 service failed with FileNotFoundError for `git` in clabgen/parse-solver-json.py `_git_dirty`, while running from the Nix store generated renderer path | reason=renderer helper metadata collection assumes `git` exists at runtime; this blocks CLAB fabric deployment before any container data-plane validation can start.
+- state=fixed-but-only-locally-tested | target=s-router-clab-render-live missing `git` failure | evidence=2026-05-13 local focused regression `NETWORK_REPO_DIRECT_TEST_OK=1 bash tests/test-provenance-without-git.sh` passed after `_git_dirty` was changed to treat missing `git` as dirty provenance instead of crashing. | reason=The fix has not yet been pushed, locked downstream, or consumed by a live `s-router-clab` deploy.
+- state=still-broken | target=CLAB host leak posture | evidence=2026-05-13 compact probe classified `s-router-clab` host public IPv4 as `HOME_LEAK`, host IPv6 public route as unreachable, DNS resolvers on vlan2 included the LAN resolver plus public resolvers, and host nft forward hooks had policy accept with NAT masquerade toward vlan2. | reason=Host realization currently exposes the operator/home WAN path; this may be expected for host management but must not be mistaken for validated CLAB fabric egress and must not leak concrete home IPv4 into source.
+
+## previous live validation
+
 - A live `s-router-test-three-site` deploy was run through the direct
   `s-router-clab` container SSH path. The rendered topology was generated on
   the host and copied into the nested container to avoid repeated GitHub/Nix
