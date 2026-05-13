@@ -40,6 +40,11 @@ Current verified state as of 2026-05-13.
 - Containerlab runtime nodes now render DNS services from CPM runtime targets.
   The generated DNS process listens on the modeled service addresses, forwards
   to the modeled upstreams/forwarders, and serves modeled local records.
+- Containerlab DNS services now preserve explicit CPM
+  `services.dns.outgoingInterfaces` by binding the runtime DNS proxy's upstream
+  sockets to modeled source addresses before forwarding queries. Focused
+  regression passed:
+  `NETWORK_REPO_DIRECT_TEST_OK=1 bash tests/test-dns-service-source-binding.sh`.
 - `s-router-clab` now exposes direct SSH into the nested container on port
   2222. The verified path is:
   `ssh -p 2222 root@s-router-clab`.

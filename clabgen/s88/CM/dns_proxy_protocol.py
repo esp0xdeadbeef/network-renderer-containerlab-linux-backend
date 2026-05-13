@@ -132,27 +132,56 @@ def forward_udp(
     if answer is not None:
         return answer
 
+    outgoing_sources = outgoing_sources_for_family(config, family)
     for forwarder in config.get("forwarders", []):
         if not isinstance(forwarder, str):
             continue
         try:
             if address_family(forwarder) != family:
                 continue
-            return query_forwarder(query, family, forwarder)
+            return query_forwarder(query, family, forwarder, outgoing_sources)
         except Exception:
             continue
 
     return servfail(query)
 
 
+def outgoing_sources_for_family(
+    config: Dict[str, Any], family: socket.AddressFamily
+) -> List[str]:
+    sources: List[str] = []
+    for source in config.get("outgoingInterfaces", []):
+        if not isinstance(source, str):
+            continue
+        try:
+            if address_family(source) == family:
+                sources.append(source)
+        except ValueError:
+            continue
+    return sources
+
+
 def query_forwarder(
-    query: bytes, family: socket.AddressFamily, forwarder: str
+    query: bytes,
+    family: socket.AddressFamily,
+    forwarder: str,
+    outgoing_sources: List[str],
 ) -> bytes:
-    upstream_socket = socket.socket(family, socket.SOCK_DGRAM)
-    try:
-        upstream_socket.settimeout(2)
-        upstream_socket.sendto(query, (forwarder, 53))
-        data, _peer = upstream_socket.recvfrom(4096)
-        return data
-    finally:
-        upstream_socket.close()
+    sources = outgoing_sources or [""]
+    last_error: Exception | None = None
+    for source in sources:
+        upstream_socket = socket.socket(family, socket.SOCK_DGRAM)
+        try:
+            upstream_socket.settimeout(2)
+            if source:
+                upstream_socket.bind((source, 0))
+            upstream_socket.sendto(query, (forwarder, 53))
+            data, _peer = upstream_socket.recvfrom(4096)
+            return data
+        except Exception as error:
+            last_error = error
+        finally:
+            upstream_socket.close()
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("no DNS forwarder source attempted")

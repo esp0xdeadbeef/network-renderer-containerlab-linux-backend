@@ -30,6 +30,7 @@ def render_dns_service(node: Dict[str, Any]) -> List[str]:
     payload = {
         "listen": ["127.0.0.1", "::1"] + listen,
         "forwarders": _string_list(dns.get("forwarders") or dns.get("upstreams") or []),
+        "outgoingInterfaces": _string_list(dns.get("outgoingInterfaces", [])),
         "localRecords": _local_records(dns.get("localRecords", [])),
     }
 

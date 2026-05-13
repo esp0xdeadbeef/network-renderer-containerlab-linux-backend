@@ -28,6 +28,7 @@ fi
 "${repo_root}/tests/test-management-eth0-egress-guard.sh"
 "${repo_root}/tests/test-hostile-dns-east-west.sh"
 "${repo_root}/tests/test-dns-service-policy-routes.sh"
+"${repo_root}/tests/test-dns-service-source-binding.sh"
 "${repo_root}/tests/test-hostile-gua-advertisements.sh"
 "${repo_root}/tests/test-host-uplink-vlan-dhcp.sh"
 "${repo_root}/tests/test-nat-uplink-runtime-addressing.sh"
