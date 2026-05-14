@@ -76,20 +76,46 @@ def interface_tag_values(interface_tags: Dict[str, Any]) -> Set[str]:
     return values
 
 
-def _lane_access_unit(link_name: Any) -> str | None:
-    if not isinstance(link_name, str) or "--access-" not in link_name:
-        return None
-    tail = link_name.split("--access-", 1)[1]
-    return tail.split("--uplink-", 1)[0]
+def _attrs(value: Any) -> Dict[str, Any]:
+    return value if isinstance(value, dict) else {}
 
 
-def _lane_uplink(link_name: Any) -> str | None:
-    if not isinstance(link_name, str) or "--uplink-" not in link_name:
+def _link_model(site: SiteModel, peer: Dict[str, Any]):
+    link_name = peer.get("link")
+    if not isinstance(link_name, str):
         return None
-    uplink = link_name.rsplit("--uplink-", 1)[1]
-    if uplink:
-        return uplink
-    return None
+    return site.links.get(link_name)
+
+
+def _lane_access_unit(site: SiteModel, peer: Dict[str, Any]) -> str | None:
+    link = _link_model(site, peer)
+    if link is None:
+        return None
+    lane = _attrs(getattr(link, "lane", None))
+    lane_meta = _attrs(getattr(link, "lane_meta", None))
+    access = lane.get("access") or lane_meta.get("access")
+    return access if isinstance(access, str) and access else None
+
+
+def _lane_uplinks(site: SiteModel, peer: Dict[str, Any]) -> List[str]:
+    link = _link_model(site, peer)
+    if link is None:
+        return []
+    lane = _attrs(getattr(link, "lane", None))
+    lane_meta = _attrs(getattr(link, "lane_meta", None))
+    values: List[str] = []
+    for item in getattr(link, "uplinks", []) or []:
+        if isinstance(item, str) and item:
+            values.append(item)
+    for value in (
+        lane.get("uplink"),
+        lane_meta.get("uplink"),
+        *(lane.get("uplinks") or []),
+        *(lane_meta.get("uplinks") or []),
+    ):
+        if isinstance(value, str) and value:
+            values.append(value)
+    return sorted(set(values))
 
 
 def tag_from_peer_role(
@@ -116,12 +142,12 @@ def tag_from_peer_role(
         add_interface_tag(interface_tags, iface_name, tenants[0])
         return True
     if peer_node.role == "upstream-selector":
-        add_interface_tag(
-            interface_tags, iface_name, _lane_uplink(peer.get("link")) or "wan"
-        )
+        uplinks = _lane_uplinks(site, peer)
+        for uplink in uplinks or ["wan"]:
+            add_interface_tag(interface_tags, iface_name, uplink)
         return True
     if peer_node.role == "downstream-selector":
-        access_unit = _lane_access_unit(peer.get("link"))
+        access_unit = _lane_access_unit(site, peer)
         access_node = None
         if access_unit:
             access_node = site.nodes.get(access_unit)

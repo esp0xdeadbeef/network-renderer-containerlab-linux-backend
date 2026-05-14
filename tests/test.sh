@@ -15,6 +15,8 @@ fi
 "${repo_root}/tests/test-s88-python-readability.sh"
 "${repo_root}/tests/test-rendered-artifact-validator-scratch-dir.sh"
 "${repo_root}/tests/test-provenance-without-git.sh"
+"${repo_root}/tests/test-policy-interface-tags-no-generated-link-parsing.sh"
+"${repo_root}/tests/test-access-tenant-no-node-name-parsing.sh"
 "${repo_root}/tests/test-vm-runtime-log-guard.sh"
 "${repo_root}/tests/test-input-path-override.sh"
 "${repo_root}/tests/test-vm-matrix-resources.sh"

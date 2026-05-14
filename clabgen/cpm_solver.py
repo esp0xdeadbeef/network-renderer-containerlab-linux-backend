@@ -53,6 +53,7 @@ def cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
     links: Dict[str, Any] = {}
     link_bridges: Dict[str, str] = {}
     link_host_uplinks: Dict[str, Dict[str, Any]] = {}
+    link_metadata: Dict[str, Dict[str, Any]] = {}
 
     for rt_name, runtime_target in runtime_targets.items():
         if not isinstance(runtime_target, dict):
@@ -64,9 +65,10 @@ def cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
             links,
             link_bridges,
             link_host_uplinks,
+            link_metadata,
         )
 
-    add_transit_links(site, links, link_bridges, link_host_uplinks)
+    add_transit_links(site, links, link_bridges, link_host_uplinks, link_metadata)
 
     out = dict(site)
     out["nodes"] = nodes

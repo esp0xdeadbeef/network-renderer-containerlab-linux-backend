@@ -78,6 +78,12 @@ def build_links(site: Dict[str, Any]) -> Dict[str, LinkModel]:
             endpoints=lo.get("endpoints", {}),
             bridge=lo.get("bridge") if isinstance(lo.get("bridge"), str) else None,
             host_uplink=dict(lo.get("hostUplink", {}) or {}),
+            lane=dict(lo.get("lane", {}) or {}),
+            lane_meta=dict(lo.get("laneMeta", {}) or {}),
+            uplinks=[
+                item for item in lo.get("uplinks", []) if isinstance(item, str) and item
+            ],
+            overlay=lo.get("overlay") if isinstance(lo.get("overlay"), str) else None,
         )
 
     return links

@@ -20,11 +20,52 @@ def _interface_overlay(kind: Any, backing_ref: Dict[str, Any], iface: Dict[str, 
     return None
 
 
+def _list_strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item]
+
+
+def _link_metadata(backing_ref: Dict[str, Any], iface: Dict[str, Any]) -> Dict[str, Any]:
+    lane = _dict_value(backing_ref.get("lane") or iface.get("lane"))
+    lane_meta = _dict_value(backing_ref.get("laneMeta") or iface.get("laneMeta"))
+    uplinks = _list_strings(backing_ref.get("uplinks")) or _list_strings(
+        iface.get("uplinks")
+    )
+    overlay = _string_value(backing_ref.get("overlay")) or _string_value(
+        iface.get("overlay")
+    )
+    return {
+        "lane": lane,
+        "laneMeta": lane_meta,
+        "uplinks": uplinks,
+        "overlay": overlay,
+    }
+
+
+def _merge_link_metadata(
+    current: Dict[str, Any] | None, incoming: Dict[str, Any]
+) -> Dict[str, Any]:
+    merged = dict(current or {})
+    for key in ("lane", "laneMeta"):
+        value = incoming.get(key)
+        if isinstance(value, dict) and value:
+            merged[key] = value
+    uplinks = incoming.get("uplinks")
+    if isinstance(uplinks, list) and uplinks:
+        merged["uplinks"] = sorted(set(_list_strings(merged.get("uplinks")) + uplinks))
+    overlay = incoming.get("overlay")
+    if isinstance(overlay, str) and overlay:
+        merged["overlay"] = overlay
+    return merged
+
+
 def _interface_output(
     if_key: str,
     iface: Dict[str, Any],
     link_bridges: Dict[str, str],
     link_host_uplinks: Dict[str, Dict[str, Any]],
+    link_metadata: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Any]:
     backing_ref = _dict_value(iface.get("backingRef"))
     kind = iface.get("sourceKind") or iface.get("kind")
@@ -32,12 +73,15 @@ def _interface_output(
     attach_bridge = _string_value(attach.get("bridge"))
     host_uplink = _dict_value(iface.get("hostUplink"))
 
-    if attach_bridge is not None:
-        link_name = str(backing_ref.get("name") or if_key)
-        if link_name:
+    link_name = str(backing_ref.get("name") or if_key)
+    if link_name:
+        if attach_bridge is not None:
             link_bridges[link_name] = attach_bridge
             if host_uplink:
                 link_host_uplinks[link_name] = dict(host_uplink)
+        link_metadata[link_name] = _merge_link_metadata(
+            link_metadata.get(link_name), _link_metadata(backing_ref, iface)
+        )
 
     return {
         "addr4": iface.get("addr4"),
@@ -57,6 +101,7 @@ def _interface_outputs(
     runtime_target: Dict[str, Any],
     link_bridges: Dict[str, str],
     link_host_uplinks: Dict[str, Dict[str, Any]],
+    link_metadata: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Any]:
     realized = _dict_value(runtime_target.get("effectiveRuntimeRealization"))
     interfaces = _dict_value(realized.get("interfaces"))
@@ -68,7 +113,7 @@ def _interface_outputs(
         if not isinstance(iface, dict):
             continue
         iface_out[if_key] = _interface_output(
-            if_key, iface, link_bridges, link_host_uplinks
+            if_key, iface, link_bridges, link_host_uplinks, link_metadata
         )
 
     return iface_out
@@ -133,12 +178,15 @@ def add_runtime_target(
     links: Dict[str, Any],
     link_bridges: Dict[str, str],
     link_host_uplinks: Dict[str, Dict[str, Any]],
+    link_metadata: Dict[str, Dict[str, Any]],
 ) -> None:
     node_name = _runtime_node_name(runtime_target)
     if node_name is None:
         return
 
-    iface_out = _interface_outputs(runtime_target, link_bridges, link_host_uplinks)
+    iface_out = _interface_outputs(
+        runtime_target, link_bridges, link_host_uplinks, link_metadata
+    )
     nodes[node_name] = {
         "role": runtime_target.get("role") or "",
         "routingDomain": runtime_target.get("routingDomain") or "",
