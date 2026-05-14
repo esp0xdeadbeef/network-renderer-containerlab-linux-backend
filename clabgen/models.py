@@ -63,6 +63,10 @@ class LinkModel:
     endpoints: Dict[str, Dict[str, Any]]
     bridge: Optional[str] = None
     host_uplink: Dict[str, Any] = field(default_factory=dict)
+    lane: Dict[str, Any] = field(default_factory=dict)
+    lane_meta: Dict[str, Any] = field(default_factory=dict)
+    uplinks: List[str] = field(default_factory=list)
+    overlay: Optional[str] = None
 
 
 @dataclass

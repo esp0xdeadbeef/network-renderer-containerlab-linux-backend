@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, List, Set
 import json
-import re
 
 from clabgen.models import SiteModel, NodeModel
 from clabgen.s88.site.policy_contract import contract_tenant_names
@@ -33,23 +32,6 @@ def ownership_tenant_names(site: SiteModel) -> List[str]:
     return sorted(result)
 
 
-def node_name_candidate_tenants(node_name: str, candidates: List[str]) -> List[str]:
-    tokens: List[str] = []
-    for token in re.split(r"[^a-zA-Z0-9]+", node_name):
-        if token:
-            tokens.append(token)
-
-    token_set: set[str] = set()
-    for token in tokens:
-        token_set.add(token.lower())
-
-    matches: set[str] = set()
-    for candidate in candidates:
-        if candidate.lower() in token_set:
-            matches.add(candidate)
-    return sorted(matches)
-
-
 def access_node_tenants(site: SiteModel, node: NodeModel) -> List[str]:
     tenants: set[str] = set()
     for iface in node.interfaces.values():
@@ -67,9 +49,6 @@ def access_node_tenants(site: SiteModel, node: NodeModel) -> List[str]:
         set(contract_tenant_names(dict(site.raw_policy or {})))
         | set(ownership_tenant_names(site))
     )
-    name_matches = node_name_candidate_tenants(node.name, candidate_tenants)
-    if len(name_matches) == 1:
-        return name_matches
     if len(candidate_tenants) == 1:
         return candidate_tenants
 
@@ -116,3 +95,14 @@ def domains_external_names(site: SiteModel) -> Set[str]:
             if isinstance(name, str) and name:
                 result.add(name)
     return result
+
+
+def policy_external_names(site: SiteModel) -> Set[str]:
+    policy = site.raw_policy if isinstance(site.raw_policy, dict) else {}
+    endpoint_bindings = policy.get("endpointBindings")
+    if not isinstance(endpoint_bindings, dict):
+        return set()
+    externals = endpoint_bindings.get("externals")
+    if not isinstance(externals, dict):
+        return set()
+    return {name for name in externals.keys() if isinstance(name, str) and name}

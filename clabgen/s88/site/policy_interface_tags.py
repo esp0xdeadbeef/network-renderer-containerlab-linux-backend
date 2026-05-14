@@ -4,7 +4,7 @@ from typing import Any, Dict
 import json
 
 from clabgen.models import SiteModel
-from clabgen.s88.site.access_tenants import domains_external_names
+from clabgen.s88.site.access_tenants import domains_external_names, policy_external_names
 from clabgen.s88.site.interface_tags import (
     add_interface_tag,
     interface_tag_values,
@@ -42,7 +42,7 @@ def build_policy_interface_tags(
             break
         available_tags = {"wan"}
 
-    declared_externals = domains_external_names(site)
+    declared_externals = domains_external_names(site) | policy_external_names(site)
     for external in sorted(required_externals):
         if external in available_tags:
             continue

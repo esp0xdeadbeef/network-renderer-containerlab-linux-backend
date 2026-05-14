@@ -26,6 +26,19 @@ def _transport(site: Dict[str, Any]) -> Dict[str, Any]:
     return raw_transport
 
 
+def _policy(site: Dict[str, Any]) -> Dict[str, Any]:
+    raw_policy = dict(site.get("communicationContract", {}) or {})
+    site_policy = site.get("policy")
+    if not isinstance(site_policy, dict):
+        return raw_policy
+
+    for key in ("endpointBindings", "interfaceTags"):
+        value = site_policy.get(key)
+        if isinstance(value, dict):
+            raw_policy[key] = value
+    return raw_policy
+
+
 def load_sites(
     path: str | Path,
     renderer_inventory: Dict[str, Any] | None = None,
@@ -52,7 +65,7 @@ def load_sites(
             links=build_links(site),
             single_access=assumptions.get("singleAccess", ""),
             domains=dict(site.get("domains", {}) or {}),
-            raw_policy=dict(site.get("communicationContract", {}) or {}),
+            raw_policy=_policy(site),
             raw_nat={},
             raw_links=dict(site.get("links", {}) or {}),
             raw_ownership=dict(site.get("ownership", {}) or {}),
