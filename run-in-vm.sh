@@ -68,7 +68,7 @@ docker-clab-frr-plus-tooling/build.sh
 # This script runs inside a dedicated test VM, so clear any stale lab state
 # before deploying the next rendered topology.
 containerlab destroy --all --cleanup --yes >/dev/null 2>&1 || true
-docker ps --format '{{.Names}}' | grep '^clab-fabric-' | xargs -r docker rm -f >/dev/null 2>&1 || true
+docker ps -aq --filter 'name=^clab-fabric-' | xargs -r docker rm -f >/dev/null 2>&1 || true
 
 wait_for_required_bridges
 containerlab deploy -t "${topo_file}" --reconfigure
