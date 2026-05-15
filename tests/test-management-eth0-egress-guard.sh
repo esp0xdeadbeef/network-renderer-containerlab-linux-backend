@@ -53,6 +53,12 @@ for site_name, site in sites.items():
         assert node.get("network-mode") == "none", (
             f"{site_name}/{node_name} must disable Containerlab management networking"
         )
+        assert node.get("restart-policy") == "no", (
+            f"{site_name}/{node_name} must not auto-restart and lose Containerlab dataplane links"
+        )
+        assert node.get("cmd") == "/bin/sh -c 'sleep infinity'", (
+            f"{site_name}/{node_name} must use a stable long-running Linux command"
+        )
         exec_commands = node.get("exec") or []
         commands = "\n".join(exec_commands)
         assert "nft add table inet clab_guard" in commands, (

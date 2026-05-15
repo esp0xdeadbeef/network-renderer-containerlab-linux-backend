@@ -65,7 +65,7 @@ def _load_renderer_inventory_for_input(input_path: Path) -> Dict[str, Any]:
         p = Path(env_path)
         try:
             data = json.loads(p.read_text())
-            return data if isinstance(data, dict) else {}
+            return _with_env_target_host(data if isinstance(data, dict) else {})
         except Exception:
             return {}
 
@@ -86,7 +86,19 @@ def _load_renderer_inventory_for_input(input_path: Path) -> Dict[str, Any]:
     if not isinstance(endpoint_inventory, dict):
         return {}
 
-    return endpoint_inventory
+    return _with_env_target_host(endpoint_inventory)
+
+
+def _with_env_target_host(renderer_inventory: Dict[str, Any]) -> Dict[str, Any]:
+    target_host = os.environ.get("CLABGEN_DEPLOYMENT_HOST", "").strip()
+    if not target_host:
+        return renderer_inventory
+
+    result = dict(renderer_inventory)
+    containerlab = dict(result.get("containerlab", {}) or {})
+    containerlab.setdefault("targetHost", target_host)
+    result["containerlab"] = containerlab
+    return result
 
 
 def render_topology(solver_json: str | Path) -> Dict[str, Any]:

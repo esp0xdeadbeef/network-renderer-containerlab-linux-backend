@@ -39,6 +39,89 @@ def _policy(site: Dict[str, Any]) -> Dict[str, Any]:
     return raw_policy
 
 
+def _target_host(renderer_inventory: Dict[str, Any]) -> str | None:
+    containerlab = renderer_inventory.get("containerlab")
+    if not isinstance(containerlab, dict):
+        return None
+    for key in ("targetHost", "deploymentHost", "host"):
+        value = containerlab.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _logical_nodes_for_host(
+    renderer_inventory: Dict[str, Any], target_host: str
+) -> set[tuple[str, str, str]]:
+    realization = renderer_inventory.get("realization")
+    if not isinstance(realization, dict):
+        return set()
+    nodes = realization.get("nodes")
+    if not isinstance(nodes, dict):
+        return set()
+
+    allowed: set[tuple[str, str, str]] = set()
+    for node in nodes.values():
+        if not isinstance(node, dict) or node.get("host") != target_host:
+            continue
+        logical = node.get("logicalNode")
+        if not isinstance(logical, dict):
+            continue
+        enterprise = logical.get("enterprise")
+        site = logical.get("site")
+        name = logical.get("name")
+        if isinstance(enterprise, str) and isinstance(site, str) and isinstance(name, str):
+            allowed.add((enterprise, site, name))
+    return allowed
+
+
+def _filter_site_to_target_host(
+    enterprise: str,
+    site_name: str,
+    site: Dict[str, Any],
+    allowed_logical_nodes: set[tuple[str, str, str]] | None,
+) -> Dict[str, Any] | None:
+    if allowed_logical_nodes is None:
+        return site
+
+    allowed_names = {
+        node_name
+        for allowed_enterprise, allowed_site, node_name in allowed_logical_nodes
+        if allowed_enterprise == enterprise and allowed_site == site_name
+    }
+    if not allowed_names:
+        return None
+
+    filtered = dict(site)
+    nodes = site.get("nodes")
+    if isinstance(nodes, dict):
+        filtered["nodes"] = {
+            name: node for name, node in nodes.items() if name in allowed_names
+        }
+
+    runtime_targets = site.get("runtimeTargets")
+    if isinstance(runtime_targets, dict):
+        filtered["runtimeTargets"] = {
+            name: target
+            for name, target in runtime_targets.items()
+            if isinstance(target, dict)
+            and isinstance(target.get("logicalNode"), dict)
+            and target["logicalNode"].get("name") in allowed_names
+        }
+
+    links = site.get("links")
+    if isinstance(links, dict):
+        filtered["links"] = {
+            name: link
+            for name, link in links.items()
+            if isinstance(link, dict)
+            and isinstance(link.get("endpoints"), dict)
+            and all(endpoint in allowed_names for endpoint in link["endpoints"].keys())
+        }
+
+    return filtered
+
+
 def load_sites(
     path: str | Path,
     renderer_inventory: Dict[str, Any] | None = None,
@@ -47,8 +130,20 @@ def load_sites(
     result: Dict[str, SiteModel] = {}
     solver_meta = dict(data.get("meta", {}) or {})
     renderer_inventory = dict(renderer_inventory or {})
+    target_host = _target_host(renderer_inventory)
+    allowed_logical_nodes = (
+        _logical_nodes_for_host(renderer_inventory, target_host)
+        if target_host is not None
+        else None
+    )
 
     for enterprise, site_name, site in extract_enterprise_sites(data):
+        filtered_site = _filter_site_to_target_host(
+            enterprise, site_name, site, allowed_logical_nodes
+        )
+        if filtered_site is None:
+            continue
+        site = filtered_site
         validate_site_invariants(
             site,
             context={"enterprise": enterprise, "site": site_name},
