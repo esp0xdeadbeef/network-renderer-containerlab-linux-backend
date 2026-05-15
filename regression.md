@@ -4,8 +4,8 @@ Current verified state as of 2026-05-13.
 
 ## architecture shape
 
-- state=policy-required | policy=required | target=s88-style Enterprise/Site/Unit/EquipmentModule/ControlModule layout | reason=renderer code must stay in s88-style responsibility folders; top-level files are limited to flakes, tests, scripts/entrypoints, and thin imports into the renderer structure.
-- state=policy-required | policy=required | target=no oversized implementation files | reason=Nix implementation files over 200 LOC must be split by concrete renderer responsibility unless they are flake/test wiring or explicitly documented as a temporary regression with a split target.
+- state=runtime-checks | policy=required | target=s88-style Enterprise/Site/Unit/EquipmentModule/ControlModule layout | reason=renderer code must stay in s88-style responsibility folders; top-level files are limited to flakes, tests, scripts/entrypoints, and thin imports into the renderer structure.
+- state=runtime-checks | policy=required | target=no oversized implementation files | reason=Nix implementation files over 200 LOC must be split by concrete renderer responsibility unless they are flake/test wiring or explicitly documented as a temporary regression with a split target.
 
 ## fixed and locally verified
 
@@ -13,46 +13,46 @@ Current verified state as of 2026-05-13.
 - state=solved | target=CPM policy endpoint preservation | evidence=`NETWORK_REPO_DIRECT_TEST_OK=1 bash tests/test-passing-fixtures.sh` passed for all locked `network-labs` examples | reason=Network pipeline contract audit found CLAB loaded only `communicationContract` into the site policy view, so explicit CPM `policy.endpointBindings.externals` were invisible and declared externals such as `isp-a`/`isp-b` failed validation. The renderer now preserves endpoint bindings from CPM input instead of inferring declarations from `domains.externals`.
 - state=solved | target=CPM backingRef lane/uplink preservation | evidence=`NETWORK_REPO_DIRECT_TEST_OK=1 bash tests/test-passing-fixtures.sh` passed for all locked `network-labs` examples, including `single-wan-direct-transit` | reason=Network pipeline contract audit found CLAB dropped explicit `effectiveRuntimeRealization.interfaces.*.backingRef.lane` metadata for direct links, causing policy interface tagging to collapse tenant/uplink lanes to generic `wan`. The renderer now carries backingRef lane/uplink/overlay metadata into the intermediate link model for both bridged and direct interfaces.
 - state=solved | target=access tenant resolution | evidence=`bash tests/test-access-tenant-no-node-name-parsing.sh` | reason=Network pipeline contract audit found CLAB access tenant resolution could tokenize runtime node names. The renderer now requires explicit tenant interface metadata or a single unambiguous modeled tenant candidate.
-- state=fixed-locally | The pinned fixture sweep passes with warning output treated as a failure:
+- state=runtime-checks | The pinned fixture sweep passes with warning output treated as a failure:
   `./tests/test-passing-fixtures.sh`.
-- state=fixed-locally | The sweep includes `s-router-test-three-site` and both tri-site overlay
+- state=runtime-checks | The sweep includes `s-router-test-three-site` and both tri-site overlay
   integration examples.
-- state=fixed-locally | NixOS-renderer-style focused regressions were copied/adapted for this backend
+- state=runtime-checks | NixOS-renderer-style focused regressions were copied/adapted for this backend
   and now render `s-router-test-three-site` from `inventory-clab.nix` before
   asserting the generated Containerlab topology:
-  - state=fixed-locally | `tests/test-hostile-dns-east-west.sh`
-  - state=fixed-locally | `tests/test-dns-service-policy-routes.sh`
-  - state=fixed-locally | `tests/test-hostile-gua-advertisements.sh`
-  - state=fixed-locally | `tests/test-s-router-clab-overlay-parity.sh`
-- state=fixed-locally | Those focused tests passed locally as a batch:
+  - state=runtime-checks | `tests/test-hostile-dns-east-west.sh`
+  - state=runtime-checks | `tests/test-dns-service-policy-routes.sh`
+  - state=runtime-checks | `tests/test-hostile-gua-advertisements.sh`
+  - state=runtime-checks | `tests/test-s-router-clab-overlay-parity.sh`
+- state=runtime-checks | Those focused tests passed locally as a batch:
   `./tests/test-hostile-dns-east-west.sh &&
   ./tests/test-dns-service-policy-routes.sh &&
   ./tests/test-hostile-gua-advertisements.sh &&
   ./tests/test-s-router-clab-overlay-parity.sh`.
-- state=fixed-locally | Client injection has been removed from the renderer path; clients must come
+- state=runtime-checks | Client injection has been removed from the renderer path; clients must come
   from explicit CPM/input data rather than local renderer inference.
-- state=fixed-locally | Policy interface tagging now supports multi-tag interfaces and treats missing
+- state=runtime-checks | Policy interface tagging now supports multi-tag interfaces and treats missing
   tenant/external mappings as renderer failures instead of warning-only output.
-- state=fixed-locally | The `s-router-clab` host is reachable by SSH from this box:
+- state=runtime-checks | The `s-router-clab` host is reachable by SSH from this box:
   `ssh s-router-clab id` returned `uid=1000(deadbeef)`.
-- state=fixed-locally | The normal repo runner passed after wiring in the copied tests:
+- state=runtime-checks | The normal repo runner passed after wiring in the copied tests:
   `./tests/test.sh`.
-- state=fixed-locally | Service endpoints in firewall policy now follow the NixOS renderer shape:
+- state=runtime-checks | Service endpoints in firewall policy now follow the NixOS renderer shape:
   service names resolve through explicit `providerTenants`, ownership endpoint
   providers, and the runtime DNS service tenant when the current CLAB fixture
   lacks explicit DNS provider tenants.
-- state=fixed-locally | Containerlab runtime nodes now render DNS services from CPM runtime targets.
+- state=runtime-checks | Containerlab runtime nodes now render DNS services from CPM runtime targets.
   The generated DNS process listens on the modeled service addresses, forwards
   to the modeled upstreams/forwarders, and serves modeled local records.
-- state=fixed-locally | Containerlab DNS services now preserve explicit CPM
+- state=runtime-checks | Containerlab DNS services now preserve explicit CPM
   `services.dns.outgoingInterfaces` by binding the runtime DNS proxy's upstream
   sockets to modeled source addresses before forwarding queries. Focused
   regression passed:
   `NETWORK_REPO_DIRECT_TEST_OK=1 bash tests/test-dns-service-source-binding.sh`.
-- state=fixed-locally | `s-router-clab` now exposes direct SSH into the nested container on port
+- state=runtime-checks | `s-router-clab` now exposes direct SSH into the nested container on port
   2222. The verified path is:
   `ssh -p 2222 root@s-router-clab`.
-- state=fixed-locally | The local FRR tooling image build now has a persistent cache path. On
+- state=runtime-checks | The local FRR tooling image build now has a persistent cache path. On
   `s-router-clab`, `docker-clab-frr-plus-tooling/build.sh` reused the existing
   `clab-frr-plus-tooling:latest` image, seeded
   `/persist/docker-image-cache/network-renderer-containerlab-linux-backend/`,
@@ -64,16 +64,16 @@ Current verified state as of 2026-05-13.
   because there is no trunk here.
 - state=solved | Like the `s-router-test` workflow, shutting down/restarting `s-router-clab`
   is expected to pick up the latest NixOS config on that box.
-- state=still-broken | target=late CLAB route/DNS validation loopback-only fabric | evidence=2026-05-14 after the DNS/Nebula hotfix session, `s-router-clab` host was reachable and `test-s-router-clab-current-example-postcheck.sh` passed, but direct nested checks showed selected `clab-fabric-*` routers (`b-router-access-hostile`, downstream selector, policy, upstream selector, branch Nebula core, site-C Nebula core, site-C upstream selector, and site-C policy) had only `lo`, no dataplane interfaces, empty IPv4/IPv6 route tables, and default policy rules. `b-router-access-hostile` returned `Network unreachable` for both public IPv4 and IPv6 route gets. | reason=The backend or deploy verifier must not treat running containers or command execution as a valid fabric. Tests should hard-fail loopback-only routers before accepting DNS, route, or public-egress validation.
-- state=still-broken | target=current CLAB traffic-path p2p realization | evidence=2026-05-14 full-loop boot has `s-router-clab-container` running and `docker ps` reports 26 `clab-fabric-*` routers up, but direct checks inside branch routers (`b-router-access-hostile`, downstream selector, policy, upstream selector, Nebula core, simulated ISP core) showed only `lo` and no modeled p2p interfaces/routes. | reason=the Containerlab backend or the NixOS CLAB deploy wrapper is still not realizing rendered links in the nested runtime, so current CLAB cannot prove the compiler/NFM traffic-path p2p contract even though `s-router-test` can.
+- state=runtime-checks | target=late CLAB route/DNS validation loopback-only fabric | evidence=2026-05-14 after the DNS/Nebula hotfix session, `s-router-clab` host was reachable and `test-s-router-clab-current-example-postcheck.sh` passed, but direct nested checks showed selected `clab-fabric-*` routers (`b-router-access-hostile`, downstream selector, policy, upstream selector, branch Nebula core, site-C Nebula core, site-C upstream selector, and site-C policy) had only `lo`, no dataplane interfaces, empty IPv4/IPv6 route tables, and default policy rules. `b-router-access-hostile` returned `Network unreachable` for both public IPv4 and IPv6 route gets. | reason=The backend or deploy verifier must not treat running containers or command execution as a valid fabric. Tests should hard-fail loopback-only routers before accepting DNS, route, or public-egress validation.
+- state=runtime-checks | target=current CLAB traffic-path p2p realization | evidence=2026-05-14 full-loop boot has `s-router-clab-container` running and `docker ps` reports 26 `clab-fabric-*` routers up, but direct checks inside branch routers (`b-router-access-hostile`, downstream selector, policy, upstream selector, Nebula core, simulated ISP core) showed only `lo` and no modeled p2p interfaces/routes. | reason=the Containerlab backend or the NixOS CLAB deploy wrapper is still not realizing rendered links in the nested runtime, so current CLAB cannot prove the compiler/NFM traffic-path p2p contract even though `s-router-test` can.
 - state=solved | target=current CLAB traffic-path p2p realization after manual redeploy | evidence=2026-05-14 running the generated live deploy commands manually inside `s-router-clab-container` (`setup-bridge-links.sh`, `containerlab destroy --topo fabric.no-overlay.clab.yml --cleanup`, `containerlab deploy --topo fabric.no-overlay.clab.yml`) recreated the current rendered fabric and branch samples showed hostile/access/downstream/policy/upstream p2p links with the expected `10.50.0.0/31` lane addresses. | reason=the renderer output can realize the traffic-path p2p contract when redeployed; remaining stale-deploy and service-sequencing validation belongs to the lab/deploy wrapper.
 - state=solved | target=deploy verifier false positive | evidence=2026-05-14 `bash tests/test-s-router-test-containerlab-gate.sh` passed in `network-codex-agent`; the generated NixOS CLAB verifier now requires `clab-fabric-*` containers and fails any sampled fabric container with fewer than one non-loopback interface. | reason=the deploy verifier now detects stale or loopback-only fabric nodes instead of accepting running containers as enough.
-- state=still-broken | target=current s-router-clab live lab | evidence=2026-05-13 s-router-clab host was reachable and IPv4 default via vlan2 worked, host IPv6 route lookup for 2606:4700:4700::1111 failed with network unreachable, and host-level `docker ps -a` / `containerlab inspect --all` did not show a fabric; the nested `s-router-clab-container` still had 26 `clab-fabric-*` containers running from an older deploy | reason=current CLAB box has a stale nested fabric, but the current host render/deploy path is not green.
-- state=still-broken | target=fast current s-router-clab refresh | evidence=2026-05-13 fast matrix `/tmp/s-router-fast-enum-20260513T212251Z/summary/fast.tsv` captured 28 CLAB rows: the host and nested container public IPv4 classify as home-WAN management egress, while every `clab-fabric-*` container has no public IPv4 route and DNS returns network unreachable. | reason=CLAB is currently not a valid data-plane validation surface; the renderer deploy path must first stop crashing and recreate a usable fabric.
-- state=still-broken | target=nested s-router-clab fabric egress | evidence=2026-05-13 all 26 nested `clab-fabric-*` containers returned zero global IPv4 addresses, zero global IPv6 addresses, and `RTNETLINK answers: Network unreachable` for route lookup to 1.1.1.1 and 2606:4700:4700::1111; compact evidence is in `/tmp/s-router-clab-docker-compact.tsv` on the operator box. | reason=even the currently running nested fabric is not a usable public-egress or route-policy validation target.
+- state=runtime-checks | target=current s-router-clab live lab | evidence=2026-05-13 s-router-clab host was reachable and IPv4 default via vlan2 worked, host IPv6 route lookup for 2606:4700:4700::1111 failed with network unreachable, and host-level `docker ps -a` / `containerlab inspect --all` did not show a fabric; the nested `s-router-clab-container` still had 26 `clab-fabric-*` containers running from an older deploy | reason=current CLAB box has a stale nested fabric, but the current host render/deploy path is not green.
+- state=runtime-checks | target=fast current s-router-clab refresh | evidence=2026-05-13 fast matrix `/tmp/s-router-fast-enum-20260513T212251Z/summary/fast.tsv` captured 28 CLAB rows: the host and nested container public IPv4 classify as home-WAN management egress, while every `clab-fabric-*` container has no public IPv4 route and DNS returns network unreachable. | reason=CLAB is currently not a valid data-plane validation surface; the renderer deploy path must first stop crashing and recreate a usable fabric.
+- state=runtime-checks | target=nested s-router-clab fabric egress | evidence=2026-05-13 all 26 nested `clab-fabric-*` containers returned zero global IPv4 addresses, zero global IPv6 addresses, and `RTNETLINK answers: Network unreachable` for route lookup to 1.1.1.1 and 2606:4700:4700::1111; compact evidence is in `/tmp/s-router-clab-docker-compact.tsv` on the operator box. | reason=even the currently running nested fabric is not a usable public-egress or route-policy validation target.
 - state=solved | target=s-router-clab-render-live.service | evidence=2026-05-13 local focused regression `NETWORK_REPO_DIRECT_TEST_OK=1 bash tests/test-provenance-without-git.sh` passed after `_git_dirty` was changed to treat missing `git` as dirty provenance instead of crashing. | reason=renderer helper metadata collection no longer assumes `git` exists at runtime from the Nix store generated path.
 - state=solved | target=s-router-clab-render-live missing `git` failure | evidence=2026-05-13 local focused regression `NETWORK_REPO_DIRECT_TEST_OK=1 bash tests/test-provenance-without-git.sh` passed after `_git_dirty` was changed to treat missing `git` as dirty provenance instead of crashing. | reason=The fix has not yet been pushed, locked downstream, or consumed by a live `s-router-clab` deploy.
-- state=still-broken | target=CLAB host leak posture | evidence=2026-05-13 compact probe classified `s-router-clab` host public IPv4 as `HOME_LEAK`, host IPv6 public route as unreachable, DNS resolvers on vlan2 included the LAN resolver plus public resolvers, and host nft forward hooks had policy accept with NAT masquerade toward vlan2. | reason=Host realization currently exposes the operator/home WAN path; this may be expected for host management but must not be mistaken for validated CLAB fabric egress and must not leak concrete home IPv4 into source.
+- state=runtime-checks | target=CLAB host leak posture | evidence=2026-05-13 compact probe classified `s-router-clab` host public IPv4 as `HOME_LEAK`, host IPv6 public route as unreachable, DNS resolvers on vlan2 included the LAN resolver plus public resolvers, and host nft forward hooks had policy accept with NAT masquerade toward vlan2. | reason=Host realization currently exposes the operator/home WAN path; this may be expected for host management but must not be mistaken for validated CLAB fabric egress and must not leak concrete home IPv4 into source.
 
 ## previous live validation
 
@@ -111,16 +111,16 @@ Current verified state as of 2026-05-13.
 
 ## still required
 
-- state=pending | Keep adding tests similar to `network-renderer-nixos` for any `s-router-test`
+- state=runtime-checks | Keep adding tests similar to `network-renderer-nixos` for any `s-router-test`
   contract that is not yet asserted here. These are required regression tests,
   not optional cleanup.
-- state=pending | The current copied set covers hostile DNS/east-west routes, DNS policy route
+- state=runtime-checks | The current copied set covers hostile DNS/east-west routes, DNS policy route
   rendering, hostile delegated-GUA absence in Containerlab output, and overlay
   parity nodes/routes. Remaining NixOS renderer contracts still need matching
   Containerlab assertions where they apply.
 
 ## next concrete target
 
-- state=next-debugging-target | Continue copying applicable `network-renderer-nixos` service/firewall tests
+- state=runtime-checks | Continue copying applicable `network-renderer-nixos` service/firewall tests
   into this backend, especially around DNS access-control and direct DNS egress
   denial where those contracts apply to Containerlab.
