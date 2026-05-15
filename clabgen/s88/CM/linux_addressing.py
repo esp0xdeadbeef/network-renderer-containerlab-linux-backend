@@ -32,18 +32,16 @@ def _first_usable_host(addr: str) -> str:
     iface = ipaddress.ip_interface(addr)
     net = iface.network
 
-    if isinstance(net, ipaddress.IPv4Network):
-        if net.prefixlen >= 31:
-            return str(iface)
-        for host_address in net.hosts():
-            return f"{host_address}/{net.prefixlen}"
+    if isinstance(net, ipaddress.IPv4Network) and net.prefixlen >= 31:
         return str(iface)
 
-    if net.prefixlen >= 127:
+    if isinstance(net, ipaddress.IPv6Network) and net.prefixlen >= 127:
         return str(iface)
 
-    for host_address in net.hosts():
-        return f"{host_address}/{net.prefixlen}"
+    first = net.network_address + 1
+    if first in net:
+        return f"{first}/{net.prefixlen}"
+
     return str(iface)
 
 
@@ -93,20 +91,30 @@ def _peer_in_subnet(cidr: str | None) -> str | None:
         return None
 
     iface = ipaddress.ip_interface(cidr)
+    net = iface.network
     current = iface.ip
 
-    if isinstance(iface.network, ipaddress.IPv4Network):
-        candidates = list(iface.network.hosts())
-        if not candidates and iface.network.prefixlen == 31:
-            candidates = list(iface.network)
-    else:
-        candidates = list(iface.network.hosts())
-        if not candidates and iface.network.prefixlen == 127:
-            candidates = list(iface.network)
+    if net.num_addresses <= 1:
+        return None
 
-    for cand in candidates:
-        if cand != current:
-            return str(cand)
+    if isinstance(net, ipaddress.IPv4Network) and net.prefixlen < 31:
+        candidate = net.network_address + 1
+        if candidate == current:
+            candidate += 1
+        if candidate < net.broadcast_address:
+            return str(candidate)
+        return None
+
+    if isinstance(net, ipaddress.IPv6Network) and net.prefixlen < 127:
+        candidate = net.network_address + 1
+        if candidate == current:
+            candidate += 1
+    else:
+        candidate = net.network_address
+        if candidate == current:
+            candidate += 1
+    if candidate in net:
+        return str(candidate)
 
     return None
 
