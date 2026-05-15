@@ -83,5 +83,7 @@ def render_linux_node(
         "kind": "linux",
         "image": "clab-frr-plus-tooling:latest",
         "network-mode": "none",
+        "restart-policy": "no",
+        "cmd": "/bin/sh -c 'sleep infinity'",
         "exec": exec_cmds,
     }

@@ -30,6 +30,7 @@ fi
 "${repo_root}/tests/test-policy-firewall.sh"
 "${repo_root}/tests/test-core-nat-wan.sh"
 "${repo_root}/tests/test-management-eth0-egress-guard.sh"
+"${repo_root}/tests/test-deployment-host-filter.sh"
 "${repo_root}/tests/test-hostile-dns-east-west.sh"
 "${repo_root}/tests/test-dns-service-policy-routes.sh"
 "${repo_root}/tests/test-dns-service-source-binding.sh"
