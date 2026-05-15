@@ -9,8 +9,8 @@ grep -q 'containerlab destroy --all --cleanup --yes' "${run_in_vm}" || {
   exit 1
 }
 
-grep -q "grep '^clab-fabric-'" "${run_in_vm}" || {
-  echo "run-in-vm.sh must remove stale clab-fabric containers before each VM example deploy" >&2
+grep -q "docker ps -aq --filter 'name=^clab-fabric-'" "${run_in_vm}" || {
+  echo "run-in-vm.sh must remove stale running and stopped clab-fabric containers before each VM example deploy" >&2
   exit 1
 }
 

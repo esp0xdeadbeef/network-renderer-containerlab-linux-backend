@@ -1,0 +1,3 @@
+# Regression state
+
+- state=solved | target=vm-example-stale-fabric-container-cleanup | evidence=2026-05-15 full-lab VM worker 5 failed during the second example in the same worker with repeated `the 'fabric' lab has already been deployed`; `run-in-vm.sh` now removes all matching `clab-fabric-*` containers with `docker ps -aq --filter 'name=^clab-fabric-' | xargs -r docker rm -f` after Containerlab metadata cleanup, and `tests/test-vm-example-lab-cleanup.sh` gates that exact fallback. | reason=The renderer VM example harness reuses a lab name across examples, so helper cleanup must remove stopped as well as running stale fabric containers before deploying the next explicit rendered topology.
