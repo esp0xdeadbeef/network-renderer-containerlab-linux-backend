@@ -12,6 +12,7 @@ fi
 "${repo_root}/tests/test-python-file-loc.sh"
 "${repo_root}/tests/test-s88-python-file-loc.sh"
 "${repo_root}/tests/test-python-format.sh"
+"${repo_root}/tests/test-large-ipv6-prefix-addressing.sh"
 "${repo_root}/tests/test-s88-naming-and-hierarchy.sh"
 "${repo_root}/tests/test-s88-python-readability.sh"
 "${repo_root}/tests/test-rendered-artifact-validator-scratch-dir.sh"
