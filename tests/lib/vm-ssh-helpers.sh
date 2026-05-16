@@ -33,7 +33,7 @@ ssh_vm_once() {
 }
 
 wait_for_ssh() {
-  local deadline=$((SECONDS + 180))
+  local deadline=$((SECONDS + ${VM_SSH_WAIT_SECONDS:-600}))
 
   while (( SECONDS < deadline )); do
     if ssh_vm_ready; then
