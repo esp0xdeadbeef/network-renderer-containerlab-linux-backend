@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from clabgen.s88.CM.linux_route_state import _connected_prefixes, _local_ips
 from clabgen.s88.CM.linux_route_via import (
@@ -19,6 +19,8 @@ from clabgen.s88.CM.linux_route_values import (
 def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
     cmds: List[str] = []
     seen: set[str] = set()
+    routes4: Dict[str, List[Tuple[str, int]]] = {}
+    routes6: Dict[str, List[Tuple[str, int]]] = {}
     connected4, connected6 = _connected_prefixes(node)
     local4, local6 = _local_ips(node)
 
@@ -53,10 +55,7 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
                         seen.add(via_cmd)
                         cmds.append(via_cmd)
 
-            cmd = f"ip route replace {dst} via {via} dev eth{eth} onlink"
-            if cmd not in seen:
-                seen.add(cmd)
-                cmds.append(cmd)
+            _add_route(routes4, dst, via, eth)
 
         for route in routes["ipv6"]:
             dst = _dst(route)
@@ -81,17 +80,18 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
                         seen.add(via_cmd)
                         cmds.append(via_cmd)
 
-            cmd = f"ip -6 route replace {dst} via {via} dev eth{eth} onlink"
-            if cmd not in seen:
-                seen.add(cmd)
-                cmds.append(cmd)
+            _add_route(routes6, dst, via, eth)
 
+    _append_route_groups(cmds, seen, "ip", routes4)
+    _append_route_groups(cmds, seen, "ip -6", routes6)
     return cmds
 
 
 def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
     cmds: List[str] = []
     seen: set[str] = set()
+    defaults4: Dict[str, List[Tuple[str, int]]] = {}
+    defaults6: Dict[str, List[Tuple[str, int]]] = {}
     local4, local6 = _local_ips(node)
 
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
@@ -110,10 +110,7 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> Lis
 
             via = _effective_via4(node, iface, route)
             if via:
-                cmd = f"ip route replace default via {via} dev eth{eth} onlink"
-                if cmd not in seen:
-                    seen.add(cmd)
-                    cmds.append(cmd)
+                _add_route(defaults4, "default", via, eth)
 
         for route in routes["ipv6"]:
             if _dst(route) != "::/0":
@@ -123,12 +120,44 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> Lis
 
             via = _effective_via6(node, iface, route)
             if via:
-                cmd = f"ip -6 route replace default via {via} dev eth{eth} onlink"
-                if cmd not in seen:
-                    seen.add(cmd)
-                    cmds.append(cmd)
+                _add_route(defaults6, "default", via, eth)
 
+    _append_route_groups(cmds, seen, "ip", defaults4)
+    _append_route_groups(cmds, seen, "ip -6", defaults6)
     return cmds
+
+
+def _add_route(
+    groups: Dict[str, List[Tuple[str, int]]],
+    dst: str,
+    via: str,
+    eth: int,
+) -> None:
+    nexthops = groups.setdefault(dst, [])
+    hop = (via, eth)
+    if hop not in nexthops:
+        nexthops.append(hop)
+
+
+def _append_route_groups(
+    cmds: List[str],
+    seen: set[str],
+    ip_cmd: str,
+    groups: Dict[str, List[Tuple[str, int]]],
+) -> None:
+    for dst in sorted(groups.keys()):
+        nexthops = groups[dst]
+        if len(nexthops) == 1:
+            via, eth = nexthops[0]
+            cmd = f"{ip_cmd} route replace {dst} via {via} dev eth{eth} onlink"
+        else:
+            parts = [f"{ip_cmd} route replace {dst}"]
+            for via, eth in sorted(nexthops, key=lambda item: (item[1], item[0])):
+                parts.append(f"nexthop via {via} dev eth{eth} onlink")
+            cmd = " ".join(parts)
+        if cmd not in seen:
+            seen.add(cmd)
+            cmds.append(cmd)
 
 
 def _render_uplink_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:

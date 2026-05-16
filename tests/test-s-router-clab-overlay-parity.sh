@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${repo_root}/tests/lib/render-clab-example.sh"
+source "${repo_root}/tests/lib/clab-yaml.sh"
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
@@ -14,20 +15,17 @@ assert_topology_contains "${topology}" "esp0xdeadbeef-site-a-s-router-core-nebul
 assert_topology_contains "${topology}" "espbranch-site-b-b-router-core-nebula:"
 assert_topology_contains "${topology}" "esp0xdeadbeef-site-c-c-router-nebula-core:"
 
-assert_node_contains \
+assert_node_exec \
+  matches \
   "${topology}" \
   "espbranch-site-b-b-router-policy" \
-  "ip route replace 10.10.0.0/32 via 10.50.0.13 dev eth3 onlink"
+  "ip route replace 10\\.10\\.0\\.0/32 nexthop via 10\\.50\\.0\\.13 dev eth3 onlink\\s+nexthop\\s+via 10\\.50\\.0\\.17 dev eth5 onlink"
 
-assert_node_contains \
-  "${topology}" \
-  "espbranch-site-b-b-router-policy" \
-  "ip route replace 10.10.0.0/32 via 10.50.0.17 dev eth5 onlink"
-
-assert_node_matches \
+assert_node_exec \
+  matches \
   "${topology}" \
   "esp0xdeadbeef-site-c-c-router-policy" \
-  "ip route replace 10\\.50\\.0\\.0/32 via 10\\.80\\.0\\.[0-9]+ dev eth[0-9]+ onlink"
+  "ip route replace 10\\.50\\.0\\.0/32[\\s\\S]*via 10\\.80\\.0\\.[0-9]+ dev eth[0-9]+ onlink"
 
 assert_node_matches \
   "${topology}" \
