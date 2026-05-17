@@ -26,7 +26,7 @@ labs_path="$(resolve_input_path network-labs)"
 mapfile -t examples < <(
   find "${labs_path}/examples" -mindepth 2 -maxdepth 2 -type f -name 'inventory-clab.nix' -printf '%h\n' \
     | while read -r dir; do
-        if [[ -f "${dir}/intent.nix" ]]; then
+        if [[ -f "${dir}/intent.nix" ]] && grep -Eq 'mode[[:space:]]*=[[:space:]]*"nat"' "${dir}/inventory-clab.nix"; then
           basename "${dir}"
         fi
       done \
