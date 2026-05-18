@@ -145,6 +145,10 @@ def _append_route_groups(
     ip_cmd: str,
     groups: Dict[str, List[Tuple[str, int]]],
 ) -> None:
+    def sort_nexthop(item: Tuple[str, int]) -> Tuple[int, str]:
+        via, eth = item
+        return eth, via
+
     for dst in sorted(groups.keys()):
         nexthops = groups[dst]
         if len(nexthops) == 1:
@@ -152,7 +156,7 @@ def _append_route_groups(
             cmd = f"{ip_cmd} route replace {dst} via {via} dev eth{eth} onlink"
         else:
             parts = [f"{ip_cmd} route replace {dst}"]
-            for via, eth in sorted(nexthops, key=lambda item: (item[1], item[0])):
+            for via, eth in sorted(nexthops, key=sort_nexthop):
                 parts.append(f"nexthop via {via} dev eth{eth} onlink")
             cmd = " ".join(parts)
         if cmd not in seen:
