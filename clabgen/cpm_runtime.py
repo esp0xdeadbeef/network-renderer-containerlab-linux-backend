@@ -96,6 +96,7 @@ def _interface_output(
         "upstream": iface.get("upstream") or iface.get("uplink"),
         "tenant": iface.get("tenant"),
         "overlay": _interface_overlay(kind, backing_ref, iface),
+        "lane": _dict_value(backing_ref.get("lane") or iface.get("lane")),
         "attachBridge": attach_bridge,
         "hostUplink": host_uplink,
     }

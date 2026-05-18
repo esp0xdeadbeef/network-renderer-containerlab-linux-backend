@@ -34,6 +34,7 @@ class InterfaceModel:
     overlay: Optional[str] = None
     attach_bridge: Optional[str] = None
     host_uplink: Dict[str, Any] = field(default_factory=dict)
+    lane: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

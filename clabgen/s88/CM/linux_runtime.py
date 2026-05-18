@@ -10,6 +10,7 @@ from clabgen.s88.CM.linux_routes import (
     _render_default_routes,
     _render_static_routes,
 )
+from clabgen.s88.CM.linux_policy_routes import render as render_policy_routes
 from clabgen.s88.CM.linux_uplink_routes import _render_uplink_routes
 from clabgen.s88.CM.linux_shell import _sh
 from clabgen.s88.CM.linux_wan_dynamic import render as render_dynamic_wan
@@ -38,11 +39,13 @@ def render(
     if routing_mode == "bgp" and _is_bgp_router(role):
         cmds.extend(_render_static_routes(node_data, eth_map))
         cmds.extend(_render_default_routes(node_data, eth_map))
+        cmds.extend(render_policy_routes(node_data, eth_map))
         cmds.extend(_render_uplink_routes(node_data, eth_map))
         cmds.extend(_render_bgp(node_name, node_data, role))
     elif role != "wan-peer":
         cmds.extend(_render_static_routes(node_data, eth_map))
         cmds.extend(_render_default_routes(node_data, eth_map))
+        cmds.extend(render_policy_routes(node_data, eth_map))
 
     cmds.extend(render_cm(role, node_data.get("_cm_inputs", {})))
     cmds.extend(render_dns_service(node_data))
