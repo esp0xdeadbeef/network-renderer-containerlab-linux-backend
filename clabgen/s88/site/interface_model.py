@@ -111,6 +111,7 @@ def build_interfaces(
             upstream=fb["upstream"],
             tenant=_infer_interface_tenant(link_key, fb, tenant_prefix_owners),
             overlay=fb["overlay"] if isinstance(fb["overlay"], str) else None,
+            lane=dict(iface.get("lane", {}) or {}),
             attach_bridge=iface.get("attachBridge")
             if isinstance(iface.get("attachBridge"), str)
             else None,

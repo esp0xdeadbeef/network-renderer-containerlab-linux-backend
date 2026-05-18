@@ -33,6 +33,8 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
         routes = _route_lists(iface)
 
         for route in routes["ipv4"]:
+            if route.get("policyOnly") is True:
+                continue
             dst = _dst(route)
             via = _effective_via4(node, iface, route)
 
@@ -58,6 +60,8 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
             _add_route(routes4, dst, via, eth)
 
         for route in routes["ipv6"]:
+            if route.get("policyOnly") is True:
+                continue
             dst = _dst(route)
             via = _effective_via6(node, iface, route)
 
@@ -103,6 +107,8 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> Lis
         routes = _route_lists(iface)
 
         for route in routes["ipv4"]:
+            if route.get("policyOnly") is True:
+                continue
             if _dst(route) != "0.0.0.0/0":
                 continue
             if _route_via_is_local(route, 4, local4, local6):
@@ -113,6 +119,8 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> Lis
                 _add_route(defaults4, "default", via, eth)
 
         for route in routes["ipv6"]:
+            if route.get("policyOnly") is True:
+                continue
             if _dst(route) != "::/0":
                 continue
             if _route_via_is_local(route, 6, local4, local6):

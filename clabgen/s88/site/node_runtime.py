@@ -51,6 +51,7 @@ def build_node_data(
             "tenant": iface.tenant,
             "overlay": iface.overlay,
             "upstream": iface.upstream,
+            "lane": copy.deepcopy(iface.lane),
             "routes": iface.routes,
         }
     node_data["interfaces"] = interfaces
