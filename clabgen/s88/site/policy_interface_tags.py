@@ -4,7 +4,10 @@ from typing import Any, Dict
 import json
 
 from clabgen.models import SiteModel
-from clabgen.s88.site.access_tenants import domains_external_names, policy_external_names
+from clabgen.s88.site.access_tenants import (
+    domains_external_names,
+    policy_external_names,
+)
 from clabgen.s88.site.interface_tags import (
     add_interface_tag,
     interface_tag_values,

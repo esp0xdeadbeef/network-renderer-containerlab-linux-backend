@@ -70,7 +70,11 @@ def _logical_nodes_for_host(
         enterprise = logical.get("enterprise")
         site = logical.get("site")
         name = logical.get("name")
-        if isinstance(enterprise, str) and isinstance(site, str) and isinstance(name, str):
+        if (
+            isinstance(enterprise, str)
+            and isinstance(site, str)
+            and isinstance(name, str)
+        ):
             allowed.add((enterprise, site, name))
     return allowed
 
