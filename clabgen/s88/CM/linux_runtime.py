@@ -9,8 +9,8 @@ from clabgen.s88.CM.linux_interfaces import _render_addressing, _render_interfac
 from clabgen.s88.CM.linux_routes import (
     _render_default_routes,
     _render_static_routes,
-    _render_uplink_routes,
 )
+from clabgen.s88.CM.linux_uplink_routes import _render_uplink_routes
 from clabgen.s88.CM.linux_shell import _sh
 from clabgen.s88.CM.linux_wan_dynamic import render as render_dynamic_wan
 

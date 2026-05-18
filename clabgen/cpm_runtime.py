@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from clabgen.cpm_runtime_wan import wan_link
+
 
 def _dict_value(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
@@ -147,30 +149,6 @@ def _loopback(runtime_target: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _wan_link(
-    node_name: str,
-    if_key: str,
-    iface: Dict[str, Any],
-    link_bridges: Dict[str, str],
-    link_host_uplinks: Dict[str, Dict[str, Any]],
-) -> Dict[str, Any]:
-    return {
-        "kind": "wan",
-        "bridge": iface.get("attachBridge") or link_bridges.get(if_key),
-        "hostUplink": iface.get("hostUplink") or link_host_uplinks.get(if_key, {}),
-        "endpoints": {
-            node_name: {
-                "node": node_name,
-                "interface": if_key,
-                "upstream": iface.get("upstream"),
-                "uplink": iface.get("upstream"),
-                "peerAddr4": None,
-                "peerAddr6": None,
-            }
-        },
-    }
-
-
 def add_runtime_target(
     rt_name: str,
     runtime_target: Dict[str, Any],
@@ -202,6 +180,6 @@ def add_runtime_target(
         if iface.get("kind") != "wan":
             continue
         link_name = f"wan-{node_name}-{if_key}"
-        links[link_name] = _wan_link(
+        links[link_name] = wan_link(
             node_name, if_key, iface, link_bridges, link_host_uplinks
         )
