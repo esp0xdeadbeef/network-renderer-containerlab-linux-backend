@@ -105,4 +105,8 @@ def policy_external_names(site: SiteModel) -> Set[str]:
     externals = endpoint_bindings.get("externals")
     if not isinstance(externals, dict):
         return set()
-    return {name for name in externals.keys() if isinstance(name, str) and name}
+    names: Set[str] = set()
+    for name in externals.keys():
+        if isinstance(name, str) and name:
+            names.add(name)
+    return names
