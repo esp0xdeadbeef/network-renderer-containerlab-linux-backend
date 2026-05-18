@@ -67,8 +67,12 @@ def add_transit_links(
             "bridge": link_bridges.get(link_name),
             "hostUplink": link_host_uplinks.get(link_name, {}),
             "endpoints": _adjacency_endpoints(adjacency),
-            "lane": _dict_value(adjacency.get("lane")) or _dict_value(metadata.get("lane")),
-            "laneMeta": _dict_value(adjacency.get("laneMeta")) or _dict_value(metadata.get("laneMeta")),
-            "uplinks": _string_list(adjacency.get("uplinks")) or _string_list(metadata.get("uplinks")),
-            "overlay": _string_value(adjacency.get("overlay")) or _string_value(metadata.get("overlay")),
+            "lane": _dict_value(adjacency.get("lane"))
+            or _dict_value(metadata.get("lane")),
+            "laneMeta": _dict_value(adjacency.get("laneMeta"))
+            or _dict_value(metadata.get("laneMeta")),
+            "uplinks": _string_list(adjacency.get("uplinks"))
+            or _string_list(metadata.get("uplinks")),
+            "overlay": _string_value(adjacency.get("overlay"))
+            or _string_value(metadata.get("overlay")),
         }

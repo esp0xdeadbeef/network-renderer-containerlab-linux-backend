@@ -28,7 +28,9 @@ def _list_strings(value: Any) -> list[str]:
     return [item for item in value if isinstance(item, str) and item]
 
 
-def _link_metadata(backing_ref: Dict[str, Any], iface: Dict[str, Any]) -> Dict[str, Any]:
+def _link_metadata(
+    backing_ref: Dict[str, Any], iface: Dict[str, Any]
+) -> Dict[str, Any]:
     lane = _dict_value(backing_ref.get("lane") or iface.get("lane"))
     lane_meta = _dict_value(backing_ref.get("laneMeta") or iface.get("laneMeta"))
     uplinks = _list_strings(backing_ref.get("uplinks")) or _list_strings(
