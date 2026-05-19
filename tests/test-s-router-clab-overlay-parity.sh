@@ -19,13 +19,13 @@ assert_node_exec \
   matches \
   "${topology}" \
   "espbranch-site-b-b-router-policy" \
-  "ip route replace 10\\.10\\.0\\.0/32 nexthop via 10\\.50\\.0\\.13 dev eth3 onlink\\s+nexthop\\s+via 10\\.50\\.0\\.17 dev eth5 onlink"
+  "ip route replace 10\\.20\\.10\\.0/24 nexthop via 10\\.50\\.0\\.13 dev eth3 onlink\\s+nexthop\\s+via 10\\.50\\.0\\.17 dev eth5 onlink"
 
 assert_node_exec \
   matches \
   "${topology}" \
   "esp0xdeadbeef-site-c-c-router-policy" \
-  "ip route replace 10\\.50\\.0\\.0/32[\\s\\S]*via 10\\.80\\.0\\.[0-9]+ dev eth[0-9]+ onlink"
+  "ip route replace 10\\.20\\.10\\.0/24 nexthop via 10\\.80\\.0\\.13 dev eth3 onlink\\s+nexthop\\s+via 10\\.80\\.0\\.17 dev eth5 onlink"
 
 assert_node_matches \
   "${topology}" \
