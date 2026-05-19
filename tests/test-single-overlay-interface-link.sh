@@ -11,7 +11,7 @@ render_clab_example "single-wan-with-nebula" "${tmp_dir}"
 
 topology="${tmp_dir}/fabric.clab.yml"
 
-if ! grep -Fq "ip addr replace 100.64.200.1/32 dev eth3" "${topology}"; then
+if ! grep -Fq "ip addr replace 100.96.10.1/32 dev eth3" "${topology}"; then
   echo "FAIL single overlay interface link: expected overlay runtime on eth3" >&2
   exit 1
 fi
