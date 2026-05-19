@@ -13,12 +13,12 @@ topology="${tmp_dir}/fabric.clab.yml"
 assert_node_contains \
   "${topology}" \
   "espbranch-site-b-b-router-policy" \
-  "ip route replace 10.20.10.0/24 via 10.50.0.13 dev eth3 onlink"
+  "ip route replace 10.20.10.0/24 nexthop via 10.50.0.13 dev eth3 onlink nexthop"
 
 assert_node_contains \
   "${topology}" \
   "espbranch-site-b-b-router-policy" \
-  "ip route replace 10.20.10.0/24 via 10.50.0.17 dev eth5 onlink"
+  "via 10.50.0.17 dev eth5 onlink"
 
 assert_node_matches \
   "${topology}" \
