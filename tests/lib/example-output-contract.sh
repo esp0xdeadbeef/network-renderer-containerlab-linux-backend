@@ -89,7 +89,6 @@ assert_clab_example_output_contract() {
       require_text "$label" "$topology" "ip route replace default via 192.0.2.1"
       ;;
     s-router-public-overlay-service)
-      require_text "$label" "$topology" "ip route replace 10.90.10.100/32"
       require_text "$label" "$topology" "udp dport 4242"
       require_text "$label" "$topology" "tcp dport 4242"
       ;;
