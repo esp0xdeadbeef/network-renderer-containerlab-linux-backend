@@ -49,7 +49,8 @@ for path in sorted(s88_root.rglob("*.py")):
         if isinstance(node, ast.comprehension):
             for name in target_names(node.target):
                 if len(name) == 1 and name != "_":
-                    errors.append(f"{rel}:{node.lineno}: comprehension variable {name!r} is too terse")
+                    line = getattr(node, "lineno", getattr(node.target, "lineno", 0))
+                    errors.append(f"{rel}:{line}: comprehension variable {name!r} is too terse")
 
         if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
             targets = [node.target] if hasattr(node, "target") else list(getattr(node, "targets", []))

@@ -29,6 +29,7 @@ fi
 "${repo_root}/tests/test-routing-mode-required.sh"
 "${repo_root}/tests/test-policy-firewall.sh"
 "${repo_root}/tests/test-core-nat-wan.sh"
+"${repo_root}/tests/test-tri-site-core-egress-nat.sh"
 "${repo_root}/tests/test-management-eth0-egress-guard.sh"
 "${repo_root}/tests/test-deployment-host-filter.sh"
 "${repo_root}/tests/test-hostile-dns-east-west.sh"

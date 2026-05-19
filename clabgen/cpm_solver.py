@@ -68,6 +68,21 @@ def cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
             link_metadata,
         )
 
+    forwarding_semantics = site.get("forwardingSemantics")
+    if isinstance(forwarding_semantics, dict):
+        semantic_nodes = forwarding_semantics.get("nodes")
+        if isinstance(semantic_nodes, dict):
+            for node_name, node_data in nodes.items():
+                semantic_node = semantic_nodes.get(node_name)
+                if not isinstance(semantic_node, dict):
+                    continue
+                egress_intent = semantic_node.get("egressIntent")
+                if isinstance(egress_intent, dict):
+                    node_data["egressIntent"] = dict(egress_intent)
+                nat_intent = semantic_node.get("natIntent")
+                if isinstance(nat_intent, dict):
+                    node_data["natIntent"] = dict(nat_intent)
+
     add_transit_links(site, links, link_bridges, link_host_uplinks, link_metadata)
 
     out = dict(site)
