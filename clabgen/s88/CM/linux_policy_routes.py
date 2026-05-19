@@ -136,12 +136,12 @@ def render(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
         if routes4 != {}:
             _render_policy_table(cmds, "ip", table_id, routes4)
             cmds.append(
-                f"ip rule add iif eth{eth} priority {priority} table {table_id} 2>/dev/null || true"
+                f"sh -c 'ip rule add iif eth{eth} priority {priority} table {table_id} 2>/dev/null || true'"
             )
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
             cmds.append(
-                f"ip -6 rule add iif eth{eth} priority {priority} table {table_id} 2>/dev/null || true"
+                f"sh -c 'ip -6 rule add iif eth{eth} priority {priority} table {table_id} 2>/dev/null || true'"
             )
 
     return cmds
