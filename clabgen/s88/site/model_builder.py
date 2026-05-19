@@ -73,6 +73,8 @@ def build_nodes(
             ),
             loopback4=loopback4,
             loopback6=loopback6,
+            egress_intent=dict(node_obj.get("egressIntent", {}) or {}),
+            nat_intent=dict(node_obj.get("natIntent", {}) or {}),
         )
 
     return nodes

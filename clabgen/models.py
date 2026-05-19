@@ -55,6 +55,8 @@ class NodeModel:
     services: Dict[str, Any] = field(default_factory=dict)
     loopback4: Optional[str] = None
     loopback6: Optional[str] = None
+    egress_intent: Dict[str, Any] = field(default_factory=dict)
+    nat_intent: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

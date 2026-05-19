@@ -32,6 +32,8 @@ def build_node_data(
         "interfaces": {},
         "route_intents": list(node.route_intents),
         "services": copy.deepcopy(node.services),
+        "egressIntent": copy.deepcopy(node.egress_intent),
+        "natIntent": copy.deepcopy(node.nat_intent),
         "loopback": {
             "ipv4": node.loopback4,
             "ipv6": node.loopback6,

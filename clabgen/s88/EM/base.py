@@ -14,6 +14,58 @@ from .roles import (
 from .default import render as render_default
 
 
+def _core_egress_masquerade(
+    node_data: Dict[str, Any],
+    role_cfg: Dict[str, Any],
+    wan_if: str | None,
+) -> Dict[str, Any]:
+    wan_firewall_cfg = role_cfg.get("wan_firewall", {})
+    if not isinstance(wan_firewall_cfg, dict):
+        wan_firewall_cfg = {}
+
+    masquerade = wan_firewall_cfg.get("masquerade")
+    if isinstance(masquerade, dict) and masquerade:
+        return dict(masquerade)
+
+    nat_intent = node_data.get("natIntent", {})
+    if isinstance(nat_intent, dict) and nat_intent.get("enabled") is True:
+        if not isinstance(wan_if, str) or not wan_if:
+            return {}
+        families = nat_intent.get("families", {})
+        families = families if isinstance(families, dict) else {}
+        result: Dict[str, Any] = {
+            "ipv4": bool(families.get("ipv4", False)),
+            "ipv6": bool(families.get("ipv6", False)),
+            "oifnames": [wan_if],
+        }
+        source6 = nat_intent.get("masqueradeSourcePrefixes6")
+        if isinstance(source6, list) and source6:
+            source6_prefixes: List[str] = []
+            for source_prefix in source6:
+                if isinstance(source_prefix, str) and source_prefix:
+                    source6_prefixes.append(source_prefix)
+            result["saddr6"] = source6_prefixes
+        return result
+
+    egress_intent = node_data.get("egressIntent", {})
+    if not isinstance(egress_intent, dict):
+        return {}
+    if not bool(egress_intent.get("exit", False)):
+        return {}
+    if not isinstance(wan_if, str) or not wan_if:
+        return {}
+
+    wan_interfaces = egress_intent.get("wanInterfaces", [])
+    if not isinstance(wan_interfaces, list) or not wan_interfaces:
+        return {}
+
+    return {
+        "ipv4": True,
+        "ipv6": True,
+        "oifnames": [wan_if],
+    }
+
+
 def _parse(
     role: str,
     node_name: str,
@@ -88,13 +140,11 @@ def _default_cm_inputs(
     if role == "core":
         wan_link = (parsed.get("links") or {}).get("wan") or {}
         wan_eth = wan_link.get("eth")
-        wan_firewall_cfg = role_cfg.get("wan_firewall", {})
-        if not isinstance(wan_firewall_cfg, dict):
-            wan_firewall_cfg = {}
+        wan_if = f"eth{wan_eth}" if isinstance(wan_eth, int) else None
 
         cm_inputs["wan_firewall"] = {
-            "wan_interfaces": [f"eth{wan_eth}"] if isinstance(wan_eth, int) else [],
-            "masquerade": wan_firewall_cfg.get("masquerade", {}),
+            "wan_interfaces": [wan_if] if isinstance(wan_if, str) else [],
+            "masquerade": _core_egress_masquerade(node_data, role_cfg, wan_if),
         }
 
     if role == "policy":
