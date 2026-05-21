@@ -1,12 +1,14 @@
-{
-  lib,
-  bridgeNetworks,
+{ lib
+, bridgeNetworks
+,
 }:
 
 let
-  natUplinks = lib.filterAttrs (
-    _name: uplink: builtins.isAttrs uplink && (uplink.mode or "") == "nat"
-  ) bridgeNetworks;
+  natUplinks = lib.filterAttrs
+    (
+      _name: uplink: builtins.isAttrs uplink && (uplink.mode or "") == "nat"
+    )
+    bridgeNetworks;
 
   ipv4For = network: network.ipv4 or { };
 
