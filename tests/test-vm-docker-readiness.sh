@@ -13,6 +13,10 @@ grep -q 'docker info' "${script}"
 grep -q 'docker did not become ready' "${script}"
 grep -q 'frrouting/frr@sha256:' "${dockerfile}"
 grep -q 'frrouting/frr@sha256:' "${build_script}"
+grep -q 'command -v rg' "${dockerfile}"
+grep -q 'command -v nmap' "${dockerfile}"
+grep -q 'ripgrep' "${dockerfile}"
+grep -q 'nmap' "${dockerfile}"
 if grep -q 'frrouting/frr:latest' "${dockerfile}" "${build_script}"; then
   echo "FRR tooling base image must be pinned by digest, not latest" >&2
   exit 1

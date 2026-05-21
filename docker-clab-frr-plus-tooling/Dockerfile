@@ -8,6 +8,8 @@ RUN if command -v tcpdump >/dev/null 2>&1 \
         && command -v traceroute >/dev/null 2>&1 \
         && command -v curl >/dev/null 2>&1 \
         && command -v vim >/dev/null 2>&1 \
+        && command -v rg >/dev/null 2>&1 \
+        && command -v nmap >/dev/null 2>&1 \
         && command -v nft >/dev/null 2>&1 \
         && command -v less >/dev/null 2>&1; then \
         echo "FRR tooling packages already present"; \
@@ -20,6 +22,8 @@ RUN if command -v tcpdump >/dev/null 2>&1 \
             procps \
             curl \
             vim \
+            ripgrep \
+            nmap \
             nftables \
             less; \
     fi
