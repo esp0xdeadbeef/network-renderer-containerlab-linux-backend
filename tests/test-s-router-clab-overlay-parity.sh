@@ -62,4 +62,9 @@ assert_topology_contains "${topology}" "espbranch-site-b-b-router-core-nebula:et
 assert_topology_contains "${topology}" "clab.link.type: overlay"
 assert_topology_contains "${topology}" "clab.overlay: east-west"
 
+if grep -A4 -E 's-router-core-nebula:eth|b-router-core-nebula:eth' "${topology}" | grep -q 'clab.link.bridge: br-uplink'; then
+  echo "core-nebula overlay nodes must not attach directly to host WAN/uplink bridges" >&2
+  exit 1
+fi
+
 pass "s-router-clab-overlay-parity"
