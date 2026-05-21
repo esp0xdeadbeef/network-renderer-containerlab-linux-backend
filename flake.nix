@@ -10,10 +10,9 @@
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      ...
+    { self
+    , nixpkgs
+    , ...
     }:
     let
       systems = [
