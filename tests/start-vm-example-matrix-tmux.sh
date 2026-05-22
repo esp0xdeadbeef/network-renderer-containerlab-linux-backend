@@ -13,6 +13,7 @@ worker_cores="${CLAB_VM_MATRIX_CORES:-4}"
 matrix_root="${CLAB_VM_MATRIX_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/network-renderer-containerlab-linux-backend/clab-vm-matrix}"
 host_cache_dir="${CLAB_VM_HOST_CACHE_DIR:-${matrix_root}/host-cache}"
 status_dir="${CLAB_VM_MATRIX_STATUS_DIR:-${matrix_root}/status}"
+success_uuid="${CLAB_VM_MATRIX_SUCCESS_UUID:-$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid)}"
 
 cleanup_legacy_tmp_state() {
   find /tmp -maxdepth 1 -type d \
@@ -44,6 +45,7 @@ fi
 mkdir -p "${matrix_root}"
 rm -rf "${status_dir}"
 mkdir -p "${status_dir}"
+printf '%s\n' "${success_uuid}" >"${matrix_root}/success.uuid"
 cleanup_legacy_tmp_state
 
 # tmux has no true "infinite" history; use a very large limit for worker inspection.
@@ -74,6 +76,7 @@ for w in $(seq 0 $((workers - 1))); do
     printf 'state_dir=%q\n' "${state_dir}"
     printf 'log_file=%q\n' "${log_file}"
     printf 'status_file=%q\n' "${status_file}"
+    printf 'success_uuid=%q\n' "${success_uuid}"
     echo 'exec > >(tee -a "$log_file") 2>&1'
     echo 'cleanup() {'
     echo '  rm -rf "$state_dir" >/dev/null 2>&1 || true'
@@ -108,6 +111,7 @@ for w in $(seq 0 $((workers - 1))); do
     echo 'if [[ "$status" -ne 0 ]]; then'
     printf '  printf "worker %s failed; leaving pane open for inspection\\n"\n' "$w"
     echo 'else'
+    printf '  printf "CLAB_VM_MATRIX_WORKER_SUCCESS %q worker=%s\\n"\n' "${success_uuid}" "$w"
     printf '  printf "worker %s completed successfully; leaving pane open\\n"\n' "$w"
     echo 'fi'
     echo 'exec bash'
