@@ -90,9 +90,61 @@ run_one_example() {
   trap - RETURN
 }
 
+if [[ "${CLAB_FIXTURE_RUN_ONE:-0}" == "1" ]]; then
+  run_one_example "${CLAB_FIXTURE_DIR:?missing CLAB_FIXTURE_DIR}"
+  exit 0
+fi
+
 log "Scanning examples under: ${examples_root}"
+jobs="${TEST_JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1')}"
+if ! [[ "${jobs}" =~ ^[0-9]+$ ]] || ((jobs < 1)); then
+  jobs=1
+fi
+timeout_seconds="${TEST_TIMEOUT_SECONDS:-${NETWORK_REPO_TEST_TIMEOUT_SECONDS:-1800}}"
+tmp_logs="$(mktemp -d)"
+running=0
+status=0
+declare -A pid_to_name=()
+declare -A pid_to_log=()
+
+finish_one() {
+  local pid="$1"
+  local rc="$2"
+  local name="${pid_to_name[${pid}]}"
+  local log_file="${pid_to_log[${pid}]}"
+
+  if ((rc == 0)); then
+    cat "${log_file}"
+  else
+    cat "${log_file}" >&2
+    status=1
+  fi
+  unset "pid_to_name[${pid}]"
+  unset "pid_to_log[${pid}]"
+}
+
 while read -r dir; do
-  run_one_example "${dir}"
+  name="$(basename "${dir}")"
+  log_file="${tmp_logs}/${name}.log"
+  CLAB_FIXTURE_RUN_ONE=1 CLAB_FIXTURE_DIR="${dir}" timeout "${timeout_seconds}" bash "${BASH_SOURCE[0]}" >"${log_file}" 2>&1 &
+  pid_to_name[$!]="${name}"
+  pid_to_log[$!]="${log_file}"
+  running=$((running + 1))
+
+  if ((running >= jobs)); then
+    rc=0
+    wait -n -p finished_pid || rc=$?
+    finish_one "${finished_pid}" "${rc}"
+    running=$((running - 1))
+  fi
 done < <(find "${examples_root}" -mindepth 1 -maxdepth 1 -type d | sort)
 
-exit 0
+while ((running > 0)); do
+  rc=0
+  wait -n -p finished_pid || rc=$?
+  finish_one "${finished_pid}" "${rc}"
+  running=$((running - 1))
+done
+
+rm -rf "${tmp_logs}"
+exit "${status}"
