@@ -39,6 +39,7 @@ fi
 "${repo_root}/tests/test-host-uplink-vlan-dhcp.sh"
 "${repo_root}/tests/test-nat-uplink-runtime-addressing.sh"
 "${repo_root}/tests/test-linux-route-multipath.sh"
+"${repo_root}/tests/test-overlay-underlay-access-rendering.sh"
 "${repo_root}/tests/test-linux-policy-rule-shell-safety.sh"
 "${repo_root}/tests/test-vm-nat-uplink.sh"
 "${repo_root}/tests/test-vm-physical-overlay-post-checks.sh"
