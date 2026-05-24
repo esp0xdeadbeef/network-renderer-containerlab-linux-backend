@@ -21,6 +21,10 @@ def _lane_uplink(value: Dict[str, Any]) -> str | None:
     return uplink if isinstance(uplink, str) and uplink else None
 
 
+def _is_default(dst: str | None) -> bool:
+    return dst in {"0.0.0.0/0", "::/0"}
+
+
 def _route_matches_ingress(
     ingress_lane: Dict[str, Any], route_lane: Dict[str, Any]
 ) -> bool:
@@ -34,6 +38,31 @@ def _route_matches_ingress(
     return (
         ingress_uplink is None or route_uplink is None or ingress_uplink == route_uplink
     )
+
+
+def _same_uplink(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
+    left_uplink = _lane_uplink(left)
+    right_uplink = _lane_uplink(right)
+    return left_uplink is not None and left_uplink == right_uplink
+
+
+def _source_interfaces_for_lane(
+    node: Dict[str, Any],
+    target_ifname: str,
+    target_iface: Dict[str, Any],
+) -> List[str]:
+    target_lane = _lane(target_iface)
+    sources: List[str] = [target_ifname]
+
+    for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
+        if ifname == target_ifname:
+            continue
+        iface = node["interfaces"][ifname]
+        lane = _lane(iface)
+        if _lane_access(lane) is None and _same_uplink(lane, target_lane):
+            sources.append(ifname)
+
+    return sources
 
 
 def _append_policy_route(
@@ -50,19 +79,19 @@ def _append_policy_route(
         entries.append(hop)
 
 
-def _policy_groups_for_ingress(
+def _policy_groups_for_lane(
     node: Dict[str, Any],
     eth_map: Dict[str, int],
-    ingress_ifname: str,
-    ingress_iface: Dict[str, Any],
+    target_ifname: str,
+    target_iface: Dict[str, Any],
 ) -> tuple[Dict[str, List[Tuple[str, int]]], Dict[str, List[Tuple[str, int]]]]:
-    ingress_lane = _lane(ingress_iface)
+    target_lane = _lane(target_iface)
     routes4: Dict[str, List[Tuple[str, int]]] = {}
     routes6: Dict[str, List[Tuple[str, int]]] = {}
+    preferred4: set[str] = set()
+    preferred6: set[str] = set()
 
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
-        if ifname == ingress_ifname:
-            continue
         iface = node["interfaces"][ifname]
         eth = eth_map.get(ifname)
         if eth is None:
@@ -72,19 +101,31 @@ def _policy_groups_for_ingress(
         for route in routes["ipv4"]:
             if route.get("policyOnly") is not True:
                 continue
-            if not _route_matches_ingress(ingress_lane, _lane(route)):
+            if not _route_matches_ingress(target_lane, _lane(route)):
                 continue
+            dst = _dst(route)
+            if ifname != target_ifname and dst in preferred4:
+                continue
+            if ifname == target_ifname and not _is_default(dst):
+                preferred4.add(_normalize_prefix(dst))
+                routes4.pop(_normalize_prefix(dst), None)
             _append_policy_route(
-                routes4, _dst(route), _effective_via4(node, iface, route), eth
+                routes4, dst, _effective_via4(node, iface, route), eth
             )
 
         for route in routes["ipv6"]:
             if route.get("policyOnly") is not True:
                 continue
-            if not _route_matches_ingress(ingress_lane, _lane(route)):
+            if not _route_matches_ingress(target_lane, _lane(route)):
                 continue
+            dst = _dst(route)
+            if ifname != target_ifname and dst in preferred6:
+                continue
+            if ifname == target_ifname and not _is_default(dst):
+                preferred6.add(_normalize_prefix(dst))
+                routes6.pop(_normalize_prefix(dst), None)
             _append_policy_route(
-                routes6, _dst(route), _effective_via6(node, iface, route), eth
+                routes6, dst, _effective_via6(node, iface, route), eth
             )
 
     return routes4, routes6
@@ -127,21 +168,28 @@ def render(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
         if eth is None or _lane_access(_lane(iface)) is None:
             continue
 
-        routes4, routes6 = _policy_groups_for_ingress(node, eth_map, ifname, iface)
+        routes4, routes6 = _policy_groups_for_lane(node, eth_map, ifname, iface)
         if routes4 == {} and routes6 == {}:
             continue
 
         table_id = 1000 + eth
         priority = 10000 + eth
+        source_eths = [
+            eth_map[source]
+            for source in _source_interfaces_for_lane(node, ifname, iface)
+            if eth_map.get(source) is not None
+        ]
         if routes4 != {}:
             _render_policy_table(cmds, "ip", table_id, routes4)
-            cmds.append(
-                f"sh -c 'ip rule add iif eth{eth} priority {priority} table {table_id} 2>/dev/null || true'"
-            )
+            for source_eth in source_eths:
+                cmds.append(
+                    f"sh -c 'ip rule add iif eth{source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                )
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
-            cmds.append(
-                f"sh -c 'ip -6 rule add iif eth{eth} priority {priority} table {table_id} 2>/dev/null || true'"
-            )
+            for source_eth in source_eths:
+                cmds.append(
+                    f"sh -c 'ip -6 rule add iif eth{source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                )
 
     return cmds
