@@ -51,5 +51,49 @@ assert "ip -6 route replace table 1001 ::/0 via fd00::1 dev eth2 onlink" in join
 assert "ip rule add iif eth1 priority 10001 table 1001" in joined
 assert "ip -6 rule add iif eth1 priority 10001 table 1001" in joined
 
+upstream = {
+    "interfaces": {
+        "core": {
+            "lane": {"uplink": "wan"},
+            "routes": {
+                "ipv4": [
+                    {
+                        "dst": "10.50.20.0/24",
+                        "via4": "10.50.0.14",
+                        "policyOnly": True,
+                        "lane": {"access": "client", "uplink": "wan"},
+                    }
+                ],
+            },
+        },
+        "policy-client": {
+            "addr4": "10.50.0.33/31",
+            "lane": {"access": "client", "uplink": "wan"},
+            "routes": {
+                "ipv4": [
+                    {
+                        "dst": "10.50.20.0/24",
+                        "via4": "10.50.0.32",
+                        "policyOnly": True,
+                        "lane": {"access": "client", "uplink": "wan"},
+                    },
+                    {
+                        "dst": "0.0.0.0/0",
+                        "via4": "10.50.0.14",
+                        "policyOnly": True,
+                        "lane": {"access": "client", "uplink": "wan"},
+                    },
+                ],
+            },
+        },
+    }
+}
+
+upstream_policy = "\n".join(render_policy_routes(upstream, {"core": 1, "policy-client": 4}))
+assert "ip route replace table 1004 10.50.20.0/24 via 10.50.0.32 dev eth4 onlink" in upstream_policy
+assert "ip route replace table 1004 10.50.20.0/24 via 10.50.0.14 dev eth1 onlink" not in upstream_policy
+assert "ip rule add iif eth1 priority 10004 table 1004" in upstream_policy
+assert "ip rule add iif eth4 priority 10004 table 1004" in upstream_policy
+
 print("PASS policy-no-main-defaults")
 PY
