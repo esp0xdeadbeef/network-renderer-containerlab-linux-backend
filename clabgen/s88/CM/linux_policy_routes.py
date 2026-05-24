@@ -109,9 +109,7 @@ def _policy_groups_for_lane(
             if ifname == target_ifname and not _is_default(dst):
                 preferred4.add(_normalize_prefix(dst))
                 routes4.pop(_normalize_prefix(dst), None)
-            _append_policy_route(
-                routes4, dst, _effective_via4(node, iface, route), eth
-            )
+            _append_policy_route(routes4, dst, _effective_via4(node, iface, route), eth)
 
         for route in routes["ipv6"]:
             if route.get("policyOnly") is not True:
@@ -124,9 +122,7 @@ def _policy_groups_for_lane(
             if ifname == target_ifname and not _is_default(dst):
                 preferred6.add(_normalize_prefix(dst))
                 routes6.pop(_normalize_prefix(dst), None)
-            _append_policy_route(
-                routes6, dst, _effective_via6(node, iface, route), eth
-            )
+            _append_policy_route(routes6, dst, _effective_via6(node, iface, route), eth)
 
     return routes4, routes6
 
@@ -174,11 +170,11 @@ def render(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
 
         table_id = 1000 + eth
         priority = 10000 + eth
-        source_eths = [
-            eth_map[source]
-            for source in _source_interfaces_for_lane(node, ifname, iface)
-            if eth_map.get(source) is not None
-        ]
+        source_eths: List[int] = []
+        for source in _source_interfaces_for_lane(node, ifname, iface):
+            source_eth = eth_map.get(source)
+            if source_eth is not None:
+                source_eths.append(source_eth)
         if routes4 != {}:
             _render_policy_table(cmds, "ip", table_id, routes4)
             for source_eth in source_eths:
