@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# LAB-SMT-ID: LAB-SMT-024
+# LAB-SMT-SCOPE: examples-only; see network-labs/tests/SMT.md
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${repo_root}/tests/lib/input-path.sh"
