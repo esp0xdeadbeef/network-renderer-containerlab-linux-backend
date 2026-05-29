@@ -6,7 +6,7 @@ from clabgen.s88.CM.linux_route_values import _dst, _normalize_prefix, _route_li
 from clabgen.s88.CM.linux_route_via import _effective_via4, _effective_via6
 
 
-def _render_uplink_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+def _render_uplink_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
     seen: set[str] = set()
 
@@ -27,9 +27,9 @@ def _render_uplink_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
                 continue
 
             if dst == "0.0.0.0/0":
-                cmd = f"ip route replace default via {via} dev eth{eth} onlink"
+                cmd = f"ip route replace default via {via} dev {eth} onlink"
             else:
-                cmd = f"ip route replace {_normalize_prefix(dst)} via {via} dev eth{eth} onlink"
+                cmd = f"ip route replace {_normalize_prefix(dst)} via {via} dev {eth} onlink"
 
             if cmd not in seen:
                 seen.add(cmd)
@@ -44,9 +44,9 @@ def _render_uplink_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
                 continue
 
             if dst == "::/0":
-                cmd = f"ip -6 route replace default via {via} dev eth{eth} onlink"
+                cmd = f"ip -6 route replace default via {via} dev {eth} onlink"
             else:
-                cmd = f"ip -6 route replace {_normalize_prefix(dst)} via {via} dev eth{eth} onlink"
+                cmd = f"ip -6 route replace {_normalize_prefix(dst)} via {via} dev {eth} onlink"
 
             if cmd not in seen:
                 seen.add(cmd)

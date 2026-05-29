@@ -37,13 +37,22 @@ node = {
     }
 }
 
-cmds = render(node, {"tenant": 1, "uplink": 2})
+cmds = render(node, {"tenant": "tenant0", "uplink": "uplink0"})
 joined = "\n".join(cmds)
 
-assert "ip route replace table 1001 0.0.0.0/0 via 10.0.0.1 dev eth2 onlink" in joined
-assert "ip -6 route replace table 1001 ::/0 via fd00::1 dev eth2 onlink" in joined
-assert "sh -c 'ip rule add iif eth1 priority 10001 table 1001 2>/dev/null || true'" in joined
-assert "sh -c 'ip -6 rule add iif eth1 priority 10001 table 1001 2>/dev/null || true'" in joined
+assert (
+    "ip route replace table 1001 0.0.0.0/0 via 10.0.0.1 dev uplink0 onlink"
+    in joined
+)
+assert "ip -6 route replace table 1001 ::/0 via fd00::1 dev uplink0 onlink" in joined
+assert (
+    "sh -c 'ip rule add iif tenant0 priority 10001 table 1001 2>/dev/null || true'"
+    in joined
+)
+assert (
+    "sh -c 'ip -6 rule add iif tenant0 priority 10001 table 1001 2>/dev/null || true'"
+    in joined
+)
 
 for cmd in cmds:
     if cmd.startswith(("ip rule add", "ip -6 rule add")):

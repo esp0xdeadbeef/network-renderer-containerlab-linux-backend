@@ -20,7 +20,7 @@ def render(
     role: str,
     node_name: str,
     node_data: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
 ) -> List[str]:
     cmds: List[str] = [
         _sh('for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$i"; done'),
@@ -47,7 +47,7 @@ def render(
         cmds.extend(_render_default_routes(node_data, eth_map))
         cmds.extend(render_policy_routes(node_data, eth_map))
 
-    cmds.extend(render_cm(role, node_data.get("_cm_inputs", {})))
+    cmds.extend(render_cm(node_data.get("_cm_inputs", {})))
     cmds.extend(render_dns_service(node_data))
 
     return cmds

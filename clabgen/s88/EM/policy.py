@@ -10,6 +10,6 @@ def render(
     role: str,
     node_name: str,
     node_data: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
 ) -> List[str]:
     return render_default(role, node_name, node_data, eth_map)

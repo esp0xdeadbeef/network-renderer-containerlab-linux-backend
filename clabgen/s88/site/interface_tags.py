@@ -11,7 +11,7 @@ def _link_sort_key(item):
     return item[0]
 
 
-def policy_peer_map(site: SiteModel, policy_node_name: str, eth_map: Dict[str, int]):
+def policy_peer_map(site: SiteModel, policy_node_name: str, eth_map: Dict[str, str]):
     results = []
     for _, link in sorted(site.links.items(), key=_link_sort_key):
         endpoints = link.endpoints
@@ -21,7 +21,7 @@ def policy_peer_map(site: SiteModel, policy_node_name: str, eth_map: Dict[str, i
         iface = local.get("interface")
         if iface not in eth_map:
             raise RuntimeError(
-                f"missing eth mapping for interface {iface}\n"
+                f"missing target interface mapping for interface {iface}\n"
                 + json.dumps(local, indent=2, default=str)
             )
         peers: List[str] = []
@@ -32,7 +32,7 @@ def policy_peer_map(site: SiteModel, policy_node_name: str, eth_map: Dict[str, i
             continue
         results.append(
             {
-                "eth": eth_map[iface],
+                "target_ifname": eth_map[iface],
                 "peer_name": peers[0],
                 "link": link.name,
                 "policy_iface": iface,

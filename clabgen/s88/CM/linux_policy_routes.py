@@ -66,10 +66,10 @@ def _source_interfaces_for_lane(
 
 
 def _append_policy_route(
-    groups: Dict[str, List[Tuple[str, int]]],
+    groups: Dict[str, List[Tuple[str, str]]],
     dst: str | None,
     via: str | None,
-    eth: int,
+    eth: str,
 ) -> None:
     if not dst or not via:
         return
@@ -81,13 +81,13 @@ def _append_policy_route(
 
 def _policy_groups_for_lane(
     node: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
     target_ifname: str,
     target_iface: Dict[str, Any],
-) -> tuple[Dict[str, List[Tuple[str, int]]], Dict[str, List[Tuple[str, int]]]]:
+) -> tuple[Dict[str, List[Tuple[str, str]]], Dict[str, List[Tuple[str, str]]]]:
     target_lane = _lane(target_iface)
-    routes4: Dict[str, List[Tuple[str, int]]] = {}
-    routes6: Dict[str, List[Tuple[str, int]]] = {}
+    routes4: Dict[str, List[Tuple[str, str]]] = {}
+    routes6: Dict[str, List[Tuple[str, str]]] = {}
     preferred4: set[str] = set()
     preferred6: set[str] = set()
 
@@ -128,34 +128,41 @@ def _policy_groups_for_lane(
 
 
 def _render_group(
-    ip_cmd: str, table_id: int, dst: str, hops: List[Tuple[str, int]]
+    ip_cmd: str, table_id: int, dst: str, hops: List[Tuple[str, str]]
 ) -> str:
     if len(hops) == 1:
         via, eth = hops[0]
-        return f"{ip_cmd} route replace table {table_id} {dst} via {via} dev eth{eth} onlink"
+        return (
+            f"{ip_cmd} route replace table {table_id} {dst} via {via} dev {eth} onlink"
+        )
 
     parts = [f"{ip_cmd} route replace table {table_id} {dst}"]
     for via, eth in sorted(hops, key=_hop_sort_key):
-        parts.append(f"nexthop via {via} dev eth{eth} onlink")
+        parts.append(f"nexthop via {via} dev {eth} onlink")
     return " ".join(parts)
 
 
-def _hop_sort_key(hop: Tuple[str, int]) -> Tuple[int, str]:
+def _hop_sort_key(hop: Tuple[str, str]) -> Tuple[str, str]:
     via, eth = hop
     return eth, via
+
+
+def _table_slot(eth_map: Dict[str, str], target_ifname: str) -> int:
+    names = sorted(set(eth_map.values()))
+    return names.index(target_ifname) + 1
 
 
 def _render_policy_table(
     cmds: List[str],
     ip_cmd: str,
     table_id: int,
-    groups: Dict[str, List[Tuple[str, int]]],
+    groups: Dict[str, List[Tuple[str, str]]],
 ) -> None:
     for dst in sorted(groups.keys()):
         cmds.append(_render_group(ip_cmd, table_id, dst, groups[dst]))
 
 
-def render(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
 
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
@@ -168,9 +175,10 @@ def render(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
         if routes4 == {} and routes6 == {}:
             continue
 
-        table_id = 1000 + eth
-        priority = 10000 + eth
-        source_eths: List[int] = []
+        slot = _table_slot(eth_map, eth)
+        table_id = 1000 + slot
+        priority = 10000 + slot
+        source_eths: List[str] = []
         for source in _source_interfaces_for_lane(node, ifname, iface):
             source_eth = eth_map.get(source)
             if source_eth is not None:
@@ -179,13 +187,13 @@ def render(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
             _render_policy_table(cmds, "ip", table_id, routes4)
             for source_eth in source_eths:
                 cmds.append(
-                    f"sh -c 'ip rule add iif eth{source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                    f"sh -c 'ip rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                 )
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
             for source_eth in source_eths:
                 cmds.append(
-                    f"sh -c 'ip -6 rule add iif eth{source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                    f"sh -c 'ip -6 rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                 )
 
     return cmds

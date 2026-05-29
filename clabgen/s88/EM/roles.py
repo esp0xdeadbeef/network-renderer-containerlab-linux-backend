@@ -3,41 +3,41 @@ from __future__ import annotations
 from typing import Dict, Any, List, Tuple
 
 
-def _eth_index(item: Tuple[str, int]) -> int:
+def _target_ifname(item: Tuple[str, str]) -> str:
     return item[1]
 
 
-def _sorted_ifaces(eth_map: Dict[str, int]) -> List[Tuple[str, int]]:
-    return sorted(eth_map.items(), key=_eth_index)
+def _sorted_ifaces(eth_map: Dict[str, str]) -> List[Tuple[str, str]]:
+    return sorted(eth_map.items(), key=_target_ifname)
 
 
-def _link(ifname: str, eth: int) -> Dict[str, Any]:
+def _link(ifname: str, target_ifname: str) -> Dict[str, Any]:
     return {
         "ifname": ifname,
-        "eth": eth,
+        "targetIfName": target_ifname,
     }
 
 
-def _maybe_link(items: List[Tuple[str, int]], index: int) -> Dict[str, Any] | None:
+def _maybe_link(items: List[Tuple[str, str]], index: int) -> Dict[str, Any] | None:
     if index < 0:
         index = len(items) + index
     if index < 0 or index >= len(items):
         return None
-    ifname, eth = items[index]
-    return _link(ifname, eth)
+    ifname, target_ifname = items[index]
+    return _link(ifname, target_ifname)
 
 
-def _links(items: List[Tuple[str, int]]) -> List[Dict[str, Any]]:
+def _links(items: List[Tuple[str, str]]) -> List[Dict[str, Any]]:
     links: List[Dict[str, Any]] = []
-    for ifname, eth in items:
-        links.append(_link(ifname, eth))
+    for ifname, target_ifname in items:
+        links.append(_link(ifname, target_ifname))
     return links
 
 
 def parse_access(
     node_name: str,
     node_data: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
 ) -> Dict[str, Any]:
     _ = node_data
     items = _sorted_ifaces(eth_map)
@@ -56,7 +56,7 @@ def parse_access(
 def parse_core(
     node_name: str,
     node_data: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
 ) -> Dict[str, Any]:
     _ = node_data
     items = _sorted_ifaces(eth_map)
@@ -75,7 +75,7 @@ def parse_core(
 def parse_wan_peer(
     node_name: str,
     node_data: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
 ) -> Dict[str, Any]:
     _ = node_data
     items = _sorted_ifaces(eth_map)
@@ -93,7 +93,7 @@ def parse_wan_peer(
 def parse_upstream_selector(
     node_name: str,
     node_data: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
 ) -> Dict[str, Any]:
     _ = node_data
     items = _sorted_ifaces(eth_map)
@@ -112,7 +112,7 @@ def parse_upstream_selector(
 def parse_downstream_selector(
     node_name: str,
     node_data: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
 ) -> Dict[str, Any]:
     _ = node_data
     items = _sorted_ifaces(eth_map)
@@ -132,7 +132,7 @@ def parse_downstream_selector(
 def parse_policy(
     node_name: str,
     node_data: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
 ) -> Dict[str, Any]:
     _ = node_data
     items = _sorted_ifaces(eth_map)

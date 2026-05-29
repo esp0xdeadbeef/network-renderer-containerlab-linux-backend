@@ -16,11 +16,11 @@ from clabgen.s88.CM.linux_route_values import (
 )
 
 
-def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
     seen: set[str] = set()
-    routes4: Dict[str, List[Tuple[str, int]]] = {}
-    routes6: Dict[str, List[Tuple[str, int]]] = {}
+    routes4: Dict[str, List[Tuple[str, str]]] = {}
+    routes6: Dict[str, List[Tuple[str, str]]] = {}
     connected4, connected6 = _connected_prefixes(node)
     local4, local6 = _local_ips(node)
 
@@ -52,7 +52,7 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
             if iface.get("kind") == "overlay":
                 via_host = _host_prefix(via, 4)
                 if via_host:
-                    via_cmd = f"ip route replace {via_host} dev eth{eth}"
+                    via_cmd = f"ip route replace {via_host} dev {eth}"
                     if via_cmd not in seen:
                         seen.add(via_cmd)
                         cmds.append(via_cmd)
@@ -79,7 +79,7 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
             if iface.get("kind") == "overlay":
                 via_host = _host_prefix(via, 6)
                 if via_host:
-                    via_cmd = f"ip -6 route replace {via_host} dev eth{eth}"
+                    via_cmd = f"ip -6 route replace {via_host} dev {eth}"
                     if via_cmd not in seen:
                         seen.add(via_cmd)
                         cmds.append(via_cmd)
@@ -91,11 +91,11 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List
     return cmds
 
 
-def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
     seen: set[str] = set()
-    defaults4: Dict[str, List[Tuple[str, int]]] = {}
-    defaults6: Dict[str, List[Tuple[str, int]]] = {}
+    defaults4: Dict[str, List[Tuple[str, str]]] = {}
+    defaults6: Dict[str, List[Tuple[str, str]]] = {}
     local4, local6 = _local_ips(node)
 
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
@@ -136,10 +136,10 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, int]) -> Lis
 
 
 def _add_route(
-    groups: Dict[str, List[Tuple[str, int]]],
+    groups: Dict[str, List[Tuple[str, str]]],
     dst: str,
     via: str,
-    eth: int,
+    eth: str,
 ) -> None:
     nexthops = groups.setdefault(dst, [])
     hop = (via, eth)
@@ -151,9 +151,9 @@ def _append_route_groups(
     cmds: List[str],
     seen: set[str],
     ip_cmd: str,
-    groups: Dict[str, List[Tuple[str, int]]],
+    groups: Dict[str, List[Tuple[str, str]]],
 ) -> None:
-    def sort_nexthop(item: Tuple[str, int]) -> Tuple[int, str]:
+    def sort_nexthop(item: Tuple[str, str]) -> Tuple[str, str]:
         via, eth = item
         return eth, via
 
@@ -161,11 +161,11 @@ def _append_route_groups(
         nexthops = groups[dst]
         if len(nexthops) == 1:
             via, eth = nexthops[0]
-            cmd = f"{ip_cmd} route replace {dst} via {via} dev eth{eth} onlink"
+            cmd = f"{ip_cmd} route replace {dst} via {via} dev {eth} onlink"
         else:
             parts = [f"{ip_cmd} route replace {dst}"]
             for via, eth in sorted(nexthops, key=sort_nexthop):
-                parts.append(f"nexthop via {via} dev eth{eth} onlink")
+                parts.append(f"nexthop via {via} dev {eth} onlink")
             cmd = " ".join(parts)
         if cmd not in seen:
             seen.add(cmd)

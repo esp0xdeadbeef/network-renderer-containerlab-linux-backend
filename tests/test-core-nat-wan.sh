@@ -42,7 +42,7 @@ from clabgen.s88.Unit.base import render_units
 
 tmp = Path(os.environ["TMP_DIR"])
 
-def _render_execs(cpm_path: Path) -> list[str]:
+def _render_core(cpm_path: Path):
     inv_path = cpm_path.with_suffix(cpm_path.suffix + ".renderer-inventory.json")
     inv = json.loads(inv_path.read_text())
     if not isinstance(inv, dict):
@@ -60,16 +60,41 @@ def _render_execs(cpm_path: Path) -> list[str]:
     core = nodes.get(name) or {}
     exec_cmds = core.get("exec") or []
     assert isinstance(exec_cmds, list) and exec_cmds, "missing core exec commands"
-    return exec_cmds
+    return site, name, core, exec_cmds
 
-execs_clab = _render_execs(tmp / "cpm.clab.json")
+site, core_name, core, execs_clab = _render_core(tmp / "cpm.clab.json")
+nat_intent = getattr(site.nodes[core_name], "nat_intent", {}) or {}
+families = nat_intent.get("families") or {}
 
-want = 'oifname "eth2" masquerade'
-want6 = 'oifname "eth2" masquerade'
+expected4 = [
+    name for name in nat_intent.get("masqueradeInterfaces4", [])
+]
+expected6 = [
+    name for name in nat_intent.get("masqueradeInterfaces6", [])
+]
 
-assert any(want in c for c in execs_clab), "expected NAT44 on resolved CLAB WAN port via inventory-clab.nix"
-assert any("ip6 nat" in c for c in execs_clab), "expected NAT66 table via inventory-clab.nix"
-assert any('ip6 saddr' in c and 'oifname "eth2" masquerade' in c for c in execs_clab), "expected NAT66 on resolved CLAB WAN port via inventory-clab.nix"
+if families.get("ipv4"):
+    assert expected4, "CPM enabled NAT44 but did not name masqueradeInterfaces4"
+    for ifname in expected4:
+        assert any(f'oifname "{ifname}" masquerade' in c for c in execs_clab), (
+            f"expected NAT44 on CPM-selected CLAB WAN port {ifname}"
+        )
+else:
+    assert not any("nft add table ip nat" in c for c in execs_clab), (
+        "renderer emitted NAT44 even though CPM natIntent.families.ipv4 is false"
+    )
+
+if families.get("ipv6"):
+    assert expected6, "CPM enabled NAT66 but did not name masqueradeInterfaces6"
+    assert any("ip6 nat" in c for c in execs_clab), "expected NAT66 table from CPM natIntent"
+    for ifname in expected6:
+        assert any('ip6 saddr' in c and f'oifname "{ifname}" masquerade' in c for c in execs_clab), (
+            f"expected NAT66 on CPM-selected CLAB WAN port {ifname}"
+        )
+else:
+    assert not any("ip6 nat" in c for c in execs_clab), (
+        "renderer emitted NAT66 even though CPM natIntent.families.ipv6 is false"
+    )
 
 print("PASS core-nat-inventory")
 PY

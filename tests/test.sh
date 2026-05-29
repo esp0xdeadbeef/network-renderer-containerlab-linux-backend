@@ -27,6 +27,7 @@ tests=(
   test-python-format.sh
   test-large-ipv6-prefix-addressing.sh
   test-s88-naming-and-hierarchy.sh
+  test-s88-no-untraced-cm-stubs.sh
   test-s88-python-readability.sh
   test-rendered-artifact-validator-scratch-dir.sh
   test-provenance-without-git.sh
@@ -41,6 +42,7 @@ tests=(
   test-bgp-example.sh
   test-routing-mode-required.sh
   test-policy-firewall.sh
+  test-role-independent-cm-inputs.sh
   test-core-nat-wan.sh
   test-tri-site-core-egress-nat.sh
   test-management-eth0-egress-guard.sh

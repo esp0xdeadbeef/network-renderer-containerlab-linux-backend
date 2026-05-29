@@ -40,30 +40,30 @@ node = {
     }
 }
 
-eth_map = {"left": 1, "right": 2}
+eth_map = {"left": "left0", "right": "right0"}
 static_cmds = _render_static_routes(node, eth_map)
 default_cmds = _render_default_routes(node, eth_map)
 joined = "\n".join(static_cmds + default_cmds)
 
 assert (
     "ip route replace 10.20.0.0/24 "
-    "nexthop via 10.0.0.1 dev eth1 onlink "
-    "nexthop via 10.0.0.3 dev eth2 onlink"
+    "nexthop via 10.0.0.1 dev left0 onlink "
+    "nexthop via 10.0.0.3 dev right0 onlink"
 ) in joined
 assert (
     "ip -6 route replace fd20::/64 "
-    "nexthop via fd00::1 dev eth1 onlink "
-    "nexthop via fd00::3 dev eth2 onlink"
+    "nexthop via fd00::1 dev left0 onlink "
+    "nexthop via fd00::3 dev right0 onlink"
 ) in joined
 assert (
     "ip route replace default "
-    "nexthop via 10.0.0.1 dev eth1 onlink "
-    "nexthop via 10.0.0.3 dev eth2 onlink"
+    "nexthop via 10.0.0.1 dev left0 onlink "
+    "nexthop via 10.0.0.3 dev right0 onlink"
 ) in joined
 assert (
     "ip -6 route replace default "
-    "nexthop via fd00::1 dev eth1 onlink "
-    "nexthop via fd00::3 dev eth2 onlink"
+    "nexthop via fd00::1 dev left0 onlink "
+    "nexthop via fd00::3 dev right0 onlink"
 ) in joined
 assert "ip route replace 10.20.0.0/24 via 10.0.0.1" not in joined
 assert "ip route replace 10.20.0.0/24 via 10.0.0.3" not in joined
