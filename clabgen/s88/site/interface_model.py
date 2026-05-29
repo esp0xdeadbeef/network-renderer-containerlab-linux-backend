@@ -116,6 +116,9 @@ def build_interfaces(
             if isinstance(iface.get("attachBridge"), str)
             else None,
             host_uplink=dict(iface.get("hostUplink", {}) or {}),
+            runtime_if_name=iface.get("runtimeIfName")
+            if isinstance(iface.get("runtimeIfName"), str)
+            else None,
         )
 
     return interfaces

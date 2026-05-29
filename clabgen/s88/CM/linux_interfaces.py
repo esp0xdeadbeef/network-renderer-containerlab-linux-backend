@@ -13,7 +13,7 @@ from clabgen.s88.CM.linux_addressing import (
 from clabgen.s88.CM.linux_shell import _sh
 
 
-def _render_interfaces(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+def _render_interfaces(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
     interfaces = node.get("interfaces", {})
 
@@ -22,7 +22,7 @@ def _render_interfaces(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[st
         if logical_if not in eth_map:
             continue
 
-        eth = f"eth{eth_map[logical_if]}"
+        eth = eth_map[logical_if]
 
         if _is_virtual_interface(iface):
             cmds.append(
@@ -57,7 +57,7 @@ def _render_loopback(node: Dict[str, Any]) -> List[str]:
     return cmds
 
 
-def _render_addressing(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+def _render_addressing(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
 
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
@@ -81,10 +81,10 @@ def _render_addressing(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[st
                 ip = ipaddress.ip_interface(addr4).ip
                 prefix = ipaddress.ip_interface(addr4).network.prefixlen
                 cmds.append(
-                    f"ip addr replace {ip}/{prefix} peer {peer}/{prefix} dev eth{eth}"
+                    f"ip addr replace {ip}/{prefix} peer {peer}/{prefix} dev {eth}"
                 )
             else:
-                cmds.append(f"ip addr replace {addr4} dev eth{eth}")
+                cmds.append(f"ip addr replace {addr4} dev {eth}")
 
         if (
             isinstance(addr6, str)
@@ -98,17 +98,17 @@ def _render_addressing(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[st
                 ip = ipaddress.ip_interface(canon).ip
                 prefix = ipaddress.ip_interface(canon).network.prefixlen
                 cmds.append(
-                    f"ip -6 addr replace {ip}/{prefix} peer {peer}/{prefix} dev eth{eth}"
+                    f"ip -6 addr replace {ip}/{prefix} peer {peer}/{prefix} dev {eth}"
                 )
             else:
-                cmds.append(f"ip -6 addr replace {canon} dev eth{eth}")
+                cmds.append(f"ip -6 addr replace {canon} dev {eth}")
 
         if (
             isinstance(ll6, str)
             and ll6
             and not _conflicts_with_wan_peer(node, ifname, ll6)
         ):
-            cmds.append(f"ip -6 addr replace {_canon_v6(ll6)} dev eth{eth}")
+            cmds.append(f"ip -6 addr replace {_canon_v6(ll6)} dev {eth}")
 
     cmds.extend(_render_loopback(node))
 

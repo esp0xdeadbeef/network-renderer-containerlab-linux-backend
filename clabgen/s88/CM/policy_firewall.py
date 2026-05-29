@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from .cpm_firewall_rules import rules_for_cpm_rule
+
 
 def _proto(match: Dict[str, Any]) -> str | None:
     proto = match.get("proto")
@@ -110,6 +112,14 @@ def render(input_data: Dict[str, Any]) -> List[str]:
 
     for rule_obj in rules:
         if not isinstance(rule_obj, dict):
+            continue
+
+        cpm_rules = rules_for_cpm_rule(rule_obj)
+        if cpm_rules:
+            for rule in cpm_rules:
+                if rule not in emitted:
+                    emitted.add(rule)
+                    cmds.append(rule)
             continue
 
         src_tenant = rule_obj.get("src_tenant")

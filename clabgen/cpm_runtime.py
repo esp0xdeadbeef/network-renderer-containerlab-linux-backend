@@ -91,6 +91,7 @@ def _interface_output(
         "addr4": iface.get("addr4"),
         "addr6": iface.get("addr6"),
         "ll6": iface.get("ll6"),
+        "runtimeIfName": iface.get("runtimeIfName") or iface.get("renderedIfName"),
         "routes": iface.get("routes") or {},
         "kind": kind,
         "upstream": iface.get("upstream") or iface.get("uplink"),
@@ -177,6 +178,8 @@ def add_runtime_target(
         "containers": runtime_target.get("containers") or [],
         "isolated": runtime_target.get("isolated") or False,
         "loopback": _loopback(runtime_target),
+        "forwardingIntent": runtime_target.get("forwardingIntent") or {},
+        "natIntent": runtime_target.get("natIntent") or {},
     }
 
     for if_key, iface in iface_out.items():

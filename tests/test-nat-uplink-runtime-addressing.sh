@@ -22,11 +22,11 @@ node = {
     }
 }
 
-commands = render(node, {"wan": 2})
+commands = render(node, {"wan": "wan0"})
 joined = "\n".join(commands)
 
-assert "ip addr replace 198.18.0.2/24 dev eth2" in joined
-assert "ip route replace default via 198.18.0.1 dev eth2 onlink" in joined
+assert "ip addr replace 198.18.0.2/24 dev wan0" in joined
+assert "ip route replace default via 198.18.0.1 dev wan0 onlink" in joined
 assert "udhcpc" not in joined
 print("PASS nat-uplink-runtime-addressing")
 PY

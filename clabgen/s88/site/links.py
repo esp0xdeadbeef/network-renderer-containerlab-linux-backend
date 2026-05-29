@@ -16,14 +16,14 @@ def _link_endpoint(
     site: SiteModel,
     node_name: str,
     ep: Dict[str, Any],
-    eth_maps: Dict[str, Dict[str, int]],
+    eth_maps: Dict[str, Dict[str, str]],
 ) -> str | None:
     if node_name not in eth_maps:
         return None
     iface = ep.get("interface")
     if iface is None or iface not in eth_maps[node_name]:
         return None
-    return f"{node_name}:eth{eth_maps[node_name][iface]}"
+    return f"{node_name}:{eth_maps[node_name][iface]}"
 
 
 def _host_bridge_link(
@@ -46,7 +46,7 @@ def _host_bridge_link(
 
 
 def _render_model_links(
-    site: SiteModel, eth_maps: Dict[str, Dict[str, int]]
+    site: SiteModel, eth_maps: Dict[str, Dict[str, str]]
 ) -> tuple[List[Dict[str, Any]], List[str]]:
     links: List[Dict[str, Any]] = []
     bridges: List[str] = []
@@ -92,7 +92,7 @@ def _bridge_link(endpoints: List[str], bridge: str) -> Dict[str, Any]:
 
 
 def _overlay_links(
-    site: SiteModel, eth_maps: Dict[str, Dict[str, int]]
+    site: SiteModel, eth_maps: Dict[str, Dict[str, str]]
 ) -> List[Dict[str, Any]]:
     links: List[Dict[str, Any]] = []
 
@@ -101,12 +101,12 @@ def _overlay_links(
         for ifname, iface in sorted(node.interfaces.items()):
             if iface.kind != "overlay":
                 continue
-            eth = eth_maps[node_name].get(ifname)
-            if eth is None:
+            target_ifname = eth_maps[node_name].get(ifname)
+            if target_ifname is None:
                 continue
             links.append(
                 {
-                    "endpoints": [f"{node_name}:eth{eth}"],
+                    "endpoints": [f"{node_name}:{target_ifname}"],
                     "labels": {
                         "clab.link.type": "overlay",
                         "clab.overlay": iface.overlay or ifname,
@@ -118,7 +118,7 @@ def _overlay_links(
 
 
 def render_links(
-    site: SiteModel, eth_maps: Dict[str, Dict[str, int]]
+    site: SiteModel, eth_maps: Dict[str, Dict[str, str]]
 ) -> tuple[List[Dict[str, Any]], List[str]]:
     links, bridges = _render_model_links(site, eth_maps)
     tenant_links, tenant_bridges = render_tenant_links(site, eth_maps)

@@ -133,9 +133,9 @@ def policy_iface_for_peer(
     for peer in peer_map:
         if peer.get("peer_name") != peer_name:
             continue
-        eth = peer.get("eth")
-        if isinstance(eth, int):
-            return (f"eth{eth}", str(peer.get("policy_iface") or ""))
+        target_ifname = peer.get("target_ifname")
+        if isinstance(target_ifname, str) and target_ifname:
+            return (target_ifname, str(peer.get("policy_iface") or ""))
     return None
 
 

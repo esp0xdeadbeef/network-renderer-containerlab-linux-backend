@@ -69,7 +69,7 @@ def _bridge_host_uplink(site: SiteModel, bridge: str) -> Dict[str, Any]:
 
 
 def render_tenant_links(
-    site: SiteModel, eth_maps: Dict[str, Dict[str, int]]
+    site: SiteModel, eth_maps: Dict[str, Dict[str, str]]
 ) -> tuple[List[Dict[str, Any]], List[str]]:
     tenant_groups: Dict[str, List[str]] = {}
     tenant_bridges: Dict[str, str] = {}
@@ -79,11 +79,13 @@ def render_tenant_links(
         for ifname, iface in sorted(node.interfaces.items()):
             if iface.kind != "tenant":
                 continue
-            eth = eth_maps[node_name].get(ifname)
-            if eth is None:
+            target_ifname = eth_maps[node_name].get(ifname)
+            if target_ifname is None:
                 continue
             tenant_key = _tenant_group_key(ifname, node_name, iface)
-            tenant_groups.setdefault(tenant_key, []).append(f"{node_name}:eth{eth}")
+            tenant_groups.setdefault(tenant_key, []).append(
+                f"{node_name}:{target_ifname}"
+            )
             attached_bridge = getattr(iface, "attach_bridge", None)
             if isinstance(attached_bridge, str) and attached_bridge:
                 tenant_bridges[tenant_key] = attached_bridge

@@ -35,6 +35,7 @@ class InterfaceModel:
     attach_bridge: Optional[str] = None
     host_uplink: Dict[str, Any] = field(default_factory=dict)
     lane: Dict[str, Any] = field(default_factory=dict)
+    runtime_if_name: Optional[str] = None
 
 
 @dataclass
@@ -57,6 +58,7 @@ class NodeModel:
     loopback6: Optional[str] = None
     egress_intent: Dict[str, Any] = field(default_factory=dict)
     nat_intent: Dict[str, Any] = field(default_factory=dict)
+    forwarding_intent: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

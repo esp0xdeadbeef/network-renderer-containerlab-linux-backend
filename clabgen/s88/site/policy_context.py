@@ -14,7 +14,7 @@ from clabgen.s88.site.policy_rules import build_policy_rules
 
 
 def build_policy_firewall_state(
-    site: SiteModel, policy_node_name: str, eth_map: Dict[str, int]
+    site: SiteModel, policy_node_name: str, eth_map: Dict[str, str]
 ):
     contract = dict(site.raw_policy or {})
     resolved_service_tenants = service_tenants(site, contract)
@@ -47,7 +47,7 @@ def build_node_firewall_state(
     site: SiteModel,
     node_name: str,
     node: NodeModel,
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
 ):
     if node.role == "policy":
         return {

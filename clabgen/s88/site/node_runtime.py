@@ -20,7 +20,7 @@ def _routing_mode(node: NodeModel) -> str:
 def build_node_data(
     node_name: str,
     node: NodeModel,
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
     extra: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     routing_mode = _routing_mode(node)
@@ -34,6 +34,7 @@ def build_node_data(
         "services": copy.deepcopy(node.services),
         "egressIntent": copy.deepcopy(node.egress_intent),
         "natIntent": copy.deepcopy(node.nat_intent),
+        "forwardingIntent": copy.deepcopy(node.forwarding_intent),
         "loopback": {
             "ipv4": node.loopback4,
             "ipv6": node.loopback6,
@@ -48,6 +49,7 @@ def build_node_data(
             "addr4": iface.addr4,
             "addr6": iface.addr6,
             "ll6": iface.ll6,
+            "runtimeIfName": iface.runtime_if_name,
             "kind": iface.kind,
             "hostUplink": copy.deepcopy(iface.host_uplink),
             "tenant": iface.tenant,
@@ -67,7 +69,7 @@ def build_node_data(
 def render_linux_node(
     node_name: str,
     node: NodeModel,
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
     extra: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     routing_mode = _routing_mode(node)

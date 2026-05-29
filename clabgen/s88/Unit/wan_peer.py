@@ -10,7 +10,7 @@ def render(
     site: SiteModel,
     node_name: str,
     node: NodeModel,
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
     extra: Dict[str, Any],
 ) -> Dict[str, Any]:
     _ = site

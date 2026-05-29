@@ -20,14 +20,14 @@ from clabgen.s88.site.overlay_paths import resolve_external_via_overlay
 def build_policy_interface_tags(
     site: SiteModel,
     policy_node_name: str,
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
     required_tenants: set[str],
     required_externals: set[str],
 ) -> Dict[str, Any]:
     interface_tags: Dict[str, Any] = {}
     peer_map = policy_peer_map(site, policy_node_name, eth_map)
     for peer in peer_map:
-        tag_from_peer_role(site, interface_tags, f"eth{peer['eth']}", peer)
+        tag_from_peer_role(site, interface_tags, str(peer["target_ifname"]), peer)
     if not interface_tags:
         raise RuntimeError(
             "policy interface tags cannot be resolved from topology\n"

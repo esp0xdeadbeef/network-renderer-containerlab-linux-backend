@@ -5,7 +5,6 @@ import ipaddress
 
 from clabgen.models import NodeModel, SiteModel
 from clabgen.s88.site.node_runtime import render_linux_node
-from clabgen.s88.site.policy_context import build_node_firewall_state
 
 
 def _loopback_ip(value: str | None) -> str | None:
@@ -42,7 +41,7 @@ def _node_extra(site: SiteModel, node_name: str) -> Dict[str, Any]:
 
 
 def render_nodes(
-    site: SiteModel, eth_maps: Dict[str, Dict[str, int]]
+    site: SiteModel, eth_maps: Dict[str, Dict[str, str]]
 ) -> Dict[str, Any]:
     nodes: Dict[str, Any] = {}
 
@@ -61,15 +60,6 @@ def render_nodes(
             raise ValueError(f"No Unit renderer for role={role!r} node={node_name!r}")
 
         extra = _node_extra(site, node_name)
-        if role == "policy":
-            extra.update(
-                build_node_firewall_state(
-                    site=site,
-                    node_name=node_name,
-                    node=node,
-                    eth_map=eth_maps.get(node_name, {}),
-                )
-            )
 
         nodes[node_name] = render_linux_node(
             node_name=node_name,

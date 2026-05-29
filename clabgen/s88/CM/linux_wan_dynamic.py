@@ -7,7 +7,7 @@ from clabgen.s88.CM.linux_shell import _sh
 
 
 def _wan_interfaces(
-    node: Dict[str, Any], eth_map: Dict[str, int]
+    node: Dict[str, Any], eth_map: Dict[str, str]
 ) -> List[Dict[str, Any]]:
     interfaces = node.get("interfaces", {})
     if not isinstance(interfaces, dict):
@@ -20,12 +20,12 @@ def _wan_interfaces(
             continue
         if iface.get("kind") != "wan":
             continue
-        eth_index = eth_map.get(logical_name)
-        if eth_index is None:
+        target_ifname = eth_map.get(logical_name)
+        if target_ifname is None:
             continue
         wan_interfaces.append(
             {
-                "name": f"eth{eth_index}",
+                "name": target_ifname,
                 "host_uplink": iface.get("hostUplink") or {},
             }
         )
@@ -76,7 +76,7 @@ def _nat4_commands(interface_name: str, host_uplink: Dict[str, Any]) -> List[str
     ]
 
 
-def render(node: Dict[str, Any], eth_map: Dict[str, int]) -> List[str]:
+def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
 
     for interface_data in _wan_interfaces(node, eth_map):

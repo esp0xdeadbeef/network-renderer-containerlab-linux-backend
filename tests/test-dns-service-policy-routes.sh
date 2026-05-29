@@ -15,42 +15,42 @@ topology="${tmp_dir}/fabric.clab.yml"
 assert_node_contains \
   "${topology}" \
   "espbranch-site-b-b-router-policy" \
-  "ip route replace 10.20.10.0/24 nexthop via 10.50.0.13 dev eth3 onlink nexthop"
+  "ip route replace 10.20.10.0/24 nexthop via 10.50.0.13 dev up-branch-ew onlink"
 
 assert_node_contains \
   "${topology}" \
   "espbranch-site-b-b-router-policy" \
-  "via 10.50.0.17 dev eth5 onlink"
+  "via 10.50.0.17 dev up-hostile-ew onlink"
 
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-upstream-selector" \
-  "ip route replace 10\\.20\\.10\\.0/24 via 10\\.10\\.0\\.[0-9]+ dev eth[0-9]+ onlink"
+  "ip route replace 10\\.20\\.10\\.0/24 via 10\\.10\\.0\\.[0-9]+ dev pol-mgt-ew onlink"
 
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-policy-only" \
-  "ip route replace 10\\.20\\.10\\.0/24 via 10\\.10\\.0\\.[0-9]+ dev eth5 onlink"
-
-assert_node_contains \
-  "${topology}" \
-  "esp0xdeadbeef-site-a-s-router-policy-only" \
-  "oifname \"eth5\" udp dport 53 counter accept"
-
-assert_node_contains \
-  "${topology}" \
-  "esp0xdeadbeef-site-a-s-router-policy-only" \
-  "oifname \"eth5\" tcp dport 53 counter accept"
+  "ip route replace 10\\.20\\.10\\.0/24 via 10\\.10\\.0\\.[0-9]+ dev downstream-mgmt onlink"
 
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-policy-only" \
-  "iifname \"eth2\" oifname \\{ \"eth10\", \"eth13\", \"eth16\",[[:space:]]+\"eth7\" \\} counter accept"
+  "oifname \"downstream-mgmt\"[[:space:]]+udp dport 53 counter accept"
 
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-policy-only" \
-  "iifname \"eth5\" oifname \\{ \"eth10\", \"eth13\", \"eth16\",[[:space:]]+\"eth7\" \\} counter accept"
+  "oifname \"downstream-mgmt\"[[:space:]]+tcp dport 53 counter accept"
+
+assert_node_matches \
+  "${topology}" \
+  "esp0xdeadbeef-site-a-s-router-policy-only" \
+  'iifname "down-client" oifname "down-stream" counter[[:space:]]+accept'
+
+assert_node_matches \
+  "${topology}" \
+  "esp0xdeadbeef-site-a-s-router-policy-only" \
+  'iifname "downstream-mgmt" oifname "up-mgmt-a"[[:space:]]+counter accept'
 
 assert_node_contains \
   "${topology}" \
@@ -70,7 +70,7 @@ assert_node_matches \
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-c-c-router-policy" \
-  "ip route replace 10\\.90\\.20\\.0/24 via 10\\.80\\.0\\.[0-9]+ dev eth[0-9]+ onlink"
+  "ip route replace 10\\.90\\.20\\.0/24 via 10\\.80\\.0\\.[0-9]+ dev down-client onlink"
 
 assert_topology_contains \
   "${topology}" \

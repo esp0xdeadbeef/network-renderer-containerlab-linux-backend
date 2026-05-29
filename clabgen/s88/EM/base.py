@@ -2,163 +2,177 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from .roles import (
-    parse_access,
-    parse_core,
-    parse_downstream_selector,
-    parse_policy,
-    parse_upstream_selector,
-    parse_wan_peer,
-)
-
 from .default import render as render_default
 
 
-def _core_egress_masquerade(
+def _dict(value: Any) -> Dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _list_strings(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    strings: List[str] = []
+    for item in value:
+        if isinstance(item, str) and item:
+            strings.append(item)
+    return strings
+
+
+def _interface_name_map(
     node_data: Dict[str, Any],
-    role_cfg: Dict[str, Any],
-    wan_if: str | None,
-) -> Dict[str, Any]:
-    wan_firewall_cfg = role_cfg.get("wan_firewall", {})
-    if not isinstance(wan_firewall_cfg, dict):
-        wan_firewall_cfg = {}
+    eth_map: Dict[str, str],
+) -> Dict[str, str]:
+    result: Dict[str, str] = {}
+    interfaces = _dict(node_data.get("interfaces"))
+    for logical_name, iface in interfaces.items():
+        if not isinstance(logical_name, str) or not isinstance(iface, dict):
+            continue
+        if logical_name not in eth_map:
+            continue
+        target_name = eth_map[logical_name]
+        result[logical_name] = target_name
+        runtime_name = iface.get("runtimeIfName")
+        if isinstance(runtime_name, str) and runtime_name:
+            result[runtime_name] = target_name
+    return result
 
-    masquerade = wan_firewall_cfg.get("masquerade")
-    if isinstance(masquerade, dict) and masquerade:
-        return dict(masquerade)
 
-    nat_intent = node_data.get("natIntent", {})
-    if isinstance(nat_intent, dict) and nat_intent.get("enabled") is True:
-        if not isinstance(wan_if, str) or not wan_if:
-            return {}
-        families = nat_intent.get("families", {})
-        families = families if isinstance(families, dict) else {}
-        result: Dict[str, Any] = {
-            "ipv4": bool(families.get("ipv4", False)),
-            "ipv6": bool(families.get("ipv6", False)),
-            "oifnames": [wan_if],
-        }
-        source6 = nat_intent.get("masqueradeSourcePrefixes6")
-        if isinstance(source6, list) and source6:
-            source6_prefixes: List[str] = []
-            for source_prefix in source6:
-                if isinstance(source_prefix, str) and source_prefix:
-                    source6_prefixes.append(source_prefix)
-            result["saddr6"] = source6_prefixes
-        return result
+def _translate_name(value: Any, name_map: Dict[str, str]) -> Any:
+    if isinstance(value, str) and value:
+        return name_map.get(value, value)
+    return value
 
-    egress_intent = node_data.get("egressIntent", {})
-    if not isinstance(egress_intent, dict):
-        return {}
-    if not bool(egress_intent.get("exit", False)):
-        return {}
-    if not isinstance(wan_if, str) or not wan_if:
-        return {}
 
-    wan_interfaces = egress_intent.get("wanInterfaces", [])
-    if not isinstance(wan_interfaces, list) or not wan_interfaces:
+def _translate_names(values: List[str], name_map: Dict[str, str]) -> List[str]:
+    translated_names: List[str] = []
+    for value in values:
+        translated = _translate_name(value, name_map)
+        if isinstance(translated, str) and translated:
+            translated_names.append(translated)
+    return translated_names
+
+
+def _translated_forwarding_rules(
+    forwarding_intent: Dict[str, Any],
+    name_map: Dict[str, str],
+) -> List[Dict[str, Any]]:
+    rules = forwarding_intent.get("rules")
+    if not isinstance(rules, list):
+        return []
+
+    translated_rules: List[Dict[str, Any]] = []
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        translated = dict(rule)
+        translated["fromInterface"] = _translate_name(
+            rule.get("fromInterface"), name_map
+        )
+        translated["toInterface"] = _translate_name(rule.get("toInterface"), name_map)
+        translated_rules.append(translated)
+
+    return translated_rules
+
+
+def _forwarding_cm_input(node_data: Dict[str, Any]) -> Dict[str, Any]:
+    forwarding_intent = _dict(node_data.get("forwardingIntent"))
+    nat_intent = _dict(node_data.get("natIntent"))
+    if not forwarding_intent and not nat_intent:
         return {}
 
     return {
-        "ipv4": True,
-        "ipv6": True,
-        "oifnames": [wan_if],
+        "enable_ipv4": True,
+        "enable_ipv6": True,
+        "disable_eth0": True,
     }
 
 
-def _parse(
-    role: str,
-    node_name: str,
+def _masquerade_from_nat_intent(nat_intent: Dict[str, Any]) -> Dict[str, Any]:
+    if nat_intent.get("enabled") is not True:
+        return {}
+
+    families = _dict(nat_intent.get("families"))
+    result: Dict[str, Any] = {
+        "ipv4": bool(families.get("ipv4", False)),
+        "ipv6": bool(families.get("ipv6", False)),
+        "oifnames": _list_strings(nat_intent.get("masqueradeInterfaces")),
+    }
+
+    source6 = _list_strings(nat_intent.get("masqueradeSourcePrefixes6"))
+    if source6:
+        result["saddr6"] = source6
+
+    return result
+
+
+def _wan_firewall_cm_input(
     node_data: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
 ) -> Dict[str, Any]:
-    normalized_role = str(role or "").strip()
+    name_map = _interface_name_map(node_data, eth_map)
+    forwarding_intent = _dict(node_data.get("forwardingIntent"))
+    nat_intent = _dict(node_data.get("natIntent"))
 
-    if normalized_role == "access":
-        return parse_access(node_name, node_data, eth_map)
+    wan_interfaces = _translate_names(
+        _list_strings(nat_intent.get("wanInterfaces")), name_map
+    )
+    if not wan_interfaces:
+        wan_interfaces = _translate_names(
+            _list_strings(forwarding_intent.get("uplinkInterfaces")),
+            name_map,
+        )
 
-    if normalized_role == "core":
-        return parse_core(node_name, node_data, eth_map)
+    masquerade = _masquerade_from_nat_intent(nat_intent)
+    if masquerade:
+        masquerade["oifnames"] = _translate_names(
+            _list_strings(masquerade.get("oifnames")),
+            name_map,
+        )
+    if not wan_interfaces and not masquerade:
+        return {}
 
-    if normalized_role == "policy":
-        return parse_policy(node_name, node_data, eth_map)
-
-    if normalized_role == "upstream-selector":
-        return parse_upstream_selector(node_name, node_data, eth_map)
-
-    if normalized_role == "downstream-selector":
-        return parse_downstream_selector(node_name, node_data, eth_map)
-
-    if normalized_role == "wan-peer":
-        return parse_wan_peer(node_name, node_data, eth_map)
-
-    return {"node": node_name, "role": normalized_role, "links": {}}
+    return {
+        "wan_interfaces": wan_interfaces,
+        "masquerade": masquerade,
+    }
 
 
-def _default_cm_inputs(
-    role: str,
+def _firewall_cm_input(
     node_data: Dict[str, Any],
-    parsed: Dict[str, Any],
+    eth_map: Dict[str, str],
+) -> Dict[str, Any]:
+    name_map = _interface_name_map(node_data, eth_map)
+    forwarding_intent = _dict(node_data.get("forwardingIntent"))
+    rules = _translated_forwarding_rules(forwarding_intent, name_map)
+    if not rules:
+        return {}
+
+    return {
+        "rules": rules,
+        "interface_tags": {},
+    }
+
+
+def _cm_inputs_from_contracts(
+    node_data: Dict[str, Any],
+    eth_map: Dict[str, str],
 ) -> Dict[str, Any]:
     cm_inputs: Dict[str, Any] = {}
 
-    containerlab = node_data.get("containerlab", {})
-    if not isinstance(containerlab, dict):
-        containerlab = {}
+    forwarding = _forwarding_cm_input(node_data)
+    if forwarding:
+        cm_inputs["forwarding"] = forwarding
 
-    roles_cfg = containerlab.get("roles", {})
-    if not isinstance(roles_cfg, dict):
-        roles_cfg = {}
+    wan_firewall = _wan_firewall_cm_input(node_data, eth_map)
+    if wan_firewall:
+        cm_inputs["wan_firewall"] = wan_firewall
 
-    role_cfg = roles_cfg.get(role, {})
-    if not isinstance(role_cfg, dict):
-        role_cfg = {}
-
-    # Forwarding defaults are environment/runtime concerns; keep them inventory-driven.
-    disable_eth0_default = role not in {"wan-peer", "isp", "core"}
-    disable_eth0 = disable_eth0_default
-    role_forwarding = role_cfg.get("forwarding", {})
-    if isinstance(role_forwarding, dict) and "disable_eth0" in role_forwarding:
-        disable_eth0 = bool(role_forwarding.get("disable_eth0"))
-
-    if role in {
-        "core",
-        "downstream-selector",
-        "policy",
-        "upstream-selector",
-        "wan-peer",
-        "isp",
-    }:
-        cm_inputs["forwarding"] = {
-            "enable_ipv4": True,
-            "enable_ipv6": True,
-            "disable_eth0": disable_eth0,
-        }
+    firewall = _firewall_cm_input(node_data, eth_map)
+    if firewall:
+        cm_inputs["firewall"] = firewall
 
     cm_inputs["management_egress"] = {"interface": "eth0"}
-
-    if role == "core":
-        wan_link = (parsed.get("links") or {}).get("wan") or {}
-        wan_eth = wan_link.get("eth")
-        wan_if = f"eth{wan_eth}" if isinstance(wan_eth, int) else None
-
-        cm_inputs["wan_firewall"] = {
-            "wan_interfaces": [wan_if] if isinstance(wan_if, str) else [],
-            "masquerade": _core_egress_masquerade(node_data, role_cfg, wan_if),
-        }
-
-    if role == "policy":
-        policy_firewall_state = node_data.get("policy_firewall_state", {})
-        if isinstance(policy_firewall_state, dict):
-            cm_inputs["firewall"] = policy_firewall_state
-
-    if role == "wan-peer":
-        fabric_link = (parsed.get("links") or {}).get("fabric") or {}
-        fabric_eth = fabric_link.get("eth")
-        if isinstance(fabric_eth, int):
-            cm_inputs["nat"] = {
-                "wan_interface": f"eth{fabric_eth}",
-            }
 
     return cm_inputs
 
@@ -167,15 +181,13 @@ def render(
     role: str,
     node_name: str,
     node_data: Dict[str, Any],
-    eth_map: Dict[str, int],
+    eth_map: Dict[str, str],
     routing_mode: str = "static",
     disable_dynamic: bool = True,
 ) -> List[str]:
     _ = routing_mode
     _ = disable_dynamic
 
-    parsed = _parse(role, node_name, node_data, eth_map)
-    node_data["_s88_links"] = parsed
-    node_data["_cm_inputs"] = _default_cm_inputs(role, node_data, parsed)
+    node_data["_cm_inputs"] = _cm_inputs_from_contracts(node_data, eth_map)
 
     return render_default(role, node_name, node_data, eth_map)
