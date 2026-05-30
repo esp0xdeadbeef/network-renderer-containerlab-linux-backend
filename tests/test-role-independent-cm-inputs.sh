@@ -55,17 +55,21 @@ cpm_shape_firewall = render(
                     "fromInterface": "uplink-a",
                     "toInterface": "uplink-b",
                     "action": "accept",
-                    "trafficType": "dns",
+                    "trafficType": "nebula",
                     "family": 4,
                     "sourcePrefixes": [{"family": 4, "prefix": "10.20.30.0/24"}],
+                    "matches": [
+                        {"family": "any", "proto": "udp", "dports": [4242]},
+                        {"family": "any", "proto": "tcp", "dports": [4242]},
+                    ],
                 }
             ],
             "interface_tags": {},
         }
     }
 )
-assert_has(cpm_shape_firewall, 'iifname "uplink-a" oifname "uplink-b" ip saddr 10.20.30.0/24 udp dport 53 counter accept')
-assert_has(cpm_shape_firewall, 'iifname "uplink-a" oifname "uplink-b" ip saddr 10.20.30.0/24 tcp dport 53 counter accept')
+assert_has(cpm_shape_firewall, 'iifname "uplink-a" oifname "uplink-b" ip saddr 10.20.30.0/24 udp dport 4242 counter accept')
+assert_has(cpm_shape_firewall, 'iifname "uplink-a" oifname "uplink-b" ip saddr 10.20.30.0/24 tcp dport 4242 counter accept')
 
 try:
     render({"made_up_policy": {"enabled": True}})

@@ -35,6 +35,69 @@ def _prefix_expr(prefixes: List[str]) -> str:
     return "{ " + ", ".join(prefixes) + " }"
 
 
+def _match_family_applies(match: Dict[str, Any], family: int) -> bool:
+    match_family = match.get("family", "any")
+    if match_family == "any":
+        return True
+    if match_family in (family, str(family)):
+        return True
+    if family == 4 and match_family in ("ipv4", "ip"):
+        return True
+    if family == 6 and match_family in ("ipv6", "ip6"):
+        return True
+    return False
+
+
+def _dports_expr(match: Dict[str, Any]) -> str:
+    raw_dports = match.get("dports")
+    if raw_dports is None:
+        return ""
+    if isinstance(raw_dports, int):
+        return f" dport {raw_dports}"
+    if not isinstance(raw_dports, list):
+        return ""
+
+    ports: List[str] = []
+    for raw_port in raw_dports:
+        if isinstance(raw_port, int):
+            ports.append(str(raw_port))
+    if not ports:
+        return ""
+    if len(ports) == 1:
+        return f" dport {ports[0]}"
+    return " dport { " + ", ".join(ports) + " }"
+
+
+def _match_suffix(match: Dict[str, Any], family: int) -> str | None:
+    if not _match_family_applies(match, family):
+        return None
+
+    proto = match.get("proto")
+    proto_text = "" if proto in (None, "any") else str(proto).lower()
+    dports = _dports_expr(match)
+
+    if proto_text == "icmp":
+        return " meta l4proto icmp"
+    if proto_text:
+        return f" {proto_text}{dports}"
+    return dports
+
+
+def _explicit_match_suffixes(rule_obj: Dict[str, Any], family: int) -> List[str]:
+    matches = rule_obj.get("matches")
+    if not isinstance(matches, list):
+        return []
+
+    suffixes: List[str] = []
+    for match in matches:
+        if not isinstance(match, dict):
+            continue
+        suffix = _match_suffix(match, family)
+        if suffix is not None:
+            suffixes.append(suffix)
+    return suffixes
+
+
 def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
     from_interface = rule_obj.get("fromInterface")
     to_interface = rule_obj.get("toInterface")
@@ -64,7 +127,11 @@ def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
             f"{prefix_part}"
         )
 
-        if traffic_type == "dns":
+        match_suffixes = _explicit_match_suffixes(rule_obj, rule_family)
+        if match_suffixes:
+            for suffix in match_suffixes:
+                rules.append(f"{base}{suffix} counter {action}")
+        elif traffic_type == "dns":
             rules.append(f"{base} udp dport 53 counter {action}")
             rules.append(f"{base} tcp dport 53 counter {action}")
         else:

@@ -19,50 +19,50 @@ assert_node_exec \
   matches \
   "${topology}" \
   "espbranch-site-b-b-router-policy" \
-  "ip route replace 10\\.20\\.10\\.0/24 nexthop via 10\\.50\\.0\\.13 dev eth3 onlink\\s+nexthop\\s+via 10\\.50\\.0\\.17 dev eth5 onlink"
+  "ip route replace 10\\.20\\.10\\.0/24 nexthop via 10\\.50\\.0\\.13 dev up-branch-ew onlink\\s+nexthop\\s+via 10\\.50\\.0\\.17 dev up-hostile-ew onlink"
 
 assert_node_exec \
   matches \
   "${topology}" \
   "esp0xdeadbeef-site-c-c-router-policy" \
-  "ip route replace 10\\.20\\.10\\.0/24 nexthop via 10\\.80\\.0\\.13 dev eth3 onlink\\s+nexthop\\s+via 10\\.80\\.0\\.17 dev eth5 onlink"
+  "ip route replace 10\\.20\\.10\\.0/24 nexthop via 10\\.80\\.0\\.13 dev up-client-ew onlink\\s+nexthop\\s+via 10\\.80\\.0\\.17 dev up-dmz-ew onlink"
 
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-core-nebula" \
-  "ip addr replace 100\\.96\\.10\\.1/32 dev eth[0-9]+"
+  "ip addr replace 100\\.96\\.10\\.1/32 dev nebula1"
 
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-core-nebula" \
-  "ip route replace 100\\.96\\.10\\.2/32 dev eth[0-9]+"
+  "ip route replace 100\\.96\\.10\\.2/32 dev nebula1"
 
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-core-nebula" \
-  "ip route replace 10\\.60\\.10\\.0/24 via 100\\.96\\.10\\.2 dev eth[0-9]+ onlink"
+  "ip route replace 10\\.60\\.10\\.0/24 via 100\\.96\\.10\\.2 dev nebula1 onlink"
 
 assert_node_matches \
   "${topology}" \
   "espbranch-site-b-b-router-core-nebula" \
-  "ip addr replace 100\\.96\\.10\\.2/32 dev eth[0-9]+"
+  "ip addr replace 100\\.96\\.10\\.2/32 dev nebula1"
 
 assert_node_matches \
   "${topology}" \
   "espbranch-site-b-b-router-core-nebula" \
-  "ip route replace 100\\.96\\.10\\.1/32 dev eth[0-9]+"
+  "ip route replace 100\\.96\\.10\\.1/32 dev nebula1"
 
 assert_node_matches \
   "${topology}" \
   "espbranch-site-b-b-router-core-nebula" \
-  "ip route replace 10\\.20\\.10\\.0/24 via 100\\.96\\.10\\.1 dev eth[0-9]+ onlink"
+  "ip route replace 10\\.20\\.10\\.0/24 via 100\\.96\\.10\\.1 dev nebula1 onlink"
 
-assert_topology_contains "${topology}" "esp0xdeadbeef-site-a-s-router-core-nebula:eth"
-assert_topology_contains "${topology}" "espbranch-site-b-b-router-core-nebula:eth"
+assert_topology_contains "${topology}" "esp0xdeadbeef-site-a-s-router-core-nebula:nebula1"
+assert_topology_contains "${topology}" "espbranch-site-b-b-router-core-nebula:nebula1"
 assert_topology_contains "${topology}" "clab.link.type: overlay"
 assert_topology_contains "${topology}" "clab.overlay: east-west"
 
-if grep -A4 -E 's-router-core-nebula:eth|b-router-core-nebula:eth' "${topology}" | grep -q 'clab.link.bridge: br-uplink'; then
+if grep -A4 -E 's-router-core-nebula:nebula1|b-router-core-nebula:nebula1' "${topology}" | grep -q 'clab.link.bridge: br-uplink'; then
   echo "core-nebula overlay nodes must not attach directly to host WAN/uplink bridges" >&2
   exit 1
 fi
