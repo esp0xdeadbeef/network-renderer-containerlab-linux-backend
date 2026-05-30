@@ -59,9 +59,15 @@ required = [
     "clab.link.bridge: streaming",
     "clab.link.bridge: br-uplink0",
     "clab.link.bridge: br-uplink1",
-    "net.ipv6.conf.eth2.accept_ra=2",
-    "net.ipv6.conf.eth2.autoconf=1",
-    "udhcpc -b -i eth2",
+    "net.ipv6.conf.isp-a.accept_ra=2",
+    "net.ipv6.conf.isp-a.autoconf=1",
+    "udhcpc -b -i isp-a",
+    "net.ipv6.conf.isp-b.accept_ra=2",
+    "net.ipv6.conf.isp-b.autoconf=1",
+    "udhcpc -b -i isp-b",
+    "net.ipv6.conf.wan.accept_ra=2",
+    "net.ipv6.conf.wan.autoconf=1",
+    "udhcpc -b -i wan",
 ]
 
 missing = [needle for needle in required if needle not in topology]

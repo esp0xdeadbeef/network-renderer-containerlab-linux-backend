@@ -14,8 +14,8 @@ node="esp0xdeadbeef-site-a-s-router-core-nebula"
 overlay_addr="100.96.10.1/32"
 
 overlay_dev="$(
-  grep -E "ip addr replace ${overlay_addr} dev eth[0-9]+" "${topology}" \
-    | sed -E 's/.* dev (eth[0-9]+).*/\1/' \
+  grep -E "ip addr replace ${overlay_addr} dev [A-Za-z0-9_.-]+" "${topology}" \
+    | sed -E 's/.* dev ([A-Za-z0-9_.-]+).*/\1/' \
     | head -n1
 )"
 

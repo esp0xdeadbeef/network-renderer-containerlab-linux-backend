@@ -13,7 +13,7 @@ topology="${tmp_dir}/fabric.clab.yml"
 assert_node_contains \
   "${topology}" \
   "espbranch-site-b-b-router-access-hostile" \
-  "ip -6 addr replace fd42:dead:feed:70::1/64 dev eth2"
+  "ip -6 addr replace fd42:dead:feed:70::1/64 dev tenant-hostile"
 
 assert_node_contains \
   "${topology}" \

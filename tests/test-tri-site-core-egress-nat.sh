@@ -34,12 +34,14 @@ cpm = {
                                 "interfaces": {
                                     "upstream": {
                                         "sourceKind": "p2p",
+                                        "runtimeIfName": "eth1",
                                         "addr4": "10.50.0.14/31",
                                         "addr6": "fd42:dead:feed:1000::e/127",
                                         "backingRef": {"name": "upstream"},
                                     },
                                     "wan": {
                                         "sourceKind": "wan",
+                                        "runtimeIfName": "eth2",
                                         "upstream": "wan",
                                         "hostUplink": {
                                             "bridge": "br-uplink1",
@@ -64,6 +66,23 @@ cpm = {
                                 ],
                             }
                         ]
+                    },
+                    "links": {
+                        "wan": {
+                            "kind": "wan",
+                            "hostUplink": {
+                                "bridge": "br-uplink1",
+                                "mode": "vlan",
+                                "parent": "eth0",
+                                "vlan": 4
+                            },
+                            "endpoints": {
+                                "clab-router-core-simulated-isp": {
+                                    "node": "clab-router-core-simulated-isp",
+                                    "interface": "wan"
+                                }
+                            }
+                        }
                     },
                     "forwardingSemantics": {
                         "nodes": {

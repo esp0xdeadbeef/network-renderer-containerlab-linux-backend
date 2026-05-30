@@ -12,34 +12,24 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 render_clab_example "s-router-overlay-dns-lane-policy" "${tmp_dir}"
 topology="${tmp_dir}/fabric.clab.yml"
 
-assert_node_contains \
+assert_node_matches \
   "${topology}" \
   "espbranch-site-b-b-router-policy" \
-  "ip route replace 10.20.10.0/24 nexthop via 10.50.0.13 dev eth3 onlink nexthop"
+  "ip route replace 10\\.20\\.10\\.0/24 nexthop via 10\\.50\\.0\\.13 dev up-branch-ew onlink\\s+nexthop via 10\\.50\\.0\\.17 dev up-hostile-ew onlink"
 
-assert_node_contains \
+assert_node_matches \
   "${topology}" \
   "espbranch-site-b-b-router-policy" \
-  "via 10.50.0.17 dev eth5 onlink"
-
-assert_node_contains \
-  "${topology}" \
-  "espbranch-site-b-b-router-policy" \
-  "ip -6 route replace fd42:dead:beef:10::/64 nexthop via fd42:dead:feed:1000:0:0:0:d"
-
-assert_node_contains \
-  "${topology}" \
-  "espbranch-site-b-b-router-policy" \
-  "via fd42:dead:feed:1000:0:0:0:11 dev eth5 onlink"
+  "ip -6 route replace fd42:dead:beef:10::/64 nexthop via fd42:dead:feed:1000:0:0:0:d\\s+dev up-branch-ew onlink nexthop via fd42:dead:feed:1000:0:0:0:11 dev up-hostile-ew\\s+onlink"
 
 assert_node_contains \
   "${topology}" \
   "espbranch-site-b-b-router-access-hostile" \
-  "ip addr replace 10.70.10.1/24 dev eth2"
+  "ip addr replace 10.70.10.1/24 dev tenant-hostile"
 
 assert_node_contains \
   "${topology}" \
   "espbranch-site-b-b-router-access-hostile" \
-  "ip -6 addr replace fd42:dead:feed:70::1/64 dev eth2"
+  "ip -6 addr replace fd42:dead:feed:70::1/64 dev tenant-hostile"
 
 pass "hostile-dns-east-west"

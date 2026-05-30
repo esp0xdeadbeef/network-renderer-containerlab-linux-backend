@@ -13,9 +13,10 @@ from clabgen.s88.enterprise.site_loader import load_sites
 from clabgen.s88.Unit.base import render_units
 
 
-def iface(link, addr4, addr6, routes=None):
+def iface(link, runtime_if_name, addr4, addr6, routes=None):
     return {
         "sourceKind": "p2p",
+        "runtimeIfName": runtime_if_name,
         "backingRef": {"name": link},
         "addr4": addr4,
         "addr6": addr6,
@@ -57,7 +58,14 @@ site["runtimeTargets"] = {
         "clab-router-access-client",
         "access",
         1,
-        {underlay: iface(underlay, "10.50.0.2/31", "fd42:dead:feed:1000::2/127")},
+        {
+            underlay: iface(
+                underlay,
+                "eth1",
+                "10.50.0.2/31",
+                "fd42:dead:feed:1000::2/127",
+            )
+        },
     ),
     "rt-core-nebula": rt(
         "clab-router-core-nebula",
@@ -66,6 +74,7 @@ site["runtimeTargets"] = {
         {
             underlay: iface(
                 underlay,
+                "eth1",
                 "10.50.0.3/31",
                 "fd42:dead:feed:1000::3/127",
                 {
@@ -73,14 +82,26 @@ site["runtimeTargets"] = {
                     "ipv6": [{"dst": "::/0", "via6": "fd42:dead:feed:1000::2"}],
                 },
             ),
-            upstream: iface(upstream, "10.50.0.14/31", "fd42:dead:feed:1000::e/127"),
+            upstream: iface(
+                upstream,
+                "eth2",
+                "10.50.0.14/31",
+                "fd42:dead:feed:1000::e/127",
+            ),
         },
     ),
     "rt-upstream": rt(
         "clab-router-upstream",
         "upstream-selector",
         3,
-        {upstream: iface(upstream, "10.50.0.15/31", "fd42:dead:feed:1000::f/127")},
+        {
+            upstream: iface(
+                upstream,
+                "eth1",
+                "10.50.0.15/31",
+                "fd42:dead:feed:1000::f/127",
+            )
+        },
     ),
 }
 site["transit"] = {
