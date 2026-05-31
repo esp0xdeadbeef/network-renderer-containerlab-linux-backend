@@ -30,7 +30,9 @@ RUN if command -v tcpdump >/dev/null 2>&1 \
 
 RUN sed -i \
         -e 's/^bgpd=no/bgpd=yes/' \
-        -e 's/^staticd=no/staticd=yes/' \
-        /etc/frr/daemons
+        /etc/frr/daemons \
+    && grep -q '^bgpd=yes' /etc/frr/daemons \
+    && { grep -q '^staticd=yes' /etc/frr/daemons \
+        || grep -q 'staticd daemons are always started' /etc/frr/daemons; }
 
 #USER frr

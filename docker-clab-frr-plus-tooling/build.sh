@@ -83,6 +83,27 @@ image_is_usable() {
     return 1
 }
 
+verify_tooling_image() {
+    docker run --rm --entrypoint /bin/sh "$IMAGE" -ec '
+        for cmd in tcpdump ping traceroute curl vim rg nmap nft less; do
+            command -v "$cmd" >/dev/null || {
+                echo "missing FRR tooling package command: $cmd" >&2
+                exit 1
+            }
+        done
+
+        grep -q "^bgpd=yes" /etc/frr/daemons || {
+            echo "FRR bgpd daemon is not enabled" >&2
+            exit 1
+        }
+        if ! grep -q "^staticd=yes" /etc/frr/daemons \
+            && ! grep -q "staticd daemons are always started" /etc/frr/daemons; then
+            echo "FRR staticd daemon is not enabled or explicitly always-started" >&2
+            exit 1
+        fi
+    '
+}
+
 maybe_load_cached_image() {
     local local_id=""
     local desired_id=""
@@ -112,6 +133,8 @@ if [[ "${FORCE_REBUILD}" == "1" || "${FORCE_REBUILD}" == "true" ]] || ! image_is
         -t "$IMAGE" \
         "$DIR"
 
+    verify_tooling_image
+
     if [[ "${SAVE_CACHE}" != "0" && "${SAVE_CACHE}" != "false" ]]; then
         echo "[clab] saving FRR tooling image cache to ${CACHE_TAR}..."
         docker save "$IMAGE" -o "${CACHE_TAR}"
@@ -119,6 +142,7 @@ if [[ "${FORCE_REBUILD}" == "1" || "${FORCE_REBUILD}" == "true" ]] || ! image_is
     fi
 else
     echo "[clab] using cached FRR tooling image ${IMAGE} (${CACHE_KEY})"
+    verify_tooling_image
     if [[ "${SAVE_CACHE}" != "0" && "${SAVE_CACHE}" != "false" && ! -f "${CACHE_TAR}" ]]; then
         mkdir -p "${CACHE_DIR}"
         echo "[clab] seeding FRR tooling image cache at ${CACHE_TAR}..."
