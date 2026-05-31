@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# GAMP-ID: USR-INET-001-FS-001-HDS-001-SDS-001-001-SMS-001-005
+# GAMP-ID: USR-INET-001-FS-001-HDS-001-SDS-001-001-SMS-001-CMC-001-005
+# GAMP-ID: USR-MODEL-001-FS-001-HDS-001-SDS-001-002-SMS-001-003
+# GAMP-ID: USR-MODEL-001-FS-001-HDS-001-SDS-001-002-SMS-001-CMC-001-003
 set -euo pipefail
 # LAB-SMT-ID: LAB-SMT-020
 # LAB-SMT-SCOPE: examples-only; see network-labs/tests/SMT.md
@@ -69,14 +73,23 @@ families = nat_intent.get("families") or {}
 expected4 = [
     name for name in nat_intent.get("masqueradeInterfaces4", [])
 ]
+expected4_sources = [
+    prefix for prefix in nat_intent.get("masqueradeSourcePrefixes4", [])
+]
 expected6 = [
     name for name in nat_intent.get("masqueradeInterfaces6", [])
 ]
 
 if families.get("ipv4"):
     assert expected4, "CPM enabled NAT44 but did not name masqueradeInterfaces4"
+    assert expected4_sources, "CPM enabled NAT44 but did not name masqueradeSourcePrefixes4"
+    source_set = ",".join(expected4_sources)
     for ifname in expected4:
-        assert any(f'oifname "{ifname}" masquerade' in c for c in execs_clab), (
+        assert any(
+            f"ip saddr {{ {source_set} }}" in c
+            and f'oifname "{ifname}" masquerade' in c
+            for c in execs_clab
+        ), (
             f"expected NAT44 on CPM-selected CLAB WAN port {ifname}"
         )
 else:

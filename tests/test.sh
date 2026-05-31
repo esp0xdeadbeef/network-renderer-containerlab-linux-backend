@@ -32,11 +32,15 @@ tests=(
   test-rendered-artifact-validator-scratch-dir.sh
   test-provenance-without-git.sh
   test-policy-interface-tags-no-generated-link-parsing.sh
+  test-runtime-interface-mapping-refusals.sh
+  test-bridge-link-realization-contracts.sh
+  test-lab-emulation-capability-gate.sh
   test-access-tenant-no-node-name-parsing.sh
   test-vm-runtime-log-guard.sh
   test-input-path-override.sh
   test-vm-matrix-resources.sh
   test-vm-matrix-runner.sh
+  test-topology-conformance-parity-guard.sh
   test-passing-fixtures.sh
   test-dual-wan-branch-overlay.sh
   test-bgp-example.sh

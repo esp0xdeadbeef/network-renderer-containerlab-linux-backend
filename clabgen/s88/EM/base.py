@@ -103,6 +103,10 @@ def _masquerade_from_nat_intent(nat_intent: Dict[str, Any]) -> Dict[str, Any]:
     if source6:
         result["saddr6"] = source6
 
+    source4 = _list_strings(nat_intent.get("masqueradeSourcePrefixes4"))
+    if source4:
+        result["saddr4"] = source4
+
     return result
 
 

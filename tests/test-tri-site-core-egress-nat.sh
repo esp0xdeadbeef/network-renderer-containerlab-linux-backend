@@ -53,7 +53,27 @@ cpm = {
                                     },
                                 }
                             },
-                        }
+                        },
+                        "esp-clab-router-upstream": {
+                            "role": "wan-peer",
+                            "routingMode": "static",
+                            "logicalNode": {
+                                "enterprise": "esp",
+                                "site": "clab",
+                                "name": "clab-router-upstream",
+                            },
+                            "effectiveRuntimeRealization": {
+                                "interfaces": {
+                                    "upstream": {
+                                        "sourceKind": "p2p",
+                                        "runtimeIfName": "eth1",
+                                        "addr4": "10.50.0.15/31",
+                                        "addr6": "fd42:dead:feed:1000::f/127",
+                                        "backingRef": {"name": "upstream"},
+                                    }
+                                }
+                            },
+                        },
                     },
                     "transit": {
                         "adjacencies": [
@@ -97,6 +117,11 @@ cpm = {
                                     "families": {"ipv4": True, "ipv6": True},
                                     "wanInterfaces": ["wan"],
                                     "masqueradeInterfaces": ["wan"],
+                                    "masqueradeSourcePrefixes4": [
+                                        "10.0.0.0/8",
+                                        "172.16.0.0/12",
+                                        "192.168.0.0/16",
+                                    ],
                                     "masqueradeSourcePrefixes6": [
                                         "fd42:dead:feed:10::/64"
                                     ],

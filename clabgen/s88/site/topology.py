@@ -4,6 +4,7 @@ import copy
 from typing import Any, Dict
 
 from clabgen.models import SiteModel
+from clabgen.s88.CM.lab_emulation import render_lab_emulation_artifacts
 from clabgen.s88.site.bridge_networks import renderer_bridge_networks
 from clabgen.s88.site.eth_map import build_eth_maps
 from clabgen.s88.site.links import render_links
@@ -56,6 +57,7 @@ def render_site_topology(site: SiteModel) -> Dict[str, Any]:
     eth_maps = build_eth_maps(site)
     nodes = render_nodes(site, eth_maps)
     links, bridges = render_links(site, eth_maps)
+    lab_emulation_artifacts = render_lab_emulation_artifacts(site)
 
     for link in site.links.values():
         if link.bridge and link.host_uplink:
@@ -78,5 +80,6 @@ def render_site_topology(site: SiteModel) -> Dict[str, Any]:
         "bridges": bridges,
         "bridge_networks": bridge_networks,
         "bridge_control_modules": {},
+        "lab_emulation_artifacts": lab_emulation_artifacts,
         "solver_meta": dict(site.solver_meta or {}),
     }

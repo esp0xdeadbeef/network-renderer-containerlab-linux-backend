@@ -48,21 +48,18 @@ def render(input_data: Dict[str, Any]) -> List[str]:
     enable_nat4 = bool(masquerade.get("ipv4", False))
     enable_nat6 = bool(masquerade.get("ipv6", False))
 
-    saddr4 = masquerade.get(
-        "saddr4",
-        ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
-    )
+    saddr4 = masquerade.get("saddr4", [])
     if not isinstance(saddr4, list):
-        saddr4 = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+        saddr4 = []
     normalized_saddr4: List[str] = []
     for source_prefix in saddr4:
         if isinstance(source_prefix, str) and source_prefix:
             normalized_saddr4.append(source_prefix)
     saddr4 = normalized_saddr4
 
-    saddr6 = masquerade.get("saddr6", ["fc00::/7"])
+    saddr6 = masquerade.get("saddr6", [])
     if not isinstance(saddr6, list):
-        saddr6 = ["fc00::/7"]
+        saddr6 = []
     normalized_saddr6: List[str] = []
     for source_prefix in saddr6:
         if isinstance(source_prefix, str) and source_prefix:
@@ -76,7 +73,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
     # management network), we still allow inventory-driven masquerading without
     # constructing WAN-filtering rules.
     if not wan_interfaces:
-        if oifnames and enable_nat4:
+        if oifnames and enable_nat4 and saddr4:
             cmds.extend(
                 [
                     "nft add table ip nat",
@@ -89,7 +86,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
                     f'nft add rule ip nat postrouting ip saddr {{ {srcset} }} oifname "{oif}" masquerade'
                 )
 
-        if oifnames and enable_nat6:
+        if oifnames and enable_nat6 and saddr6:
             cmds.extend(
                 [
                     "nft add table ip6 nat",
@@ -123,7 +120,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
             )
 
     # NAT is inventory-driven and independent from which interfaces are treated as WAN for filtering.
-    if oifnames and enable_nat4:
+    if oifnames and enable_nat4 and saddr4:
         cmds.extend(
             [
                 "nft add table ip nat",
@@ -136,7 +133,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
                 f'nft add rule ip nat postrouting ip saddr {{ {srcset} }} oifname "{oif}" masquerade'
             )
 
-    if oifnames and enable_nat6:
+    if oifnames and enable_nat6 and saddr6:
         cmds.extend(
             [
                 "nft add table ip6 nat",

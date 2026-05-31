@@ -51,10 +51,12 @@ def build_eth_maps(site: SiteModel) -> Dict[str, Dict[str, str]]:
         link = site.links[link_name]
         for node_name, ep in sorted(link.endpoints.items()):
             if node_name not in site.nodes:
-                continue
+                raise ValueError(f"link endpoint references unknown node {node_name!r}")
             iface = ep.get("interface")
-            if iface is None:
-                continue
+            if not isinstance(iface, str) or not iface:
+                raise ValueError(
+                    f"link endpoint for node {node_name!r} is missing explicit interface"
+                )
             if iface not in eth_maps[node_name]:
                 _add_mapping(eth_maps, used_names, site, node_name, iface)
 

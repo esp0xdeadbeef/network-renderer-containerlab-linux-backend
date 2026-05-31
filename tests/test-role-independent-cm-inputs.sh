@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# GAMP-ID: SMT-CLAB-ROLE-INDEPENDENT-CM-001
+# GAMP-ID: USR-MODEL-001-FS-001-HDS-001-SDS-001-002-SMS-001-002
+# GAMP-ID: USR-MODEL-001-FS-001-HDS-001-SDS-001-002-SMS-001-CMC-001-002
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -19,7 +20,11 @@ explicit_wan_firewall = render(
     {
         "wan_firewall": {
             "wan_interfaces": ["eth9"],
-            "masquerade": {"ipv4": True, "oifnames": ["eth9"]},
+            "masquerade": {
+                "ipv4": True,
+                "oifnames": ["eth9"],
+                "saddr4": ["10.66.0.0/24"],
+            },
         }
     }
 )

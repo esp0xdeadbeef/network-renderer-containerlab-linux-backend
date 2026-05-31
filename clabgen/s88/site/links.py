@@ -19,10 +19,19 @@ def _link_endpoint(
     eth_maps: Dict[str, Dict[str, str]],
 ) -> str | None:
     if node_name not in eth_maps:
-        return None
+        raise ValueError(
+            f"link endpoint references node {node_name!r} outside the rendered CPM node set"
+        )
     iface = ep.get("interface")
-    if iface is None or iface not in eth_maps[node_name]:
-        return None
+    if not isinstance(iface, str) or not iface:
+        raise ValueError(
+            f"link endpoint for node {node_name!r} is missing explicit interface"
+        )
+    if iface not in eth_maps[node_name]:
+        raise ValueError(
+            f"link endpoint for node {node_name!r} references interface {iface!r} "
+            "without explicit CPM runtimeIfName"
+        )
     return f"{node_name}:{eth_maps[node_name][iface]}"
 
 
@@ -35,6 +44,7 @@ def _host_bridge_link(
             f"{bridge}:{host_ifname(f'{bridge}-{link_name}-{endpoint}')}",
         ],
         bridge,
+        link_name,
     )
     labels = link["labels"]
     labels["clab.host.parent"] = str(host_uplink.get("parent") or "")
@@ -70,24 +80,29 @@ def _render_model_links(
 
             bridges.append(bridge)
             endpoints.append(f"host:{host_ifname(f'{bridge}-{link_name}')}")
-            links.append(_bridge_link(endpoints, bridge))
+            links.append(_bridge_link(endpoints, bridge, link_name))
             continue
 
         if len(endpoints) == 2:
             bridge = link_bridge(site, link, link_name)
             bridges.append(bridge)
-            links.append(_bridge_link(endpoints, bridge))
+            links.append(_bridge_link(endpoints, bridge, link_name))
 
     return links, bridges
 
 
-def _bridge_link(endpoints: List[str], bridge: str) -> Dict[str, Any]:
+def _bridge_link(
+    endpoints: List[str], bridge: str, source_link: str | None = None
+) -> Dict[str, Any]:
+    labels = {
+        "clab.link.type": "bridge",
+        "clab.link.bridge": bridge,
+    }
+    if isinstance(source_link, str) and source_link:
+        labels["clab.source.link"] = source_link
     return {
         "endpoints": endpoints,
-        "labels": {
-            "clab.link.type": "bridge",
-            "clab.link.bridge": bridge,
-        },
+        "labels": labels,
     }
 
 
