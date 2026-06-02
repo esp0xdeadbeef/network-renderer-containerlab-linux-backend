@@ -25,4 +25,16 @@ for fn in check_dual_wan_overlay check_dual_wan_overlay_bgp; do
   fi
 done
 
+for fn in check_single_wan check_site_a_wan_core_egress; do
+  body="$(extract_function "${fn}")"
+  if grep -q 'addr show dev eth2' <<<"${body}"; then
+    echo "FAIL vm-physical-overlay-post-checks: ${fn} must not hard-code eth2 for VM WAN egress checks" >&2
+    exit 1
+  fi
+  if ! grep -q 'egress_dev=' <<<"${body}"; then
+    echo "FAIL vm-physical-overlay-post-checks: ${fn} must derive the WAN egress device from route selection" >&2
+    exit 1
+  fi
+done
+
 echo "PASS vm-physical-overlay-post-checks"
