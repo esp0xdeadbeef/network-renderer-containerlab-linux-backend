@@ -9,6 +9,7 @@ from clabgen.s88.site.model_builder import (
     build_nodes,
     tenant_prefix_owners,
 )
+from clabgen.s88.enterprise.reservations import reject_unsupported_reservations
 from clabgen.solver import (
     extract_enterprise_sites,
     load_solver,
@@ -160,6 +161,7 @@ def load_sites(
         if filtered_site is None:
             continue
         site = filtered_site
+        reject_unsupported_reservations(site)
         validate_site_invariants(
             site,
             context={"enterprise": enterprise, "site": site_name},

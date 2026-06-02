@@ -6,7 +6,11 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 PYTHONPATH="${repo_root}" python3 - <<'PY'
-from clabgen.cpm_solver import control_plane_model_to_solver_json
+import json
+import tempfile
+from pathlib import Path
+
+from clabgen.s88.enterprise.site_loader import load_sites
 
 cpm = {
     "control_plane_model": {
@@ -65,14 +69,61 @@ cpm = {
     }
 }
 
+def write_cpm(payload):
+    tmp_dir = tempfile.TemporaryDirectory()
+    path = Path(tmp_dir.name) / "cpm.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return tmp_dir, path
+
 try:
-    control_plane_model_to_solver_json(cpm)
+    tmp_dir, cpm_path = write_cpm(cpm)
+    with tmp_dir:
+        load_sites(cpm_path)
 except ValueError as exc:
     message = str(exc)
     assert "containerlab-linux renderer does not materialize DHCP reservations" in message
     assert "runtimeTargets.access-runtime.advertisements" in message
 else:
     raise SystemExit("FAIL dhcp-reservation-contract-fail-closed: unsupported reservations were accepted")
+
+target_filtered_cpm = json.loads(json.dumps(cpm))
+target_filtered_cpm["control_plane_model"]["data"]["esp"]["clab"]["runtimeTargets"][
+    "clab-runtime"
+] = {
+    "role": "access",
+    "routingMode": "static",
+    "logicalNode": {
+        "enterprise": "esp",
+        "site": "clab",
+        "name": "access-clab",
+    },
+    "effectiveRuntimeRealization": {
+        "interfaces": {}
+    },
+}
+target_filtered_cpm["control_plane_model"]["data"]["esp"]["clab"]["nodes"] = {
+    "access-clab": {"role": "access"}
+}
+
+renderer_inventory = {
+    "containerlab": {"targetHost": "s-router-clab"},
+    "realization": {
+        "nodes": {
+            "access-clab-realized": {
+                "host": "s-router-clab",
+                "logicalNode": {
+                    "enterprise": "esp",
+                    "site": "clab",
+                    "name": "access-clab",
+                },
+            }
+        }
+    },
+}
+
+tmp_dir, cpm_path = write_cpm(target_filtered_cpm)
+with tmp_dir:
+    load_sites(cpm_path, renderer_inventory=renderer_inventory)
 
 print("PASS dhcp-reservation-contract-fail-closed")
 PY
