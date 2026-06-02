@@ -23,7 +23,19 @@ check_single_wan() {
     '
     docker exec '${core}' sh -c '
       set -e
-      ip -4 addr show dev eth2
+      egress_route=\$(ip route get 8.8.8.8)
+      set -- \$egress_route
+      egress_dev=
+      while test \"\$#\" -gt 0; do
+        if test \"\$1\" = dev; then
+          shift
+          egress_dev=\"\$1\"
+          break
+        fi
+        shift
+      done
+      test -n \"\$egress_dev\"
+      ip -4 addr show dev \"\$egress_dev\"
       ip route
       ip route get 8.8.8.8
       ping -c1 -W 3 8.8.8.8
@@ -40,7 +52,19 @@ check_site_a_wan_core_egress() {
     containerlab inspect -t '${topo_file}' >/dev/null
     docker exec '${core}' sh -c '
       set -e
-      ip -4 addr show dev eth2
+      egress_route=\$(ip route get 8.8.8.8)
+      set -- \$egress_route
+      egress_dev=
+      while test \"\$#\" -gt 0; do
+        if test \"\$1\" = dev; then
+          shift
+          egress_dev=\"\$1\"
+          break
+        fi
+        shift
+      done
+      test -n \"\$egress_dev\"
+      ip -4 addr show dev \"\$egress_dev\"
       ip route
       ip route get 8.8.8.8
       ping -c1 -W 3 8.8.8.8
