@@ -96,3 +96,4 @@ class SiteModel:
     policy_node_name: str = ""
     upstream_selector_node_name: str = ""
     tenant_prefix_owners: Dict[str, Any] = field(default_factory=dict)
+    upstream_emulation: Dict[str, Any] = field(default_factory=dict)

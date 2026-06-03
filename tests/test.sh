@@ -35,6 +35,7 @@ tests=(
   test-runtime-interface-mapping-refusals.sh
   test-bridge-link-realization-contracts.sh
   test-lab-emulation-capability-gate.sh
+  test-upstream-emulation-pppoe-artifacts.sh
   test-access-tenant-no-node-name-parsing.sh
   test-vm-runtime-log-guard.sh
   test-input-path-override.sh
