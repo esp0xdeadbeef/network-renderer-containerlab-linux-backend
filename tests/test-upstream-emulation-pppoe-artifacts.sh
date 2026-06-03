@@ -7,8 +7,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${repo_root}/tests/lib/input-path.sh"
 
 python3 - <<'PY'
-from clabgen.models import SiteModel
+from clabgen.models import InterfaceModel, LinkModel, NodeModel, SiteModel
 from clabgen.s88.CM.lab_emulation import render_lab_emulation_artifacts
+from clabgen.s88.site.topology import render_site_topology
 
 site = SiteModel(
     enterprise="esp",
@@ -82,6 +83,51 @@ except ValueError as exc:
     assert "requires explicit PPPoE server and client records" in str(exc)
 else:
     raise AssertionError("missing PPPoE client did not fail closed")
+
+runtime_site = SiteModel(
+    enterprise="esp",
+    site="clab",
+    nodes={
+        "clab-router-core-simulated-isp": NodeModel(
+            name="clab-router-core-simulated-isp",
+            role="core",
+            routing_domain="core",
+            routing_mode="static",
+            interfaces={
+                "pppoe-wan": InterfaceModel(
+                    name="pppoe-wan",
+                    runtime_if_name="eth1",
+                    kind="wan",
+                )
+            },
+        )
+    },
+    links={
+        "pppoe-handoff": LinkModel(
+            name="pppoe-handoff",
+            kind="lan",
+            bridge="br-clab-pppoe",
+            endpoints={
+                "clab-router-core-simulated-isp": {"interface": "pppoe-wan"}
+            },
+        )
+    },
+    single_access="",
+    domains={},
+    upstream_emulation=site.upstream_emulation,
+)
+topology = render_site_topology(runtime_site)
+nodes = topology["topology"]["nodes"]
+core_exec = "\n".join(nodes["clab-router-core-simulated-isp"]["exec"])
+server_exec = "\n".join(nodes["sat-clab-pppoe-ac"]["exec"])
+assert "pppd pty" in core_exec and "pppoe -I eth1" in core_exec
+assert "udhcpc -b -i eth1" not in core_exec
+assert "accept_ra=2" not in core_exec
+assert "pppoe-server -I eth1" in server_exec
+assert any("sat-clab-pppoe-ac:eth1" in link["endpoints"] for link in topology["topology"]["links"])
 PY
+
+rg -q 'ppp' "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
+rg -q 'rp-pppoe' "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
 
 echo "PASS upstream-emulation-pppoe-artifacts"

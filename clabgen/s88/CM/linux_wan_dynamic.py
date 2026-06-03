@@ -25,12 +25,31 @@ def _wan_interfaces(
             continue
         wan_interfaces.append(
             {
+                "logical_name": logical_name,
                 "name": target_ifname,
                 "host_uplink": iface.get("hostUplink") or {},
             }
         )
 
     return wan_interfaces
+
+
+def _pppoe_client_interfaces(node: Dict[str, Any]) -> set[str]:
+    upstream = node.get("upstreamEmulation")
+    if not isinstance(upstream, dict):
+        return set()
+    node_name = node.get("name")
+    result: set[str] = set()
+    for row in upstream.values():
+        if not isinstance(row, dict) or row.get("mode") != "pppoe":
+            continue
+        client = row.get("pppoe", {}).get("client", {})
+        if not isinstance(client, dict) or client.get("coreNode") != node_name:
+            continue
+        core_interface = client.get("coreInterface")
+        if isinstance(core_interface, str) and core_interface:
+            result.add(core_interface)
+    return result
 
 
 def _dhcp4_command(interface_name: str) -> str:
@@ -78,8 +97,11 @@ def _nat4_commands(interface_name: str, host_uplink: Dict[str, Any]) -> List[str
 
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
+    pppoe_client_interfaces = _pppoe_client_interfaces(node)
 
     for interface_data in _wan_interfaces(node, eth_map):
+        if interface_data["logical_name"] in pppoe_client_interfaces:
+            continue
         interface_name = interface_data["name"]
         host_uplink = interface_data["host_uplink"]
         cmds.append(_sh(_slaac_command(interface_name)))
