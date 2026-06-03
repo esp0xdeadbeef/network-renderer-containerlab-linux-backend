@@ -13,6 +13,15 @@ def _string_value(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def _address_value(iface: Dict[str, Any], flat_key: str, family_key: str) -> str | None:
+    flat = _string_value(iface.get(flat_key))
+    if flat is not None:
+        return flat
+
+    family = _dict_value(iface.get(family_key))
+    return _string_value(family.get("address"))
+
+
 def _interface_overlay(kind: Any, backing_ref: Dict[str, Any], iface: Dict[str, Any]):
     overlay = _string_value(iface.get("overlay"))
     if overlay is not None:
@@ -88,8 +97,8 @@ def _interface_output(
         )
 
     return {
-        "addr4": iface.get("addr4"),
-        "addr6": iface.get("addr6"),
+        "addr4": _address_value(iface, "addr4", "ipv4"),
+        "addr6": _address_value(iface, "addr6", "ipv6"),
         "ll6": iface.get("ll6"),
         "runtimeIfName": iface.get("runtimeIfName") or iface.get("renderedIfName"),
         "routes": iface.get("routes") or {},
