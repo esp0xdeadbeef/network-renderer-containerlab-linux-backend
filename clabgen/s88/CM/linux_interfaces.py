@@ -13,6 +13,16 @@ from clabgen.s88.CM.linux_addressing import (
 from clabgen.s88.CM.linux_shell import _sh
 
 
+def _nested_address(iface: Dict[str, Any], family: str) -> str | None:
+    value = iface.get(family)
+    if not isinstance(value, dict):
+        return None
+    address = value.get("address")
+    if not isinstance(address, str) or not address:
+        return None
+    return address
+
+
 def _render_interfaces(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
     interfaces = node.get("interfaces", {})
@@ -66,8 +76,8 @@ def _render_addressing(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[st
         if eth is None:
             continue
 
-        addr4 = iface.get("addr4")
-        addr6 = iface.get("addr6")
+        addr4 = iface.get("addr4") or _nested_address(iface, "ipv4")
+        addr6 = iface.get("addr6") or _nested_address(iface, "ipv6")
         ll6 = iface.get("ll6")
 
         if (
