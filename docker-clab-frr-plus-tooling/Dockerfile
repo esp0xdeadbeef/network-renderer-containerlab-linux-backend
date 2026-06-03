@@ -25,7 +25,9 @@ RUN if command -v tcpdump >/dev/null 2>&1 \
             ripgrep \
             nmap \
             nftables \
-            less; \
+            less \
+            ppp \
+            rp-pppoe; \
     fi
 
 RUN sed -i \

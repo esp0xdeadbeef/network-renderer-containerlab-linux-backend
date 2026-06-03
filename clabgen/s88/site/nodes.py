@@ -37,6 +37,7 @@ def _node_extra(site: SiteModel, node_name: str) -> Dict[str, Any]:
         },
         "bgp": bgp,
         "containerlab": containerlab,
+        "upstreamEmulation": getattr(site, "upstream_emulation", {}) or {},
     }
 
 
@@ -67,5 +68,41 @@ def render_nodes(
             eth_map=eth_maps.get(node_name, {}),
             extra=extra,
         )
+
+    for row in sorted((getattr(site, "upstream_emulation", {}) or {}).values(), key=lambda item: str(item.get("scenarioId") or "")):
+        if not isinstance(row, dict) or row.get("mode") != "pppoe":
+            continue
+        server = (row.get("pppoe") or {}).get("server") or {}
+        node_name = server.get("node")
+        if not isinstance(node_name, str) or not node_name or node_name in nodes:
+            continue
+        node_data = {
+            "name": node_name,
+            "role": "pppoe-access-concentrator",
+            "routing_mode": "static",
+            "interfaces": {},
+            "route_intents": [],
+            "services": {},
+            "egressIntent": {},
+            "natIntent": {},
+            "forwardingIntent": {},
+            "loopback": {"ipv4": None, "ipv6": None},
+            "upstreamEmulation": {node_name: row},
+        }
+        exec_cmds = [
+            "sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > \"$i\"; done'",
+            "ip link set lo up",
+        ]
+        from clabgen.s88.CM.pppoe_runtime import render as render_pppoe_runtime
+
+        exec_cmds.extend(render_pppoe_runtime(node_name, node_data, {}))
+        nodes[node_name] = {
+            "kind": "linux",
+            "image": "clab-frr-plus-tooling:latest",
+            "network-mode": "none",
+            "restart-policy": "no",
+            "cmd": "/bin/sh -c 'sleep infinity'",
+            "exec": exec_cmds,
+        }
 
     return nodes
