@@ -65,8 +65,6 @@ def _lab_emulation_requests(containerlab: Dict[str, Any]) -> List[Dict[str, Any]
 def render_lab_emulation_artifacts(site: SiteModel) -> List[Dict[str, Any]]:
     containerlab = _containerlab_inventory(site)
     requests = _lab_emulation_requests(containerlab)
-    if not requests:
-        return []
 
     has_capability = _has_lab_emulation_capability(containerlab)
     artifacts: List[Dict[str, Any]] = []
@@ -77,4 +75,35 @@ def render_lab_emulation_artifacts(site: SiteModel) -> List[Dict[str, Any]]:
                 f"structured refusal: {mode} handoff input requires explicit lab-emulation capability"
             )
         artifacts.append(provider_emulation_artifact(request, mode))
+
+    upstream_emulation = getattr(site, "upstream_emulation", {}) or {}
+    if isinstance(upstream_emulation, dict):
+        for name, row in sorted(upstream_emulation.items()):
+            if not isinstance(row, dict):
+                continue
+            pppoe = row.get("pppoe")
+            if not isinstance(pppoe, dict):
+                continue
+            server = pppoe.get("server")
+            client = pppoe.get("client")
+            if not isinstance(server, dict) or not isinstance(client, dict):
+                raise ValueError(
+                    f"upstream-emulation {name!r} requires explicit PPPoE server and client records"
+                )
+            artifacts.append(
+                {
+                    "name": name,
+                    "source": "control-plane-model",
+                    "providerEmulationMode": "pppoe",
+                    "backend": row.get("backend"),
+                    "host": row.get("host"),
+                    "scope": "harness",
+                    "harnessScoped": True,
+                    "ordinaryTargetOutput": False,
+                    "handoff": row.get("handoff", {}),
+                    "server": dict(server),
+                    "client": dict(client),
+                    "probeIntent": list(row.get("probeIntent", []) or []),
+                }
+            )
     return artifacts

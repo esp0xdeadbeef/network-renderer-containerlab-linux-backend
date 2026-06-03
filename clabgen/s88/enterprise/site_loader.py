@@ -192,6 +192,7 @@ def load_sites(
                 site.get("upstreamSelectorNodeName", "") or ""
             ),
             tenant_prefix_owners=owners,
+            upstream_emulation=dict(site.get("upstreamEmulation", {}) or {}),
         )
 
     return result
