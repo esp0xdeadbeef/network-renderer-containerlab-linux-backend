@@ -74,11 +74,49 @@ def _server_commands(row: Dict[str, Any], node_name: str) -> List[str]:
         session = {}
     provider = str(session.get("providerAddress") or "203.0.113.1")
     customer = str(session.get("customerAddress") or "203.0.113.2")
+    credentials = server.get("credentials", {})
+    if not isinstance(credentials, dict):
+        credentials = {}
+    username_file = str(credentials.get("usernameFile") or "/run/secrets/pppoe-username")
+    password_file = str(credentials.get("passwordFile") or "/run/secrets/pppoe-password")
     return [
         _sh("ip link set eth1 up"),
+        _sh("test -x /usr/sbin/pppoe-sniff || test -x /usr/bin/pppoe-sniff || command -v pppoe-sniff"),
+        _sh("mkdir -p /etc/ppp"),
+        _sh(
+            "sh -c '"
+            f"user=$(cat {username_file} 2>/dev/null || printf s88-lab); "
+            f"pass=$(cat {password_file} 2>/dev/null || printf s88-lab); "
+            "printf \"%s * %s *\\n\" \"$user\" \"$pass\" >/etc/ppp/pap-secrets; "
+            "printf \"* * %s *\\n\" \"$pass\" >>/etc/ppp/pap-secrets; "
+            "printf \"%s * %s *\\n\" \"$user\" \"$pass\" >/etc/ppp/chap-secrets; "
+            "printf \"* * %s *\\n\" \"$pass\" >>/etc/ppp/chap-secrets; "
+            "chmod 600 /etc/ppp/pap-secrets /etc/ppp/chap-secrets'"
+        ),
+        _sh(
+            "cat >/etc/ppp/s88-pppoe-server-options <<'EOF'\n"
+            "require-pap\n"
+            "refuse-chap\n"
+            "refuse-mschap\n"
+            "refuse-mschap-v2\n"
+            "refuse-eap\n"
+            "noauth\n"
+            "nobsdcomp\n"
+            "nodeflate\n"
+            "noccp\n"
+            "novj\n"
+            "+ipv6\n"
+            "ipv6cp-accept-local\n"
+            "ipv6cp-accept-remote\n"
+            "lcp-echo-interval 10\n"
+            "lcp-echo-failure 3\n"
+            f"ms-dns {provider}\n"
+            "EOF"
+        ),
         _sh(
             "nohup pppoe-server "
-            f"-I eth1 -L {provider} -R {customer} -N 32 "
+            f"-I eth1 -L {provider} -R {customer} -O /etc/ppp/s88-pppoe-server-options "
+            "-q $(command -v pppd) -N 32 "
             f">/tmp/s88-pppoe-server-{node_name}.log 2>&1 &"
         ),
     ]

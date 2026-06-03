@@ -30,6 +30,8 @@ RUN if command -v tcpdump >/dev/null 2>&1 \
             rp-pppoe; \
     fi
 
+RUN command -v pppoe-sniff >/dev/null 2>&1
+
 RUN sed -i \
         -e 's/^bgpd=no/bgpd=yes/' \
         /etc/frr/daemons \
