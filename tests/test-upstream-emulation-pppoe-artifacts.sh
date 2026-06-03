@@ -124,10 +124,18 @@ assert "pppd pty" in core_exec and "pppoe -I eth1" in core_exec
 assert "udhcpc -b -i eth1" not in core_exec
 assert "accept_ra=2" not in core_exec
 assert "pppoe-server -I eth1" in server_exec
+assert "pppoe-sniff" in server_exec
+assert "pap-secrets" in server_exec
+assert "s88-pppoe-server-options" in server_exec
+assert "require-pap" in server_exec
+assert "refuse-chap" in server_exec
+assert "-q $(command -v pppd)" in server_exec
+assert "-O /etc/ppp/s88-pppoe-server-options" in server_exec
 assert any("sat-clab-pppoe-ac:eth1" in link["endpoints"] for link in topology["topology"]["links"])
 PY
 
 rg -q 'ppp' "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
 rg -q 'rp-pppoe' "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
+rg -q 'pppoe-sniff' "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
 
 echo "PASS upstream-emulation-pppoe-artifacts"
