@@ -12,6 +12,49 @@ from clabgen.s88.site.naming import realized_bridge_name
 from clabgen.s88.site.nodes import render_nodes
 
 
+def _validate_pppoe_pairs(site: SiteModel) -> None:
+    pairs: Dict[str, Dict[str, list[str]]] = {}
+
+    for node_name, node in sorted(site.nodes.items()):
+        services = dict(node.services or {})
+        pppoe = services.get("pppoe")
+        if not isinstance(pppoe, dict):
+            continue
+
+        for side in ("client", "server"):
+            config = pppoe.get(side)
+            if not isinstance(config, dict):
+                continue
+
+            logical = config.get("interface")
+            if isinstance(logical, str) and logical:
+                iface = node.interfaces.get(logical)
+                bridge = iface.attach_bridge if iface is not None else None
+                scope = (
+                    f"bridge {bridge!r}"
+                    if isinstance(bridge, str) and bridge
+                    else f"interface {logical!r}"
+                )
+                location = f"{node_name}:{logical}"
+            else:
+                scope = f"node {node_name!r}"
+                location = f"{node_name}:<invalid-interface>"
+
+            bucket = pairs.setdefault(scope, {"client": [], "server": []})
+            bucket[side].append(location)
+
+    for scope, sides in sorted(pairs.items()):
+        clients = sides["client"]
+        servers = sides["server"]
+        if len(clients) == 1 and len(servers) == 1:
+            continue
+        raise ValueError(
+            "CLAB PPPoE pairing requires exactly one client and one server for "
+            f"{scope}; got clients={clients or ['<none>']} "
+            f"servers={servers or ['<none>']}"
+        )
+
+
 def _normalize_bridge_references(site: SiteModel) -> None:
     for link in site.links.values():
         if link.bridge:
@@ -32,6 +75,7 @@ def _normalize_bridge_references(site: SiteModel) -> None:
 
 def render_site_topology(site: SiteModel) -> Dict[str, Any]:
     site = copy.deepcopy(site)
+    _validate_pppoe_pairs(site)
     bridge_networks = renderer_bridge_networks(site)
     _normalize_bridge_references(site)
     site.bridge_networks = bridge_networks
