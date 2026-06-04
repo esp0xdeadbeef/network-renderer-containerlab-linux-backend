@@ -59,6 +59,7 @@ tests=(
   test-dns-service-source-binding.sh
   test-hostile-gua-advertisements.sh
   test-host-uplink-vlan-dhcp.sh
+  test-hat-upstream-vlan4-wan.sh
   test-nat-uplink-runtime-addressing.sh
   test-linux-route-multipath.sh
   test-overlay-underlay-access-rendering.sh
