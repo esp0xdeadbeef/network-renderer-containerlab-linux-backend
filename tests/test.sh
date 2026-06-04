@@ -52,6 +52,7 @@ tests=(
   test-tri-site-core-egress-nat.sh
   test-management-eth0-egress-guard.sh
   test-deployment-host-filter.sh
+  test-access-advertisements-runtime.sh
   test-hostile-dns-east-west.sh
   test-dns-service-policy-routes.sh
   test-dns-service-source-binding.sh

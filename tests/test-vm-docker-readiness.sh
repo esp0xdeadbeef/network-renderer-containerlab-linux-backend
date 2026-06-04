@@ -26,7 +26,7 @@ grep -q 'ripgrep' "${dockerfile}"
 grep -q 'nmap' "${dockerfile}"
 grep -q 'staticd daemons are always started' "${dockerfile}"
 grep -q 'staticd daemons are always started' "${build_script}"
-for command_name in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff; do
+for command_name in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpd radvd; do
   grep -q 'command -v "$cmd"' "${build_script}" || {
     echo "FRR tooling builder must verify package commands before cache export" >&2
     exit 1
