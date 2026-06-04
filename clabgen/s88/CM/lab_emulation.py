@@ -76,34 +76,4 @@ def render_lab_emulation_artifacts(site: SiteModel) -> List[Dict[str, Any]]:
             )
         artifacts.append(provider_emulation_artifact(request, mode))
 
-    upstream_emulation = getattr(site, "upstream_emulation", {}) or {}
-    if isinstance(upstream_emulation, dict):
-        for name, row in sorted(upstream_emulation.items()):
-            if not isinstance(row, dict):
-                continue
-            pppoe = row.get("pppoe")
-            if not isinstance(pppoe, dict):
-                continue
-            server = pppoe.get("server")
-            client = pppoe.get("client")
-            if not isinstance(server, dict) or not isinstance(client, dict):
-                raise ValueError(
-                    f"upstream-emulation {name!r} requires explicit PPPoE server and client records"
-                )
-            artifacts.append(
-                {
-                    "name": name,
-                    "source": "control-plane-model",
-                    "providerEmulationMode": "pppoe",
-                    "backend": row.get("backend"),
-                    "host": row.get("host"),
-                    "scope": "harness",
-                    "harnessScoped": True,
-                    "ordinaryTargetOutput": False,
-                    "handoff": row.get("handoff", {}),
-                    "server": dict(server),
-                    "client": dict(client),
-                    "probeIntent": list(row.get("probeIntent", []) or []),
-                }
-            )
     return artifacts

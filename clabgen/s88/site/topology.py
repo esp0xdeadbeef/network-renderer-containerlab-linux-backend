@@ -59,34 +59,16 @@ def render_site_topology(site: SiteModel) -> Dict[str, Any]:
     links, bridges = render_links(site, eth_maps)
     lab_emulation_artifacts = render_lab_emulation_artifacts(site)
 
-    for row in sorted((getattr(site, "upstream_emulation", {}) or {}).values(), key=lambda item: str(item.get("scenarioId") or "")):
-        if not isinstance(row, dict) or row.get("mode") != "pppoe":
-            continue
-        server = (row.get("pppoe") or {}).get("server") or {}
-        server_node = server.get("node")
-        bridge = (row.get("handoff") or {}).get("bridge")
-        if isinstance(server_node, str) and server_node and isinstance(bridge, str) and bridge:
-            links.append(
-                {
-                    "endpoints": [f"{server_node}:eth1", f"host:{bridge}-{server_node}"],
-                    "labels": {
-                        "clab.link.type": "pppoe-handoff",
-                        "clab.link.bridge": bridge,
-                    },
-                }
-            )
-            bridges.append(bridge)
-
     for link in site.links.values():
         if link.bridge and link.host_uplink:
             bridge_networks.setdefault(link.bridge, dict(link.host_uplink))
 
-    bridge_endpoint_nodes = {
-        str(endpoint).split(":", 1)[0]
-        for link in links
-        for endpoint in link.get("endpoints", [])
-        if isinstance(endpoint, str) and ":" in endpoint
-    }
+    bridge_endpoint_nodes = set()
+    for link in links:
+        for endpoint in link.get("endpoints", []):
+            if not isinstance(endpoint, str) or ":" not in endpoint:
+                continue
+            bridge_endpoint_nodes.add(endpoint.split(":", 1)[0])
     for bridge in bridges:
         if bridge in bridge_networks or bridge in bridge_endpoint_nodes:
             nodes.setdefault(bridge, {"kind": "bridge"})

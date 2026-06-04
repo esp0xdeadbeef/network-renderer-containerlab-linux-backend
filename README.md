@@ -43,6 +43,8 @@ network-forwarding-model -> network-control-plane-model -> network-renderer-cont
   OpenVPN unless CPM explicitly models that backend output for this renderer.
 - Infer fake-provider or PPPoE-like emulation from interface names, VLAN IDs,
   host names, or provider-like labels.
+- Consume CPM side-channel fields such as `upstreamEmulation` or
+  `providerAccess`.
 
 ## Usage
 
