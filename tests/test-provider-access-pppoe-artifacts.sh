@@ -135,6 +135,68 @@ assert direct_pppoe == []
 direct_dynamic = "\n".join(render_dynamic_wan(node_data, {"pppoe-wan": "eth1"}))
 assert "udhcpc -b -i eth1" in direct_dynamic
 assert "pppd pty" not in direct_dynamic
+
+explicit_client_node = {
+    "name": "clab-router-core-simulated-isp",
+    "interfaces": {"pppoe-wan": {"kind": "wan"}},
+    "services": {
+        "pppoe": {
+            "client": {
+                "interface": "pppoe-wan",
+                "runtimeInterface": "ppp0",
+                "defaultRoute": True,
+                "usePeerDns": True,
+                "mtu": 1492,
+                "credentials": {"username": "hat-pppoe", "password": "hat-pppoe"},
+            }
+        }
+    },
+}
+explicit_client = "\n".join(
+    render_pppoe_runtime(
+        "clab-router-core-simulated-isp",
+        explicit_client_node,
+        {"pppoe-wan": "eth1"},
+    )
+)
+assert "pppd pty" in explicit_client
+assert "pppoe -I eth1" in explicit_client
+assert "ifname ppp0" in explicit_client
+assert "defaultroute replacedefaultroute" in explicit_client
+assert "usepeerdns" in explicit_client
+explicit_client_dynamic = "\n".join(
+    render_dynamic_wan(explicit_client_node, {"pppoe-wan": "eth1"})
+)
+assert "udhcpc -b -i eth1" not in explicit_client_dynamic
+assert "accept_ra=2" not in explicit_client_dynamic
+
+explicit_server_node = {
+    "name": "sat-clab-pppoe-ac",
+    "interfaces": {"provider-handoff": {"kind": "wan"}},
+    "services": {
+        "pppoe": {
+            "server": {
+                "interface": "provider-handoff",
+                "providerAddress": "203.0.113.5",
+                "customerAddress": "203.0.113.4",
+                "maxSessions": 32,
+                "mtu": 1492,
+                "credentials": {"username": "hat-pppoe", "password": "hat-pppoe"},
+            }
+        }
+    },
+}
+explicit_server = "\n".join(
+    render_pppoe_runtime(
+        "sat-clab-pppoe-ac",
+        explicit_server_node,
+        {"provider-handoff": "eth2"},
+    )
+)
+assert "pppoe-server" in explicit_server
+assert "-I eth2" in explicit_server
+assert "-L 203.0.113.5" in explicit_server
+assert "-R 203.0.113.4" in explicit_server
 PY
 
 rg -q 'ppp' "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
