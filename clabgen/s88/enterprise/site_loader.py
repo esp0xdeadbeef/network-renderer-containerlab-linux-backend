@@ -153,6 +153,11 @@ def load_sites(
         if target_host is not None
         else None
     )
+    if target_host is not None and not allowed_logical_nodes:
+        raise ValueError(
+            "containerlab renderer targetHost "
+            f"'{target_host}' matched zero inventory realization nodes"
+        )
 
     for enterprise, site_name, site in extract_enterprise_sites(data):
         filtered_site = _filter_site_to_target_host(
@@ -195,6 +200,12 @@ def load_sites(
                 site.get("upstreamSelectorNodeName", "") or ""
             ),
             tenant_prefix_owners=owners,
+        )
+
+    if target_host is not None and not result:
+        raise ValueError(
+            "containerlab renderer targetHost "
+            f"'{target_host}' selected zero runtime targets"
         )
 
     return result
