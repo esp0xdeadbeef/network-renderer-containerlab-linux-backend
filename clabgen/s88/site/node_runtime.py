@@ -32,6 +32,7 @@ def build_node_data(
         "interfaces": {},
         "route_intents": list(node.route_intents),
         "services": copy.deepcopy(node.services),
+        "advertisements": copy.deepcopy(node.advertisements),
         "egressIntent": copy.deepcopy(node.egress_intent),
         "natIntent": copy.deepcopy(node.nat_intent),
         "forwardingIntent": copy.deepcopy(node.forwarding_intent),

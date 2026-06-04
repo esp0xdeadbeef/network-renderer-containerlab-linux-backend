@@ -35,19 +35,20 @@ def build_nodes(
 ) -> Dict[str, NodeModel]:
     nodes: Dict[str, NodeModel] = {}
     runtime_services: Dict[str, Dict[str, Any]] = {}
+    runtime_advertisements: Dict[str, Dict[str, Any]] = {}
 
     for rt in (site.get("runtimeTargets", {}) or {}).values():
         if not isinstance(rt, dict):
             continue
         logical = rt.get("logicalNode")
         services = rt.get("services")
+        advertisements = rt.get("advertisements")
         logical_name = logical.get("name") if isinstance(logical, dict) else None
-        if (
-            isinstance(logical_name, str)
-            and logical_name
-            and isinstance(services, dict)
-        ):
-            runtime_services[logical_name] = dict(services)
+        if isinstance(logical_name, str) and logical_name:
+            if isinstance(services, dict):
+                runtime_services[logical_name] = dict(services)
+            if isinstance(advertisements, dict):
+                runtime_advertisements[logical_name] = dict(advertisements)
 
     for unit, node_obj in site.get("nodes", {}).items():
         routing_mode = node_obj.get("routing_mode")
@@ -70,6 +71,11 @@ def build_nodes(
             isolated=bool(node_obj.get("isolated", False)),
             services=dict(
                 node_obj.get("services", {}) or runtime_services.get(unit, {}) or {}
+            ),
+            advertisements=dict(
+                node_obj.get("advertisements", {})
+                or runtime_advertisements.get(unit, {})
+                or {}
             ),
             loopback4=loopback4,
             loopback6=loopback6,

@@ -13,6 +13,7 @@ from clabgen.s88.CM.linux_routes import (
 from clabgen.s88.CM.linux_policy_routes import render as render_policy_routes
 from clabgen.s88.CM.linux_uplink_routes import _render_uplink_routes
 from clabgen.s88.CM.linux_shell import _sh
+from clabgen.s88.CM.access_advertisements import render as render_access_advertisements
 from clabgen.s88.CM.linux_wan_dynamic import render as render_dynamic_wan
 from clabgen.s88.CM.pppoe_runtime import render as render_pppoe_runtime
 
@@ -50,6 +51,7 @@ def render(
 
     cmds.extend(render_cm(node_data.get("_cm_inputs", {})))
     cmds.extend(render_dns_service(node_data))
+    cmds.extend(render_access_advertisements(node_data, eth_map))
     cmds.extend(render_pppoe_runtime(node_name, node_data, eth_map))
 
     return cmds
