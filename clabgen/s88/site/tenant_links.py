@@ -29,6 +29,10 @@ def _tenant_group_key(iface_name: str, node_name: str, iface: Any) -> str:
         family_sorted = sorted(prefixes, key=_prefix_sort_key)
         return family_sorted[0]
 
+    tenant = getattr(iface, "tenant", None)
+    if isinstance(tenant, str) and tenant:
+        return f"{tenant}:{iface_name}"
+
     raise ValueError(
         f"tenant interface has no usable prefix for node={node_name!r} iface={iface_name!r}"
     )
