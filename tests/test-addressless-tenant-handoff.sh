@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 PYTHONPATH="${repo_root}" python3 - <<'PY'
 from clabgen.models import InterfaceModel, NodeModel, SiteModel
+from clabgen.s88.enterprise.merge import merge_sites
 from clabgen.s88.site.topology import render_site_topology
 
 
@@ -64,6 +65,7 @@ site.nodes["wireguard-host128"] = node("wireguard-host128", "core")
 site.nodes["wireguard-remote-egress"] = node("wireguard-remote-egress", "core")
 rendered = render_site_topology(site)
 links = rendered["topology"]["links"]
+nodes = rendered["topology"]["nodes"]
 oversized = [
     link
     for link in links
@@ -78,6 +80,25 @@ multi_links = [
 ]
 if len(multi_links) != 4:
     raise AssertionError(f"expected four binary tenant bridge links, got {multi_links!r}")
+bridge_endpoints = {
+    str(endpoint).split(":", 1)[0]
+    for link in multi_links
+    for endpoint in link.get("endpoints", [])
+    if isinstance(endpoint, str) and endpoint.startswith("br-")
+}
+if not bridge_endpoints:
+    raise AssertionError(f"expected binary fanout to use bridge endpoints: {multi_links!r}")
+for bridge_node in bridge_endpoints:
+    if nodes.get(bridge_node, {}).get("kind") != "bridge":
+        raise AssertionError(f"missing bridge-kind node for {bridge_node!r}: {nodes!r}")
+
+merged = merge_sites({"test.clab": site})
+merged_nodes = merged["topology"]["nodes"]
+for bridge_node in bridge_endpoints:
+    if merged_nodes.get(bridge_node, {}).get("kind") != "bridge":
+        raise AssertionError(
+            f"enterprise merge must preserve bridge-kind node {bridge_node!r}: {merged_nodes!r}"
+        )
 
 print("PASS addressless-tenant-handoff")
 PY
