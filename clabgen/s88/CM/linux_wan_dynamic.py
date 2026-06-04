@@ -12,6 +12,17 @@ def _wan_interfaces(
     interfaces = node.get("interfaces", {})
     if not isinstance(interfaces, dict):
         return []
+    pppoe = node.get("services", {}).get("pppoe", {})
+    if not isinstance(pppoe, dict):
+        pppoe = {}
+    pppoe_interfaces = set()
+    for side in ("client", "server"):
+        service = pppoe.get(side)
+        if not isinstance(service, dict):
+            continue
+        logical = service.get("interface")
+        if isinstance(logical, str) and logical:
+            pppoe_interfaces.add(logical)
 
     wan_interfaces: List[Dict[str, Any]] = []
     for logical_name in sorted(interfaces.keys()):
@@ -19,6 +30,8 @@ def _wan_interfaces(
         if not isinstance(iface, dict):
             continue
         if iface.get("kind") != "wan":
+            continue
+        if logical_name in pppoe_interfaces:
             continue
         target_ifname = eth_map.get(logical_name)
         if target_ifname is None:
