@@ -81,8 +81,14 @@ def render_site_topology(site: SiteModel) -> Dict[str, Any]:
         if link.bridge and link.host_uplink:
             bridge_networks.setdefault(link.bridge, dict(link.host_uplink))
 
+    bridge_endpoint_nodes = {
+        str(endpoint).split(":", 1)[0]
+        for link in links
+        for endpoint in link.get("endpoints", [])
+        if isinstance(endpoint, str) and ":" in endpoint
+    }
     for bridge in bridges:
-        if bridge in bridge_networks:
+        if bridge in bridge_networks or bridge in bridge_endpoint_nodes:
             nodes.setdefault(bridge, {"kind": "bridge"})
 
     return {
