@@ -59,5 +59,25 @@ except ValueError as exc:
 else:
     raise AssertionError("addressless tenant handoff without explicit tenant must fail closed")
 
+site.nodes["core-nebula"].interfaces["tenant-iot"].tenant = "iot"
+site.nodes["wireguard-host128"] = node("wireguard-host128", "core")
+site.nodes["wireguard-remote-egress"] = node("wireguard-remote-egress", "core")
+rendered = render_site_topology(site)
+links = rendered["topology"]["links"]
+oversized = [
+    link
+    for link in links
+    if len(link.get("endpoints", [])) > 2
+]
+if oversized:
+    raise AssertionError(f"containerlab links must stay binary: {oversized!r}")
+multi_links = [
+    link
+    for link in links
+    if any(str(ep).endswith(":eth1") for ep in link.get("endpoints", []))
+]
+if len(multi_links) != 4:
+    raise AssertionError(f"expected four binary tenant bridge links, got {multi_links!r}")
+
 print("PASS addressless-tenant-handoff")
 PY

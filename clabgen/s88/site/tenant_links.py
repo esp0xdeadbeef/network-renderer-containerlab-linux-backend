@@ -109,6 +109,18 @@ def render_tenant_links(
         if len(endpoints) == 1:
             endpoints.append(f"host:{host_ifname(f'{bridge}-tenant')}")
         bridges.append(bridge)
+        if len(endpoints) > 2:
+            for endpoint in endpoints:
+                links.append(
+                    _bridge_link(
+                        [
+                            endpoint,
+                            f"{bridge}:{host_ifname(f'{bridge}-{tenant}-{endpoint}')}",
+                        ],
+                        bridge,
+                    )
+                )
+            continue
         links.append(_bridge_link(endpoints, bridge))
 
     return links, bridges
