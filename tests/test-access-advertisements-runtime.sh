@@ -133,8 +133,11 @@ assert_has(access_text, "start 10.50.20.100")
 assert_has(access_text, "end 10.50.20.200")
 assert_has(access_text, "option router 10.50.20.1")
 assert_has(access_text, "option dns 10.50.20.1")
-assert_has(access_text, "radvd -C /run/radvd.eth2.conf")
-assert_has(access_text, "prefix fd42:dead:beef:20::/64")
+assert_has(access_text, "command -v vtysh")
+assert_has(access_text, "no ipv6 nd suppress-ra")
+assert_has(access_text, "ipv6 nd ra-interval 30")
+assert_has(access_text, "ipv6 nd prefix fd42:dead:beef:20::/64")
+assert_not_has(access_text, "radvd")
 
 provider = render_linux_node(
     "provider-handoff-access-a",
@@ -143,7 +146,7 @@ provider = render_linux_node(
 )
 provider_text = "\n".join(provider["exec"])
 assert_not_has(provider_text, "udhcpd /run/udhcpd.eth2.conf")
-assert_not_has(provider_text, "radvd -C /run/radvd.eth2.conf")
+assert_not_has(provider_text, "radvd")
 
 print("PASS access-advertisements-runtime")
 PY

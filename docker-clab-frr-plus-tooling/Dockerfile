@@ -16,7 +16,7 @@ RUN if command -v tcpdump >/dev/null 2>&1 \
         && command -v pppoe >/dev/null 2>&1 \
         && command -v pppoe-server >/dev/null 2>&1 \
         && command -v udhcpd >/dev/null 2>&1 \
-        && command -v radvd >/dev/null 2>&1; then \
+        && command -v vtysh >/dev/null 2>&1; then \
         echo "FRR tooling packages already present"; \
     else \
         apk add --no-cache \
@@ -32,8 +32,7 @@ RUN if command -v tcpdump >/dev/null 2>&1 \
             nftables \
             less \
             ppp \
-            rp-pppoe \
-            radvd; \
+            rp-pppoe; \
     fi
 
 RUN if ! command -v pppoe-sniff >/dev/null 2>&1; then \

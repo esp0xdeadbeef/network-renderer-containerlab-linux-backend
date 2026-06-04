@@ -104,7 +104,7 @@ def _dhcp4_command(scope: Dict[str, Any], ifname: str) -> str:
     )
 
 
-def _radvd_config(scope: Dict[str, Any], ifname: str) -> str:
+def _ipv6_ra_prefixes(scope: Dict[str, Any]) -> List[str]:
     prefixes = _list(scope.get("prefixes"))
     if not prefixes:
         router_interface = _dict(scope.get("routerInterface"))
@@ -112,7 +112,7 @@ def _radvd_config(scope: Dict[str, Any], ifname: str) -> str:
     if not prefixes:
         raise ValueError("access IPv6 RA advertisement requires prefixes")
 
-    prefix_blocks: List[str] = []
+    rendered: List[str] = []
     for raw_prefix in prefixes:
         if not isinstance(raw_prefix, str) or not raw_prefix:
             raise ValueError("access IPv6 RA prefix must be a string")
@@ -122,44 +122,30 @@ def _radvd_config(scope: Dict[str, Any], ifname: str) -> str:
             raise ValueError(f"invalid access IPv6 RA prefix: {raw_prefix!r}") from exc
         if prefix.version != 6:
             raise ValueError("access IPv6 RA prefix must be IPv6")
-        prefix_blocks.extend(
-            [
-                f"    prefix {prefix} {{",
-                "        AdvOnLink on;",
-                "        AdvAutonomous on;",
-                "    };",
-            ]
+        rendered.append(str(prefix))
+    return rendered
+
+
+def _ipv6_ra_command(scope: Dict[str, Any], ifname: str) -> str:
+    prefixes = _ipv6_ra_prefixes(scope)
+    commands = [
+        "command -v vtysh >/dev/null || { echo 'missing vtysh' >&2; exit 1; }",
+        f"sysctl -qw net.ipv6.conf.{ifname}.forwarding=1 net.ipv6.conf.{ifname}.disable_ipv6=0 || true",
+        "mkdir -p /etc/frr /var/run/frr",
+        "touch /etc/frr/vtysh.conf",
+        "if ! pgrep -x zebra >/dev/null 2>&1; then /usr/lib/frr/zebra -d -F traditional -A 127.0.0.1 || true; sleep 1; fi",
+        "vtysh -c 'configure terminal' "
+        f"-c 'interface {ifname}' "
+        "-c 'no ipv6 nd suppress-ra' "
+        "-c 'ipv6 nd ra-interval 30'",
+    ]
+    for prefix in prefixes:
+        commands.append(
+            "vtysh -c 'configure terminal' "
+            f"-c 'interface {ifname}' "
+            f"-c 'ipv6 nd prefix {prefix}'"
         )
-
-    return "\n".join(
-        [
-            f"interface {ifname} {{",
-            "    AdvSendAdvert on;",
-            "    MaxRtrAdvInterval 30;",
-            "    AdvManagedFlag off;",
-            "    AdvOtherConfigFlag off;",
-            *prefix_blocks,
-            "};",
-            "",
-        ]
-    )
-
-
-def _radvd_command(scope: Dict[str, Any], ifname: str) -> str:
-    config_path = f"/run/radvd.{ifname}.conf"
-    pid_path = f"/run/radvd.{ifname}.pid"
-    config = _radvd_config(scope, ifname)
-    return "\n".join(
-        [
-            "command -v radvd >/dev/null || { echo 'missing radvd' >&2; exit 1; }",
-            f"sysctl -qw net.ipv6.conf.{ifname}.forwarding=1 net.ipv6.conf.{ifname}.disable_ipv6=0 || true",
-            f"cat > {config_path} <<'EOF'",
-            config,
-            "EOF",
-            f"test ! -s {pid_path} || kill $(cat {pid_path}) 2>/dev/null || true",
-            f"radvd -C {config_path} -p {pid_path}",
-        ]
-    )
+    return "\n".join(commands)
 
 
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
@@ -180,6 +166,6 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         ifname = _interface(scope, eth_map)
         if ifname is None:
             continue
-        cmds.append(_sh(_radvd_command(scope, ifname)))
+        cmds.append(_sh(_ipv6_ra_command(scope, ifname)))
 
     return cmds
