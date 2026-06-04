@@ -35,7 +35,7 @@ tests=(
   test-runtime-interface-mapping-refusals.sh
   test-bridge-link-realization-contracts.sh
   test-lab-emulation-capability-gate.sh
-  test-upstream-emulation-pppoe-artifacts.sh
+  test-provider-access-pppoe-artifacts.sh
   test-access-tenant-no-node-name-parsing.sh
   test-vm-runtime-log-guard.sh
   test-input-path-override.sh
@@ -44,6 +44,7 @@ tests=(
   test-topology-conformance-parity-guard.sh
   test-passing-fixtures.sh
   test-dual-wan-branch-overlay.sh
+  test-bgp-cpm-contract-render.sh
   test-bgp-example.sh
   test-routing-mode-required.sh
   test-policy-firewall.sh

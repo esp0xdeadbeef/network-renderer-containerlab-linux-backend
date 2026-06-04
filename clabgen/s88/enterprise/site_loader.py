@@ -166,6 +166,9 @@ def load_sites(
             site,
             context={"enterprise": enterprise, "site": site_name},
         )
+        for field_name in ("upstreamEmulation", "providerAccess"):
+            if field_name in site:
+                raise ValueError(f"CPM field {field_name} is not supported")
 
         assumptions = validate_routing_assumptions(site)
         owners = tenant_prefix_owners(site)
@@ -192,7 +195,6 @@ def load_sites(
                 site.get("upstreamSelectorNodeName", "") or ""
             ),
             tenant_prefix_owners=owners,
-            upstream_emulation=dict(site.get("upstreamEmulation", {}) or {}),
         )
 
     return result

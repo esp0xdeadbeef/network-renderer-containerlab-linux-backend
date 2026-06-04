@@ -25,12 +25,12 @@ assert_node_contains \
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-upstream-selector" \
-  "ip route replace 10\\.20\\.10\\.0/24 via 10\\.10\\.0\\.[0-9]+ dev pol-mgt-ew onlink"
+  "ip route replace 10\\.20\\.10\\.0/24 nexthop via 10\\.10\\.0\\.[0-9]+ dev pol-cli-ew onlink\\s+nexthop via 10\\.10\\.0\\.[0-9]+ dev pol-mgt-ew onlink"
 
 assert_node_matches \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-policy-only" \
-  "ip route replace 10\\.20\\.10\\.0/24 via 10\\.10\\.0\\.[0-9]+ dev downstream-mgmt onlink"
+  "ip route replace 10\\.20\\.10\\.0/24 nexthop via 10\\.10\\.0\\.[0-9]+ dev down-client onlink\\s+nexthop via 10\\.10\\.0\\.[0-9]+ dev downstream-mgmt onlink"
 
 assert_node_matches \
   "${topology}" \
