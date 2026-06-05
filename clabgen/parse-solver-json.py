@@ -8,6 +8,7 @@ from typing import Any, Dict
 
 import yaml
 
+from clabgen.provenance import build_provenance
 from clabgen.solver import load_solver
 from clabgen.s88.enterprise.enterprise import Enterprise
 
@@ -101,10 +102,14 @@ def _with_env_target_host(renderer_inventory: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def render_topology(solver_json: str | Path) -> Dict[str, Any]:
+def render_topology(
+    solver_json: str | Path,
+    renderer_inventory: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[1]
     solver_path = Path(solver_json)
-    renderer_inventory = _load_renderer_inventory_for_input(solver_path)
+    if renderer_inventory is None:
+        renderer_inventory = _load_renderer_inventory_for_input(solver_path)
 
     enterprise = Enterprise.from_solver_json(
         solver_json,
@@ -133,7 +138,8 @@ def write_outputs(
 
     _ = load_solver(solver_json)
 
-    merged = render_topology(solver_json)
+    renderer_inventory = _load_renderer_inventory_for_input(solver_json)
+    merged = render_topology(solver_json, renderer_inventory=renderer_inventory)
 
     topo_yaml = yaml.safe_dump(
         {
@@ -152,9 +158,14 @@ def write_outputs(
         "schemaVersion": 2,
     }
 
-    provenance = {
-        "renderer": renderer_meta,
-    }
+    provenance = build_provenance(
+        solver_json,
+        topology_out,
+        bridges_out,
+        renderer_inventory,
+        renderer_meta,
+        repo_root,
+    )
 
     comment = _render_meta_comment(provenance)
 

@@ -31,6 +31,7 @@ tests=(
   test-s88-python-readability.sh
   test-rendered-artifact-validator-scratch-dir.sh
   test-provenance-without-git.sh
+  test-fs100-renderer-output-provenance.sh
   test-policy-interface-tags-no-generated-link-parsing.sh
   test-runtime-interface-mapping-refusals.sh
   test-bridge-link-realization-contracts.sh
