@@ -14,6 +14,45 @@ def _sh(script: str) -> str:
     return "sh -c " + shlex.quote(script)
 
 
+def _nft_literal(value: str) -> str:
+    return shlex.quote(value)
+
+
+def _public_resolver_drop_commands(dns: Dict[str, Any]) -> List[str]:
+    kill_switch = dns.get("killSwitch")
+    if not isinstance(kill_switch, dict) or not kill_switch.get("blockPublicResolvers"):
+        return []
+
+    denied_cidrs = _string_list(dns.get("deniedResolverCidrs", []))
+    if not denied_cidrs:
+        return []
+
+    commands = [
+        "nft add table inet clab_dns_guard 2>/dev/null || true",
+        "nft add chain inet clab_dns_guard forward '{ type filter hook forward priority -50; policy accept; }' 2>/dev/null || true",
+        "nft add chain inet clab_dns_guard output '{ type filter hook output priority -50; policy accept; }' 2>/dev/null || true",
+        "nft flush chain inet clab_dns_guard forward",
+        "nft flush chain inet clab_dns_guard output",
+    ]
+    for cidr in denied_cidrs:
+        family = "ip6" if ":" in cidr else "ip"
+        literal = _nft_literal(cidr)
+        for hook, comment in (
+            ("forward", "deny-public-dns-forward-leak"),
+            ("output", "deny-public-dns-output-leak"),
+        ):
+            commands.append(
+                f"nft add rule inet clab_dns_guard {hook} {family} daddr {literal} "
+                f"udp dport 53 drop comment {shlex.quote(comment)}"
+            )
+            commands.append(
+                f"nft add rule inet clab_dns_guard {hook} {family} daddr {literal} "
+                f"tcp dport 53 drop comment {shlex.quote(comment)}"
+            )
+
+    return commands
+
+
 def render_dns_service(node: Dict[str, Any]) -> List[str]:
     services = node.get("services")
     if not isinstance(services, dict):
@@ -33,11 +72,18 @@ def render_dns_service(node: Dict[str, Any]) -> List[str]:
         "outgoingInterfaces": _string_list(dns.get("outgoingInterfaces", [])),
         "localRecords": _local_records(dns.get("localRecords", [])),
     }
+    namespace_fallback = _namespace_fallback(dns.get("namespaceFallback", {}))
+    if namespace_fallback:
+        payload["namespaceFallback"] = namespace_fallback
+    public_resolver_drop_script = "\n".join(_public_resolver_drop_commands(dns))
+    if public_resolver_drop_script:
+        public_resolver_drop_script += "\n"
 
     return [
         _sh(
             "pkill -f '^python3 /tmp/clabgen-dns-proxy.py' >/dev/null 2>&1 || true\n"
-            "cat >/etc/resolv.conf <<'RESOLV'\n"
+            + public_resolver_drop_script
+            + "cat >/etc/resolv.conf <<'RESOLV'\n"
             "nameserver 127.0.0.1\n"
             "nameserver ::1\n"
             "options timeout:1 attempts:2\n"
@@ -80,3 +126,48 @@ def _local_records(value: Any) -> List[Dict[str, Any]]:
         if isinstance(record_name, str) and record_name:
             records.append(record)
     return records
+
+
+def _namespace_fallback(value: Any) -> Dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+
+    decisions = []
+    for decision in value.get("decisions", []):
+        if not isinstance(decision, dict):
+            continue
+        namespace = decision.get("namespace")
+        action = decision.get("action")
+        if not isinstance(namespace, str) or not namespace:
+            continue
+        if action not in ("block", "deny", "fallback", "answer"):
+            continue
+        decisions.append(
+            {
+                "requesterScope": decision.get("requesterScope"),
+                "namespace": namespace,
+                "allowedRecordClasses": _string_list(
+                    decision.get("allowedRecordClasses", [])
+                ),
+                "deniedRecordClasses": _string_list(
+                    decision.get("deniedRecordClasses", [])
+                ),
+                "failedAnswerReason": decision.get("failedAnswerReason"),
+                "action": action,
+                "publicRecursionFallback": bool(
+                    decision.get("publicRecursionFallback", False)
+                ),
+                "leakPrevention": decision.get("leakPrevention"),
+                "fallbackTarget": decision.get("fallbackTarget"),
+            }
+        )
+
+    if not decisions:
+        return {}
+
+    return {
+        "defaultPublicRecursionFallback": bool(
+            value.get("defaultPublicRecursionFallback", False)
+        ),
+        "decisions": decisions,
+    }

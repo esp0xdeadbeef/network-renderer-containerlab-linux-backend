@@ -5,6 +5,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${repo_root}/tests/lib/render-clab-example.sh"
+source "${repo_root}/tests/lib/clab-yaml.sh"
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
@@ -52,20 +53,23 @@ assert_node_matches \
   "esp0xdeadbeef-site-a-s-router-policy-only" \
   'iifname "downstream-mgmt" oifname "up-mgmt-a"[[:space:]]+counter accept'
 
-assert_node_contains \
+assert_node_exec \
+  contains \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-access-mgmt" \
   "clabgen-dns-proxy.py"
 
-assert_node_contains \
+assert_node_exec \
+  contains \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-access-mgmt" \
   "nameserver 127.0.0.1"
 
-assert_node_matches \
+assert_node_exec \
+  contains \
   "${topology}" \
   "esp0xdeadbeef-site-a-s-router-access-mgmt" \
-  "nameserver[[:space:]]+::1\\\\noptions timeout:1 attempts:2"
+  $'nameserver ::1\noptions timeout:1 attempts:2'
 
 assert_node_matches \
   "${topology}" \

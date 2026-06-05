@@ -61,15 +61,15 @@ def _client_command(config: Dict[str, Any], eth_map: Dict[str, str]) -> str:
         [
             "command -v pppd >/dev/null || { echo 'missing pppd' >&2; exit 1; }",
             "command -v pppoe >/dev/null || { echo 'missing pppoe' >&2; exit 1; }",
-            "mkdir -p /etc/ppp /run/pppd",
+            "mkdir -p /etc/ppp /run/ppp /run/pppd",
             f"ip link set {shlex.quote(ifname)} up",
-            f"user=\"$({_credential_command(credentials, 'username')})\"",
-            f"pass=\"$({_credential_command(credentials, 'password')})\"",
+            f'user="$({_credential_command(credentials, "username")})"',
+            f'pass="$({_credential_command(credentials, "password")})"',
             "install -m 0600 /dev/null /etc/ppp/chap-secrets",
             "install -m 0600 /dev/null /etc/ppp/pap-secrets",
-            "printf '%s * %s *\\n' \"$user\" \"$pass\" > /etc/ppp/chap-secrets",
-            "printf '%s * %s *\\n' \"$user\" \"$pass\" > /etc/ppp/pap-secrets",
-            f"pkill -f 'pppoe -I {shlex.quote(ifname)}' >/dev/null 2>&1 || true",
+            'printf \'%s * %s *\\n\' "$user" "$pass" > /etc/ppp/chap-secrets',
+            'printf \'%s * %s *\\n\' "$user" "$pass" > /etc/ppp/pap-secrets',
+            "pkill -x pppd >/dev/null 2>&1 || true",
             (
                 "nohup pppd "
                 f"pty {shlex.quote('pppoe -I ' + ifname)} "
@@ -100,15 +100,15 @@ def _server_command(config: Dict[str, Any], eth_map: Dict[str, str]) -> str:
         [
             "command -v pppoe-server >/dev/null || { echo 'missing pppoe-server' >&2; exit 1; }",
             "command -v pppd >/dev/null || { echo 'missing pppd' >&2; exit 1; }",
-            "mkdir -p /etc/ppp",
+            "mkdir -p /etc/ppp /run/ppp",
             f"ip link set {shlex.quote(ifname)} up",
-            f"user=\"$({_credential_command(credentials, 'username')})\"",
-            f"pass=\"$({_credential_command(credentials, 'password')})\"",
+            f'user="$({_credential_command(credentials, "username")})"',
+            f'pass="$({_credential_command(credentials, "password")})"',
             "install -m 0600 /dev/null /etc/ppp/chap-secrets",
             "install -m 0600 /dev/null /etc/ppp/pap-secrets",
-            "printf '%s * %s *\\n' \"$user\" \"$pass\" > /etc/ppp/chap-secrets",
+            'printf \'%s * %s *\\n\' "$user" "$pass" > /etc/ppp/chap-secrets',
             "printf '* * %s *\\n' \"$pass\" >> /etc/ppp/chap-secrets",
-            "printf '%s * %s *\\n' \"$user\" \"$pass\" > /etc/ppp/pap-secrets",
+            'printf \'%s * %s *\\n\' "$user" "$pass" > /etc/ppp/pap-secrets',
             "printf '* * %s *\\n' \"$pass\" >> /etc/ppp/pap-secrets",
             "cat >/etc/ppp/s88-pppoe-server-options <<'EOF'",
             "require-pap",
@@ -130,7 +130,7 @@ def _server_command(config: Dict[str, Any], eth_map: Dict[str, str]) -> str:
             f"mru {mtu}",
             f"ms-dns {provider_address}",
             "EOF",
-            f"pkill -f 'pppoe-server -I {shlex.quote(ifname)}' >/dev/null 2>&1 || true",
+            "pkill -x pppoe-server >/dev/null 2>&1 || true",
             (
                 "nohup pppoe-server "
                 f"-I {shlex.quote(ifname)} "
