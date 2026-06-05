@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from typing import Any, Dict, List
 
 
@@ -98,6 +99,14 @@ def _explicit_match_suffixes(rule_obj: Dict[str, Any], family: int) -> List[str]
     return suffixes
 
 
+def _identity_comment(rule_obj: Dict[str, Any]) -> str:
+    for field in ("relationId", "policyId", "sourceRelationId", "comment"):
+        value = rule_obj.get(field)
+        if isinstance(value, str) and value:
+            return f" comment {shlex.quote(value)}"
+    return ""
+
+
 def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
     from_interface = rule_obj.get("fromInterface")
     to_interface = rule_obj.get("toInterface")
@@ -110,6 +119,7 @@ def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
     traffic_type = rule_obj.get("trafficType")
     family = rule_obj.get("family")
     families = [family] if family in (4, 6) else [4, 6]
+    comment = _identity_comment(rule_obj)
 
     rules: List[str] = []
     for rule_family in families:
@@ -130,11 +140,11 @@ def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
         match_suffixes = _explicit_match_suffixes(rule_obj, rule_family)
         if match_suffixes:
             for suffix in match_suffixes:
-                rules.append(f"{base}{suffix} counter {action}")
+                rules.append(f"{base}{suffix} counter {action}{comment}")
         elif traffic_type == "dns":
-            rules.append(f"{base} udp dport 53 counter {action}")
-            rules.append(f"{base} tcp dport 53 counter {action}")
+            rules.append(f"{base} udp dport 53 counter {action}{comment}")
+            rules.append(f"{base} tcp dport 53 counter {action}{comment}")
         else:
-            rules.append(f"{base} counter {action}")
+            rules.append(f"{base} counter {action}{comment}")
 
     return rules
