@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# GAMP-ID: FS-520-HDS-010-SDS-010-SMS-040
+# GAMP-SCOPE: software-module-test
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
