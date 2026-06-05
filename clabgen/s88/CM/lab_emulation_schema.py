@@ -25,7 +25,11 @@ def provider_emulation_mode(request: Dict[str, Any]) -> str:
         or request.get("type")
     )
     if not isinstance(raw_mode, str) or not raw_mode:
-        raise ValueError("lab-emulation request missing provider-emulation mode")
+        raise ValueError(
+            "structured refusal: lab-emulation request missing provider-emulation mode"
+        )
     if raw_mode not in SUPPORTED_PROVIDER_EMULATION_MODES:
-        raise ValueError(f"unsupported lab-emulation provider mode: {raw_mode!r}")
+        raise ValueError(
+            f"structured refusal: unsupported lab-emulation provider mode: {raw_mode!r}"
+        )
     return SUPPORTED_PROVIDER_EMULATION_MODES[raw_mode]
