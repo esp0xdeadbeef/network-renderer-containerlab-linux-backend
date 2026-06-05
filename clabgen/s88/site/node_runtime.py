@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from typing import Dict, Any, List
 
 from clabgen.models import NodeModel
@@ -84,10 +85,17 @@ def render_linux_node(
         routing_mode=routing_mode,
         disable_dynamic=(routing_mode != "bgp"),
     )
+    audit_map: Dict[str, str] = {}
+    for logical, runtime in sorted(eth_map.items()):
+        audit_map[runtime] = logical
 
     return {
         "kind": "linux",
         "image": "clab-frr-plus-tooling:latest",
+        "labels": {
+            "clab.interface.map": json.dumps(eth_map, sort_keys=True),
+            "clab.interface.audit": json.dumps(audit_map, sort_keys=True),
+        },
         "network-mode": "none",
         "restart-policy": "no",
         "cmd": "/bin/sh -c 'sleep infinity'",

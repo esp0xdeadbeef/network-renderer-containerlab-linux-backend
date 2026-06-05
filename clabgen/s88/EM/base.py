@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from .default import render as render_default
+from .interface_names import require_runtime_name, translate_names
 
 
 def _dict(value: Any) -> Dict[str, Any]:
@@ -38,21 +39,6 @@ def _interface_name_map(
     return result
 
 
-def _translate_name(value: Any, name_map: Dict[str, str]) -> Any:
-    if isinstance(value, str) and value:
-        return name_map.get(value, value)
-    return value
-
-
-def _translate_names(values: List[str], name_map: Dict[str, str]) -> List[str]:
-    translated_names: List[str] = []
-    for value in values:
-        translated = _translate_name(value, name_map)
-        if isinstance(translated, str) and translated:
-            translated_names.append(translated)
-    return translated_names
-
-
 def _translated_forwarding_rules(
     forwarding_intent: Dict[str, Any],
     name_map: Dict[str, str],
@@ -66,10 +52,12 @@ def _translated_forwarding_rules(
         if not isinstance(rule, dict):
             continue
         translated = dict(rule)
-        translated["fromInterface"] = _translate_name(
-            rule.get("fromInterface"), name_map
+        translated["fromInterface"] = require_runtime_name(
+            rule.get("fromInterface"), name_map, "forwardingIntent.rules.fromInterface"
         )
-        translated["toInterface"] = _translate_name(rule.get("toInterface"), name_map)
+        translated["toInterface"] = require_runtime_name(
+            rule.get("toInterface"), name_map, "forwardingIntent.rules.toInterface"
+        )
         translated_rules.append(translated)
 
     return translated_rules
@@ -118,20 +106,24 @@ def _wan_firewall_cm_input(
     forwarding_intent = _dict(node_data.get("forwardingIntent"))
     nat_intent = _dict(node_data.get("natIntent"))
 
-    wan_interfaces = _translate_names(
-        _list_strings(nat_intent.get("wanInterfaces")), name_map
+    wan_interfaces = translate_names(
+        _list_strings(nat_intent.get("wanInterfaces")),
+        name_map,
+        "natIntent.wanInterfaces",
     )
     if not wan_interfaces:
-        wan_interfaces = _translate_names(
+        wan_interfaces = translate_names(
             _list_strings(forwarding_intent.get("uplinkInterfaces")),
             name_map,
+            "forwardingIntent.uplinkInterfaces",
         )
 
     masquerade = _masquerade_from_nat_intent(nat_intent)
     if masquerade:
-        masquerade["oifnames"] = _translate_names(
+        masquerade["oifnames"] = translate_names(
             _list_strings(masquerade.get("oifnames")),
             name_map,
+            "natIntent.masqueradeInterfaces",
         )
     if not wan_interfaces and not masquerade:
         return {}
