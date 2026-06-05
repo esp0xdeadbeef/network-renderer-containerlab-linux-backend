@@ -11,8 +11,8 @@ grep -q 'wait_for_docker()' "${script}"
 grep -q 'systemctl start docker' "${script}"
 grep -q 'docker info' "${script}"
 grep -q 'docker did not become ready' "${script}"
-grep -q 'frrouting/frr@sha256:' "${dockerfile}"
-grep -q 'frrouting/frr@sha256:' "${build_script}"
+grep -q 'debian:bookworm-slim@sha256:' "${dockerfile}"
+grep -q 'debian:bookworm-slim@sha256:' "${build_script}"
 grep -q 'verify_tooling_image()' "${build_script}"
 grep -q 'docker run --rm --entrypoint /bin/sh "$IMAGE"' "${build_script}"
 grep -q 'verify_tooling_image' "${build_script}"
@@ -20,13 +20,17 @@ grep -q 'docker load -i "${CACHE_TAR}"' "${build_script}"
 grep -q -- '--pull=false' "${build_script}"
 grep -q -- '--label "${LABEL_KEY}=${CACHE_KEY}"' "${build_script}"
 grep -q 'docker save "$IMAGE" -o "${CACHE_TAR}"' "${build_script}"
-grep -q 'command -v rg' "${dockerfile}"
-grep -q 'command -v nmap' "${dockerfile}"
+grep -q 'apt-get install -y --no-install-recommends' "${dockerfile}"
+grep -q 'rm -rf /var/lib/apt/lists/' "${dockerfile}"
 grep -q 'ripgrep' "${dockerfile}"
 grep -q 'nmap' "${dockerfile}"
-grep -q 'staticd daemons are always started' "${dockerfile}"
-grep -q 'staticd daemons are always started' "${build_script}"
-for command_name in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpd vtysh; do
+grep -q 'test -x /usr/lib/frr/staticd' "${dockerfile}"
+grep -q 'test -x /usr/lib/frr/staticd' "${build_script}"
+grep -q 'test -x /usr/lib/frr/bgpd' "${dockerfile}"
+grep -q 'test -x /usr/lib/frr/bgpd' "${build_script}"
+grep -q 'test -x /usr/lib/frr/zebra' "${dockerfile}"
+grep -q 'test -x /usr/lib/frr/zebra' "${build_script}"
+for command_name in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd vtysh python3; do
   grep -q 'command -v "$cmd"' "${build_script}" || {
     echo "FRR tooling builder must verify package commands before cache export" >&2
     exit 1
@@ -47,8 +51,12 @@ if [[ -z "${build_line}" || -z "${verify_line}" || -z "${save_line}" || "${build
   echo "FRR tooling builder must verify package commands after build and before cache save" >&2
   exit 1
 fi
-if grep -q 'frrouting/frr:latest' "${dockerfile}" "${build_script}"; then
-  echo "FRR tooling base image must be pinned by digest, not latest" >&2
+if grep -qE 'frrouting/frr:latest|debian:latest|bookworm-slim($|")' "${dockerfile}" "${build_script}"; then
+  echo "FRR tooling base image must be pinned by digest, not latest or tag-only" >&2
+  exit 1
+fi
+if grep -q 'apk add' "${dockerfile}" "${build_script}"; then
+  echo "FRR tooling image must not use the Alpine PPP package path" >&2
   exit 1
 fi
 
@@ -62,5 +70,5 @@ grep -q 'CLAB_FRR_TOOLING_CACHE_DIR="${cache_dir}"' "${cache_update}"
 grep -q 'test -s "${cache_tar}"' "${cache_update}"
 grep -q 'test -s "${cache_id}"' "${cache_update}"
 grep -q 'docker run --rm --entrypoint /bin/sh clab-frr-plus-tooling:latest' "${cache_update}"
-grep -q 'staticd daemons are always started' "${cache_update}"
+grep -q 'test -x /usr/lib/frr/staticd' "${cache_update}"
 grep -q 'shutdown -h now' "${cache_update}"

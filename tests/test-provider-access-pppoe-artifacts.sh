@@ -166,6 +166,9 @@ assert "pppoe -I eth1" in explicit_client
 assert "ifname ppp0" in explicit_client
 assert "defaultroute replacedefaultroute" in explicit_client
 assert "usepeerdns" in explicit_client
+assert "mkdir -p /etc/ppp /run/ppp /run/pppd" in explicit_client
+assert "pkill -x pppd" in explicit_client
+assert "pkill -f 'pppoe -I eth1'" not in explicit_client
 explicit_client_dynamic = "\n".join(
     render_dynamic_wan(explicit_client_node, {"pppoe-wan": "eth1"})
 )
@@ -199,6 +202,9 @@ assert "pppoe-server" in explicit_server
 assert "-I eth2" in explicit_server
 assert "-L 203.0.113.5" in explicit_server
 assert "-R 203.0.113.4" in explicit_server
+assert "mkdir -p /etc/ppp /run/ppp" in explicit_server
+assert "pkill -x pppoe-server" in explicit_server
+assert "pkill -f 'pppoe-server -I eth2'" not in explicit_server
 
 
 def render_cpm(cpm):
@@ -316,9 +322,15 @@ assert "pppd pty" in customer_exec
 assert "pppoe -I eth1" in customer_exec
 assert "udhcpc -b -i eth1" not in customer_exec
 assert "accept_ra=2" not in customer_exec
+assert "mkdir -p /etc/ppp /run/ppp /run/pppd" in customer_exec
+assert "pkill -x pppd" in customer_exec
+assert "pkill -f 'pppoe -I eth1'" not in customer_exec
 assert "pppoe-server -I eth1" in provider_exec
 assert "udhcpc -b -i eth1" not in provider_exec
 assert "accept_ra=2" not in provider_exec
+assert "mkdir -p /etc/ppp /run/ppp" in provider_exec
+assert "pkill -x pppoe-server" in provider_exec
+assert "pkill -f 'pppoe-server -I eth1'" not in provider_exec
 
 missing_client = copy.deepcopy(positive_cpm)
 del missing_client["control_plane_model"]["data"]["esp0xdeadbeef"][
@@ -354,7 +366,7 @@ else:
 PY
 
 rg -q 'ppp' "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
-rg -q 'rp-pppoe' "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
+rg -q 'pppoe' "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
 rg -q 'pppoe-sniff' "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
 
 echo "PASS provider-access-side-channel-quarantine"

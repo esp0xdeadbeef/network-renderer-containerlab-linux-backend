@@ -26,7 +26,7 @@ fi
 
 CACHE_TAR="${CLAB_FRR_TOOLING_CACHE_TAR:-${CACHE_DIR}/clab-frr-plus-tooling-${CACHE_KEY}.tar}"
 CACHE_ID_FILE="${CLAB_FRR_TOOLING_CACHE_IMAGE_ID_FILE:-${CACHE_TAR}.image-id}"
-BASE_IMAGE="${CLAB_FRR_TOOLING_BASE_IMAGE:-frrouting/frr@sha256:990e83490108b686fd6df3b1cafa6bdbb2714acb00eedb9a89693946f46f45ce}"
+BASE_IMAGE="${CLAB_FRR_TOOLING_BASE_IMAGE:-debian:bookworm-slim@sha256:0104b334637a5f19aa9c983a91b54c89887c0984081f2068983107a6f6c21eeb}"
 
 current_id() {
     docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null || true
@@ -44,17 +44,10 @@ cache_id() {
 
 base_image_ref() {
     local base_id=""
-    local existing_id=""
 
     base_id="$(docker image inspect --format '{{.Id}}' "${BASE_IMAGE}" 2>/dev/null || true)"
     if [[ -n "${base_id}" ]]; then
         printf '%s\n' "${base_id}"
-        return 0
-    fi
-
-    existing_id="$(current_id)"
-    if [[ -n "${existing_id}" ]]; then
-        printf '%s\n' "${existing_id}"
         return 0
     fi
 
@@ -85,7 +78,7 @@ image_is_usable() {
 
 verify_tooling_image() {
     docker run --rm --entrypoint /bin/sh "$IMAGE" -ec '
-        for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpd vtysh; do
+        for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd vtysh python3; do
             command -v "$cmd" >/dev/null || {
                 echo "missing FRR tooling package command: $cmd" >&2
                 exit 1
@@ -96,11 +89,9 @@ verify_tooling_image() {
             echo "FRR bgpd daemon is not enabled" >&2
             exit 1
         }
-        if ! grep -q "^staticd=yes" /etc/frr/daemons \
-            && ! grep -q "staticd daemons are always started" /etc/frr/daemons; then
-            echo "FRR staticd daemon is not enabled or explicitly always-started" >&2
-            exit 1
-        fi
+        test -x /usr/lib/frr/zebra || { echo "missing FRR zebra daemon" >&2; exit 1; }
+        test -x /usr/lib/frr/bgpd || { echo "missing FRR bgpd daemon" >&2; exit 1; }
+        test -x /usr/lib/frr/staticd || { echo "missing FRR staticd daemon" >&2; exit 1; }
     '
 }
 

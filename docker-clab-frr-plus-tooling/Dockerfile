@@ -1,39 +1,29 @@
-ARG CLAB_FRR_BASE_IMAGE=frrouting/frr@sha256:990e83490108b686fd6df3b1cafa6bdbb2714acb00eedb9a89693946f46f45ce
+ARG CLAB_FRR_BASE_IMAGE=debian:bookworm-slim@sha256:0104b334637a5f19aa9c983a91b54c89887c0984081f2068983107a6f6c21eeb
 FROM ${CLAB_FRR_BASE_IMAGE}
 
-USER root
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN if command -v tcpdump >/dev/null 2>&1 \
-        && command -v ping >/dev/null 2>&1 \
-        && command -v traceroute >/dev/null 2>&1 \
-        && command -v curl >/dev/null 2>&1 \
-        && command -v vim >/dev/null 2>&1 \
-        && command -v rg >/dev/null 2>&1 \
-        && command -v nmap >/dev/null 2>&1 \
-        && command -v nft >/dev/null 2>&1 \
-        && command -v less >/dev/null 2>&1 \
-        && command -v pppd >/dev/null 2>&1 \
-        && command -v pppoe >/dev/null 2>&1 \
-        && command -v pppoe-server >/dev/null 2>&1 \
-        && command -v udhcpd >/dev/null 2>&1 \
-        && command -v vtysh >/dev/null 2>&1; then \
-        echo "FRR tooling packages already present"; \
-    else \
-        apk add --no-cache \
-            tcpdump \
-            iputils \
-            traceroute \
-            busybox-extras \
-            procps \
-            curl \
-            vim \
-            ripgrep \
-            nmap \
-            nftables \
-            less \
-            ppp \
-            rp-pppoe; \
-    fi
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        frr \
+        iproute2 \
+        iputils-ping \
+        less \
+        nmap \
+        nftables \
+        ppp \
+        pppoe \
+        procps \
+        python3 \
+        ripgrep \
+        tcpdump \
+        traceroute \
+        udhcpc \
+        udhcpd \
+        vim \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN if ! command -v pppoe-sniff >/dev/null 2>&1; then \
         { \
@@ -65,13 +55,13 @@ RUN if ! command -v pppoe-sniff >/dev/null 2>&1; then \
         chmod +x /usr/local/bin/pppoe-sniff; \
     fi
 
-RUN command -v pppoe-sniff >/dev/null 2>&1
-
 RUN sed -i \
         -e 's/^bgpd=no/bgpd=yes/' \
         /etc/frr/daemons \
     && grep -q '^bgpd=yes' /etc/frr/daemons \
-    && { grep -q '^staticd=yes' /etc/frr/daemons \
-        || grep -q 'staticd daemons are always started' /etc/frr/daemons; }
-
-#USER frr
+    && for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd vtysh python3; do \
+        command -v "$cmd" >/dev/null || { echo "missing command: $cmd" >&2; exit 1; }; \
+    done \
+    && test -x /usr/lib/frr/zebra \
+    && test -x /usr/lib/frr/bgpd \
+    && test -x /usr/lib/frr/staticd

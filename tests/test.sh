@@ -55,6 +55,7 @@ tests=(
   test-deployment-host-filter.sh
   test-access-advertisements-runtime.sh
   test-hostile-dns-east-west.sh
+  test-dns-namespace-fallback-cpm-contract.sh
   test-dns-service-policy-routes.sh
   test-dns-service-source-binding.sh
   test-hostile-gua-advertisements.sh
@@ -72,6 +73,12 @@ tests=(
   test-vm-example-lab-cleanup.sh
   test-vm-docker-readiness.sh
 )
+
+if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" == "1" ]]; then
+  tests+=(
+    test-provider-access-pppoe-runtime.sh
+  )
+fi
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT

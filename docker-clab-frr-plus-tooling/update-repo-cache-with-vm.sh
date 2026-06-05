@@ -119,11 +119,13 @@ test -s "${cache_tar}"
 test -s "${cache_id}"
 
 docker run --rm --entrypoint /bin/sh clab-frr-plus-tooling:latest -ec '
-    for cmd in tcpdump ping traceroute curl vim rg nmap nft less; do
+    for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd vtysh python3; do
         command -v "$cmd" >/dev/null || exit 1
     done
     grep -q "^bgpd=yes" /etc/frr/daemons
-    grep -q "^staticd=yes" /etc/frr/daemons || grep -q "staticd daemons are always started" /etc/frr/daemons
+    test -x /usr/lib/frr/zebra
+    test -x /usr/lib/frr/bgpd
+    test -x /usr/lib/frr/staticd
 '
 
 printf 'CACHE_TAR=%s\n' "${cache_tar}"
