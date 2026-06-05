@@ -89,6 +89,17 @@ def assert_refuses(containerlab, expected):
         raise AssertionError(f"expected refusal containing {expected!r}")
 
 
+def assert_topology_refuses_without_artifacts(containerlab, expected):
+    try:
+        render_site_topology(site(containerlab))
+    except ValueError as exc:
+        message = str(exc)
+        if expected not in message:
+            raise AssertionError(f"expected {expected!r} in {message!r}") from exc
+    else:
+        raise AssertionError("expected topology render refusal before backend artifact emission")
+
+
 fake_provider = {
     "capabilities": {"labEmulation": True},
     "labEmulation": {
@@ -187,7 +198,27 @@ assert_refuses(
             "requests": [{"name": "pppoe-wan-provider", "handoffVlan": 11}],
         },
     },
-    "lab-emulation request missing provider-emulation mode",
+    "structured refusal: lab-emulation request missing provider-emulation mode",
+)
+assert_refuses(
+    {
+        "capabilities": {"labEmulation": True},
+        "providerEmulation": {
+            "mode": "commercial-vpn-overlay",
+            "name": "unsupported-target-capability",
+        },
+    },
+    "structured refusal: unsupported lab-emulation provider mode: 'commercial-vpn-overlay'",
+)
+assert_topology_refuses_without_artifacts(
+    {
+        "capabilities": {"labEmulation": True},
+        "providerEmulation": {
+            "mode": "commercial-vpn-overlay",
+            "name": "unsupported-target-capability",
+        },
+    },
+    "structured refusal: unsupported lab-emulation provider mode: 'commercial-vpn-overlay'",
 )
 
 assert_refuses(
