@@ -140,6 +140,12 @@ with tempfile.TemporaryDirectory() as tmp:
         provenance["locks"]["upstream"]["network-control-plane-model"]["rev"]
         == "1111222233334444555566667777888899990000"
     )
+    assert provenance["renderer"]["name"] == "network-renderer-containerlab-linux-backend"
+    assert provenance["renderer"]["identity"].startswith(
+        "network-renderer-containerlab-linux-backend@"
+    )
+    assert provenance["renderer"]["rev"] != "unknown"
+    assert provenance["renderer"]["revSource"] in {"env", "git"}
     assert provenance["locks"]["renderer"]["available"] is True
     assert provenance["output"]["kind"] == "containerlab-topology"
     assert provenance["controlledBaseline"] == "fs100-renderer-output-provenance"

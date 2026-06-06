@@ -2,46 +2,15 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 from pathlib import Path
 from typing import Any, Dict
 
 import yaml
 
 from clabgen.provenance import build_provenance
+from clabgen.provenance_fields import renderer_source_identity
 from clabgen.solver import load_solver
 from clabgen.s88.enterprise.enterprise import Enterprise
-
-
-def _git_rev(repo: Path) -> str:
-    try:
-        return (
-            subprocess.check_output(
-                ["git", "-C", str(repo), "rev-parse", "HEAD"],
-                stderr=subprocess.DEVNULL,
-            )
-            .decode()
-            .strip()
-        )
-    except Exception:
-        return "unknown"
-
-
-def _git_dirty(repo: Path) -> bool:
-    try:
-        subprocess.check_call(
-            ["git", "-C", str(repo), "diff", "--quiet"],
-            stderr=subprocess.DEVNULL,
-        )
-        subprocess.check_call(
-            ["git", "-C", str(repo), "diff", "--cached", "--quiet"],
-            stderr=subprocess.DEVNULL,
-        )
-        return False
-    except subprocess.CalledProcessError:
-        return True
-    except FileNotFoundError:
-        return True
 
 
 def _render_meta_comment(meta: Dict[str, Any]) -> str:
@@ -151,12 +120,8 @@ def write_outputs(
 
     repo_root = Path(__file__).resolve().parents[1]
 
-    renderer_meta = {
-        "name": repo_root.name,
-        "gitRev": _git_rev(repo_root),
-        "gitDirty": _git_dirty(repo_root),
-        "schemaVersion": 2,
-    }
+    renderer_meta = renderer_source_identity(repo_root)
+    renderer_meta["schemaVersion"] = 3
 
     provenance = build_provenance(
         solver_json,

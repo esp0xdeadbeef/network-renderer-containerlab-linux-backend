@@ -96,10 +96,28 @@ grep -F 'prebuilt CPM JSON' "${tmp_dir}/bad.stderr" >/dev/null
 test -s "${tmp_dir}/run/fabric.clab.yml"
 test -s "${tmp_dir}/run/vm-bridges-generated.nix"
 test -s "${tmp_dir}/run/clab-bridge-plan.json"
+test -s "${tmp_dir}/run/clab-renderer-deploy-provenance.json"
 
 grep -F 'clab.link.bridge: br-fs960' "${tmp_dir}/run/fabric.clab.yml" >/dev/null
 jq -e '.bridgeNames == ["br-fs960"]' "${tmp_dir}/run/clab-bridge-plan.json" >/dev/null
+jq -e '
+  .schema == "clab-renderer-deploy-provenance.v1"
+  and .renderer.name == "network-renderer-containerlab-linux-backend"
+  and (.renderer.identity | startswith("network-renderer-containerlab-linux-backend@"))
+  and (
+    (.renderer.rev | type == "string" and length > 6 and . != "unknown")
+    or (.renderer.narHash | type == "string" and startswith("sha256-"))
+  )
+  and .renderer.revSource == "env"
+  and .renderer.immutable == true
+  and (.renderer.immutableProof == "git-rev" or .renderer.immutableProof == "narHash")
+  and .locks.renderer.available == true
+  and .artifacts.topology == "'"${tmp_dir}"'/run/fabric.clab.yml"
+  and .artifacts.bridgePlan == "'"${tmp_dir}"'/run/clab-bridge-plan.json"
+' "${tmp_dir}/run/clab-renderer-deploy-provenance.json" >/dev/null
 grep -F 'would ensure Docker tooling image cache, cleanup fabric, materialize bridges, deploy, and verify containers' \
+  "${tmp_dir}/dry-run.log" >/dev/null
+grep -F "renderer deploy provenance=${tmp_dir}/run/clab-renderer-deploy-provenance.json" \
   "${tmp_dir}/dry-run.log" >/dev/null
 
 echo "PASS deploy-clab-app-contract"

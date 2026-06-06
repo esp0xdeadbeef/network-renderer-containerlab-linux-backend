@@ -5,11 +5,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 python3 - <<'PY' "${repo_root}"
 import importlib.util
-import subprocess
 import sys
 import types
 from pathlib import Path
-from unittest import mock
 
 repo = Path(sys.argv[1])
 module_path = repo / "clabgen" / "parse-solver-json.py"
@@ -23,13 +21,12 @@ sys.modules["clabgen.s88.enterprise.enterprise"] = types.SimpleNamespace(Enterpr
 
 spec.loader.exec_module(module)
 
+from clabgen.provenance_fields import renderer_source_identity
 
-def missing_git(*_args, **_kwargs):
-    raise FileNotFoundError("git")
-
-
-with mock.patch.object(subprocess, "check_call", side_effect=missing_git):
-    assert module._git_dirty(repo) is True
+identity = renderer_source_identity(Path("/tmp/not-a-git-repo-for-clab-provenance"))
+assert identity["rev"] == "unknown"
+assert identity["dirty"] in {True, "unknown"}
+assert identity["immutable"] is False
 
 print("PASS provenance-without-git")
 PY
