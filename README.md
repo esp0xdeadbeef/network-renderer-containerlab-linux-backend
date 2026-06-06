@@ -57,6 +57,27 @@ nix run .#generate-clab-config -- \
   ./vm-bridges-generated.nix
 ```
 
+Deploy from explicit CPM and renderer inventory JSON:
+
+```bash
+nix run .#deploy-clab -- \
+  --work-dir /var/lib/network-renderer-containerlab-linux-backend \
+  ./output-control-plane-model.json \
+  ./renderer-inventory.json
+```
+
+`deploy-clab` is downstream of CPM. It does not parse intent or inventory Nix
+files; callers must build the CPM JSON first and pass renderer inventory as
+JSON. The command renders `fabric.clab.yml` and `vm-bridges-generated.nix`,
+evaluates the rendered bridge artifact, prepares the Docker tooling image
+cache, clears stale Containerlab state for the rendered lab, materializes host
+bridges and explicit VLAN/NAT bridge attachments, deploys Containerlab, and
+checks that rendered fabric containers have non-loopback interfaces.
+
+For deterministic service integration, pin this flake and invoke the app with
+locked CPM and renderer-inventory artifacts. `--dry-run` renders artifacts and
+the bridge plan without touching Docker, Linux links, or Containerlab.
+
 ## Tests
 
 Run:

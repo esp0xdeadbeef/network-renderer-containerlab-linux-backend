@@ -40,6 +40,7 @@ tests=(
   test-access-tenant-no-node-name-parsing.sh
   test-vm-runtime-log-guard.sh
   test-input-path-override.sh
+  test-deploy-clab-app-contract.sh
   test-vm-matrix-resources.sh
   test-vm-matrix-runner.sh
   test-topology-conformance-parity-guard.sh

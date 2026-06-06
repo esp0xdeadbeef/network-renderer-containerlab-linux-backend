@@ -64,6 +64,29 @@
             '';
           };
 
+          deploy-clab = pkgs.writeShellApplication {
+            name = "deploy-clab";
+            runtimeInputs = with pkgs; [
+              bash
+              containerlab
+              coreutils
+              docker
+              findutils
+              gawk
+              gnugrep
+              gnused
+              iproute2
+              jq
+              pythonEnv
+            ];
+            text = ''
+              export CLAB_RENDERER_ROOT="${repoRoot}"
+              export CLABGEN_PYTHON="${pythonEnv}/bin/python"
+              export PYTHONPATH="${repoRoot}:''${PYTHONPATH:+:$PYTHONPATH}"
+              exec ${./deploy-clab.sh} "$@"
+            '';
+          };
+
           default = self.packages.${system}.generate-clab-config;
         }
       );
@@ -79,6 +102,11 @@
           start-vm = {
             type = "app";
             program = "${self.packages.${system}.start-vm}/bin/start-vm";
+          };
+
+          deploy-clab = {
+            type = "app";
+            program = "${self.packages.${system}.deploy-clab}/bin/deploy-clab";
           };
 
           default = self.apps.${system}.generate-clab-config;
