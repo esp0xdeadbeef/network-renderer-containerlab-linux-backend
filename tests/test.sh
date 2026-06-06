@@ -69,6 +69,7 @@ tests=(
   test-overlay-underlay-access-rendering.sh
   test-linux-policy-rule-shell-safety.sh
   test-policy-no-main-defaults.sh
+  test-policy-ingress-interface-lane-default.sh
   test-vm-nat-uplink.sh
   test-vm-physical-overlay-post-checks.sh
   test-s-router-clab-overlay-parity.sh
