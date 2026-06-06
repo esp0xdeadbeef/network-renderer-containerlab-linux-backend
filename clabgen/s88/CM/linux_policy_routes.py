@@ -35,9 +35,7 @@ def _route_matches_ingress(
 
     ingress_uplink = _lane_uplink(ingress_lane)
     route_uplink = _lane_uplink(route_lane)
-    return (
-        ingress_uplink is None or route_uplink is None or ingress_uplink == route_uplink
-    )
+    return None in {ingress_uplink, route_uplink} or ingress_uplink == route_uplink
 
 
 def _same_uplink(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
@@ -101,7 +99,8 @@ def _policy_groups_for_lane(
         for route in routes["ipv4"]:
             if route.get("policyOnly") is not True:
                 continue
-            if not _route_matches_ingress(target_lane, _lane(route)):
+            route_lane = _lane(route) or (_lane(iface) if _is_default(_dst(route)) else {})  # fmt: skip
+            if not _route_matches_ingress(target_lane, route_lane):
                 continue
             dst = _dst(route)
             if ifname != target_ifname and dst in preferred4:
@@ -114,7 +113,8 @@ def _policy_groups_for_lane(
         for route in routes["ipv6"]:
             if route.get("policyOnly") is not True:
                 continue
-            if not _route_matches_ingress(target_lane, _lane(route)):
+            route_lane = _lane(route) or (_lane(iface) if _is_default(_dst(route)) else {})  # fmt: skip
+            if not _route_matches_ingress(target_lane, route_lane):
                 continue
             dst = _dst(route)
             if ifname != target_ifname and dst in preferred6:
