@@ -40,6 +40,25 @@
             ]
           );
           repoRoot = ./.;
+          rendererSourceName = "network-renderer-containerlab-linux-backend";
+          rendererSourceRev = self.rev or (self.dirtyRev or "unknown");
+          rendererSourceShortRev =
+            self.shortRev or (self.dirtyShortRev or (
+              if rendererSourceRev == "unknown" then "unknown" else builtins.substring 0 7 rendererSourceRev
+            ));
+          rendererSourceDirty =
+            if self ? rev then "0" else if self ? dirtyRev then "1" else "unknown";
+          rendererSourceLastModified = toString (self.lastModified or 0);
+          rendererSourceNarHash = self.narHash or "";
+          rendererSourceEnv = ''
+            export CLAB_RENDERER_SOURCE_NAME="${rendererSourceName}"
+            export CLAB_RENDERER_SOURCE_REV="${rendererSourceRev}"
+            export CLAB_RENDERER_SOURCE_SHORT_REV="${rendererSourceShortRev}"
+            export CLAB_RENDERER_SOURCE_DIRTY="${rendererSourceDirty}"
+            export CLAB_RENDERER_SOURCE_LAST_MODIFIED="${rendererSourceLastModified}"
+            export CLAB_RENDERER_SOURCE_NAR_HASH="${rendererSourceNarHash}"
+            export CLAB_RENDERER_SOURCE_OUT_PATH="${repoRoot}"
+          '';
         in
         {
           generate-clab-config = pkgs.writeShellApplication {
@@ -48,6 +67,7 @@
               pythonEnv
             ];
             text = ''
+              ${rendererSourceEnv}
               export PYTHONPATH="${repoRoot}:''${PYTHONPATH:+:$PYTHONPATH}"
               exec ${pythonEnv}/bin/python ${./generate-clab-config.py} "$@"
             '';
@@ -80,6 +100,7 @@
               pythonEnv
             ];
             text = ''
+              ${rendererSourceEnv}
               export CLAB_RENDERER_ROOT="${repoRoot}"
               export CLABGEN_PYTHON="${pythonEnv}/bin/python"
               export PYTHONPATH="${repoRoot}:''${PYTHONPATH:+:$PYTHONPATH}"

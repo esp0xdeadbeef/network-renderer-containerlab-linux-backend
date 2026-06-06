@@ -64,6 +64,7 @@ topology_file="${work_dir}/fabric.clab.yml"
 bridges_file="${work_dir}/vm-bridges-generated.nix"
 bridge_plan_file="${work_dir}/clab-bridge-plan.json"
 tooling_cache_evidence_file="${work_dir}/clab-frr-tooling-cache-evidence.json"
+deploy_provenance_file="${work_dir}/clab-renderer-deploy-provenance.json"
 
 render_artifacts() {
   log "rendering ${topology_file} and ${bridges_file}"
@@ -120,6 +121,50 @@ plan_path.write_text(
         sort_keys=True,
     )
     + "\n"
+)
+PY
+}
+
+write_deploy_provenance() {
+  log "writing renderer deploy provenance ${deploy_provenance_file}"
+  REPO_ROOT="${repo_root}" \
+  CPM_JSON="${cpm_json}" \
+  RENDERER_INVENTORY_JSON="${renderer_inventory_json}" \
+  WORK_DIR="${work_dir}" \
+  TOPOLOGY_FILE="${topology_file}" \
+  BRIDGES_FILE="${bridges_file}" \
+  BRIDGE_PLAN_FILE="${bridge_plan_file}" \
+  TOOLING_CACHE_EVIDENCE_FILE="${tooling_cache_evidence_file}" \
+  DEPLOY_PROVENANCE_FILE="${deploy_provenance_file}" \
+    "${python_bin}" - <<'PY'
+import json
+import os
+from pathlib import Path
+
+from clabgen.provenance_fields import renderer_lock_summary, renderer_source_identity
+
+repo_root = Path(os.environ["REPO_ROOT"])
+payload = {
+    "schema": "clab-renderer-deploy-provenance.v1",
+    "renderer": renderer_source_identity(repo_root),
+    "locks": {
+        "renderer": renderer_lock_summary(repo_root),
+    },
+    "inputs": {
+        "controlPlaneModel": os.environ["CPM_JSON"],
+        "rendererInventory": os.environ["RENDERER_INVENTORY_JSON"],
+    },
+    "artifacts": {
+        "topology": os.environ["TOPOLOGY_FILE"],
+        "bridges": os.environ["BRIDGES_FILE"],
+        "bridgePlan": os.environ["BRIDGE_PLAN_FILE"],
+        "toolingCacheEvidence": os.environ["TOOLING_CACHE_EVIDENCE_FILE"],
+    },
+    "workDir": os.environ["WORK_DIR"],
+}
+Path(os.environ["DEPLOY_PROVENANCE_FILE"]).write_text(
+    json.dumps(payload, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
 )
 PY
 }
@@ -253,6 +298,7 @@ verify_fabric_containers() {
 
 render_artifacts
 write_bridge_plan
+write_deploy_provenance
 
 name="$(lab_name)"
 [[ -n "${name}" ]] || fail "rendered topology is missing a top-level lab name"
@@ -261,6 +307,7 @@ if ((dry_run)); then
   log "dry-run: rendered topology=${topology_file}"
   log "dry-run: rendered bridges=${bridges_file}"
   log "dry-run: bridge plan=${bridge_plan_file}"
+  log "dry-run: renderer deploy provenance=${deploy_provenance_file}"
   log "dry-run: Docker tooling image cache evidence=${tooling_cache_evidence_file}"
   log "dry-run: would ensure Docker tooling image cache, cleanup ${name}, materialize bridges, deploy, and verify containers"
   exit 0
