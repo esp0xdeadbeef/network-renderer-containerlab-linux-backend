@@ -63,6 +63,7 @@ mkdir -p "${work_dir}"
 topology_file="${work_dir}/fabric.clab.yml"
 bridges_file="${work_dir}/vm-bridges-generated.nix"
 bridge_plan_file="${work_dir}/clab-bridge-plan.json"
+tooling_cache_evidence_file="${work_dir}/clab-frr-tooling-cache-evidence.json"
 
 render_artifacts() {
   log "rendering ${topology_file} and ${bridges_file}"
@@ -215,7 +216,10 @@ ensure_tooling_image_cache() {
       export CLAB_FRR_TOOLING_CACHE_DIR="/tmp/network-renderer-containerlab-linux-backend/docker"
     fi
   fi
-  "${repo_root}/docker-clab-frr-plus-tooling/build.sh"
+  CLAB_FRR_TOOLING_CACHE_EVIDENCE_JSON="${tooling_cache_evidence_file}" \
+    "${repo_root}/docker-clab-frr-plus-tooling/build.sh"
+  [[ -s "${tooling_cache_evidence_file}" ]] || fail "missing Docker tooling image cache evidence: ${tooling_cache_evidence_file}"
+  log "Docker tooling image cache evidence=${tooling_cache_evidence_file}"
 }
 
 cleanup_stale_lab() {
@@ -257,6 +261,7 @@ if ((dry_run)); then
   log "dry-run: rendered topology=${topology_file}"
   log "dry-run: rendered bridges=${bridges_file}"
   log "dry-run: bridge plan=${bridge_plan_file}"
+  log "dry-run: Docker tooling image cache evidence=${tooling_cache_evidence_file}"
   log "dry-run: would ensure Docker tooling image cache, cleanup ${name}, materialize bridges, deploy, and verify containers"
   exit 0
 fi
