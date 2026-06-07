@@ -30,6 +30,32 @@
             pkgs = import nixpkgs { inherit system; };
           }
         );
+
+      rendererLib = {
+        renderer.hostModule =
+          rendererInput:
+          { lib, ... }:
+          {
+            _module.args.containerlabLinuxRendererInput = rendererInput;
+
+            assertions = [
+              {
+                assertion = rendererInput ? hostName;
+                message = "containerlab linux renderer input must include hostName";
+              }
+              {
+                assertion = rendererInput ? intent;
+                message = "containerlab linux renderer input must include intent";
+              }
+              {
+                assertion = rendererInput ? inventory;
+                message = "containerlab linux renderer input must include inventory";
+              }
+            ];
+
+            networking.hostName = lib.mkDefault rendererInput.hostName;
+          };
+      };
     in
     {
       packages = forAllSystems (
@@ -137,15 +163,11 @@
         }
       );
 
-      lib = {
-        renderer.hostModule =
-          _rendererInput:
-          { ... }:
-          {
-            # TODO: implement the Containerlab Linux backend NixOS host module.
-            # Temporary no-op so consumers can depend on the standard renderer
-            # contract without patching downstream NixOS host profiles.
-          };
-      };
+      lib = rendererLib;
+
+      libBySystem = forAllSystems (
+        { ... }:
+        rendererLib
+      );
     };
 }
