@@ -6,10 +6,13 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 PYTHONPATH="${repo_root}" python3 - <<'PY'
+import json
+
 from clabgen.models import InterfaceModel, LinkModel, NodeModel, SiteModel
 from clabgen.s88.EM.base import render as render_em
 from clabgen.s88.site.eth_map import build_eth_maps
 from clabgen.s88.site.node_runtime import build_node_data
+from clabgen.s88.site.node_runtime import render_linux_node
 from clabgen.s88.site.topology import render_site_topology
 
 
@@ -86,6 +89,39 @@ cm_node.forwarding_intent = {
             "fromInterface": "inside",
             "toInterface": "outside",
             "action": "accept",
+            "relationId": "selector-handoff-forward--router--selector-transport-to-access-to-selector--no-uplink",
+            "comment": "selector-handoff-forward--router--selector-transport-to-access-to-selector--no-uplink",
+            "direction": "forward",
+            "relationCardinality": {
+                "unit": "selector-forwarding-rule",
+                "decomposition": "one-rule-per-selector-handoff-direction",
+            },
+            "from": {
+                "runtimeInterface": "lan-target0",
+                "relationPurpose": "selector-transport",
+                "hostFacing": False,
+                "backingRef": {
+                    "kind": "attachment",
+                    "name": "inside-tenant",
+                },
+                "lane": {
+                    "kind": "tenant",
+                    "access": "access-client",
+                },
+            },
+            "to": {
+                "runtimeInterface": "wan-target0",
+                "relationPurpose": "access-to-selector",
+                "hostFacing": False,
+                "backingRef": {
+                    "kind": "link",
+                    "name": "p2p-access-client-downstream-selector",
+                },
+                "lane": {
+                    "kind": "access-edge",
+                    "access": "access-client",
+                },
+            },
         }
     ],
 }
@@ -110,6 +146,28 @@ for expected in ('iifname "lan-target0"', 'oifname "wan-target0"', 'oifname "wan
 for forbidden in ('iifname "inside"', 'oifname "outside"', 'oifname "outside" masquerade'):
     if forbidden in cm_exec:
         raise AssertionError(f"cm-runtime-if-name: leaked logical interface {forbidden!r} in {cm_exec}")
+
+cm_rendered = render_linux_node(
+    node_name="router",
+    node=cm_node,
+    eth_map={"inside": "lan-target0", "outside": "wan-target0"},
+)
+cm_labels = cm_rendered.get("labels", {})
+selector_audit = json.loads(cm_labels.get("clab.selector.interface.relation.audit", "{}"))
+wan_audit = selector_audit.get("wan-target0", [])
+if len(wan_audit) != 1:
+    raise AssertionError(f"selector-relation-audit-cardinality: unexpected audit {selector_audit!r}")
+wan_record = wan_audit[0]
+if wan_record.get("relationId") != "selector-handoff-forward--router--selector-transport-to-access-to-selector--no-uplink":
+    raise AssertionError(f"selector-relation-audit-id: unexpected record {wan_record!r}")
+if wan_record.get("relationPurpose") != "access-to-selector":
+    raise AssertionError(f"selector-relation-audit-purpose: unexpected record {wan_record!r}")
+if wan_record.get("hostFacing") is not False:
+    raise AssertionError(f"selector-relation-audit-host-facing: unexpected record {wan_record!r}")
+if wan_record.get("nodeRole") != "core":
+    raise AssertionError(f"selector-relation-audit-role: unexpected record {wan_record!r}")
+if wan_record.get("backingRef", {}).get("name") != "p2p-access-client-downstream-selector":
+    raise AssertionError(f"selector-relation-audit-backing-ref: unexpected record {wan_record!r}")
 
 cm_bad_data = build_node_data("router", cm_node, {"inside": "lan-target0"})
 assert_refuses(

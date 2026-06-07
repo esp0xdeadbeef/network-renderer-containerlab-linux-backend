@@ -68,6 +68,62 @@ def build_node_data(
     return node_data
 
 
+def _selector_relation_audit(
+    node: NodeModel, eth_map: Dict[str, str]
+) -> Dict[str, List[Dict[str, Any]]]:
+    runtime_names = set(eth_map.values())
+    result: Dict[str, List[Dict[str, Any]]] = {}
+    forwarding_intent = getattr(node, "forwarding_intent", {}) or {}
+    rules = forwarding_intent.get("rules", [])
+    if not isinstance(rules, list):
+        return result
+
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        relation_id = rule.get("relationId")
+        relation_cardinality = rule.get("relationCardinality")
+        cardinality_unit = (
+            relation_cardinality.get("unit")
+            if isinstance(relation_cardinality, dict)
+            else None
+        )
+        if not (
+            (isinstance(relation_id, str) and relation_id.startswith("selector-"))
+            or cardinality_unit == "selector-forwarding-rule"
+        ):
+            continue
+
+        for side in ("from", "to"):
+            endpoint = rule.get(side)
+            if not isinstance(endpoint, dict):
+                continue
+            runtime_interface = endpoint.get("runtimeInterface")
+            if (
+                not isinstance(runtime_interface, str)
+                or runtime_interface not in runtime_names
+            ):
+                continue
+            result.setdefault(runtime_interface, []).append(
+                {
+                    "side": side,
+                    "runtimeInterface": runtime_interface,
+                    "nodeRole": node.role,
+                    "relationId": relation_id,
+                    "relationComment": rule.get("comment"),
+                    "relationAction": rule.get("action"),
+                    "relationDirection": rule.get("direction"),
+                    "relationPurpose": endpoint.get("relationPurpose"),
+                    "hostFacing": endpoint.get("hostFacing"),
+                    "backingRef": copy.deepcopy(endpoint.get("backingRef")),
+                    "lane": copy.deepcopy(endpoint.get("lane")),
+                    "relationCardinality": copy.deepcopy(relation_cardinality),
+                }
+            )
+
+    return result
+
+
 def render_linux_node(
     node_name: str,
     node: NodeModel,
@@ -88,14 +144,21 @@ def render_linux_node(
     audit_map: Dict[str, str] = {}
     for logical, runtime in sorted(eth_map.items()):
         audit_map[runtime] = logical
+    selector_relation_audit = _selector_relation_audit(node, eth_map)
+
+    labels = {
+        "clab.interface.map": json.dumps(eth_map, sort_keys=True),
+        "clab.interface.audit": json.dumps(audit_map, sort_keys=True),
+    }
+    if selector_relation_audit:
+        labels["clab.selector.interface.relation.audit"] = json.dumps(
+            selector_relation_audit, sort_keys=True
+        )
 
     return {
         "kind": "linux",
         "image": "clab-frr-plus-tooling:latest",
-        "labels": {
-            "clab.interface.map": json.dumps(eth_map, sort_keys=True),
-            "clab.interface.audit": json.dumps(audit_map, sort_keys=True),
-        },
+        "labels": labels,
         "network-mode": "none",
         "restart-policy": "no",
         "cmd": "/bin/sh -c 'sleep infinity'",
