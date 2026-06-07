@@ -133,5 +133,18 @@
           default = self.apps.${system}.generate-clab-config;
         }
       );
+
+      libBySystem = forAllSystems (
+        { system, pkgs }:
+        {
+          renderer.hostModule =
+            _rendererInput:
+            {
+              # TODO: implement the Containerlab Linux backend NixOS host module.
+              # Temporary no-op so consumers can depend on the standard renderer
+              # contract without patching downstream NixOS host profiles.
+            };
+        }
+      );
     };
 }
