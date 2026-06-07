@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
     network-control-plane-model.url = "github:esp0xdeadbeef/network-control-plane-model";
     network-control-plane-model.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -39,6 +40,7 @@
               pyyaml
             ]
           );
+
           repoRoot = ./.;
           rendererSourceName = "network-renderer-containerlab-linux-backend";
           rendererSourceRev = self.rev or (self.dirtyRev or "unknown");
@@ -50,6 +52,7 @@
             if self ? rev then "0" else if self ? dirtyRev then "1" else "unknown";
           rendererSourceLastModified = toString (self.lastModified or 0);
           rendererSourceNarHash = self.narHash or "";
+
           rendererSourceEnv = ''
             export CLAB_RENDERER_SOURCE_NAME="${rendererSourceName}"
             export CLAB_RENDERER_SOURCE_REV="${rendererSourceRev}"
@@ -134,17 +137,14 @@
         }
       );
 
-      libBySystem = forAllSystems (
-        { system, pkgs }:
-        {
-          renderer.hostModule =
-            _rendererInput:
-            {
-              # TODO: implement the Containerlab Linux backend NixOS host module.
-              # Temporary no-op so consumers can depend on the standard renderer
-              # contract without patching downstream NixOS host profiles.
-            };
-        }
-      );
+      lib = {
+        renderer.hostModule =
+          _rendererInput:
+          {
+            # TODO: implement the Containerlab Linux backend NixOS host module.
+            # Temporary no-op so consumers can depend on the standard renderer
+            # contract without patching downstream NixOS host profiles.
+          };
+      };
     };
 }
