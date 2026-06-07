@@ -140,6 +140,7 @@
       lib = {
         renderer.hostModule =
           _rendererInput:
+          { ... }:
           {
             # TODO: implement the Containerlab Linux backend NixOS host module.
             # Temporary no-op so consumers can depend on the standard renderer
