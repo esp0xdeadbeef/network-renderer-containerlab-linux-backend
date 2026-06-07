@@ -51,6 +51,7 @@ tests=(
   test-bgp-example.sh
   test-routing-mode-required.sh
   test-policy-firewall.sh
+  test-fs760-policy-firewall-forwarding-intent.sh
   test-role-independent-cm-inputs.sh
   test-core-nat-wan.sh
   test-tri-site-core-egress-nat.sh
