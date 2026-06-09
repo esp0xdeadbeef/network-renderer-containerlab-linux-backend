@@ -287,24 +287,24 @@ let
 
 in
 {
-  environment.systemPackages = lib.mkDefault (lib.mkIf (hasAllRepos && s-router-clab-render-live != null) [
+  environment.systemPackages = lib.mkIf (hasAllRepos && s-router-clab-render-live != null) [
     s-router-clab-render-live
     pkgs.containerlab
-  ]);
+  ];
 
-  virtualisation.docker = lib.mkDefault (lib.mkIf hasAllRepos {
+  virtualisation.docker = lib.mkIf hasAllRepos {
     enable = true;
     autoPrune.enable = true;
-  });
+  };
 
-  environment.variables = lib.mkDefault (lib.mkIf hasAllRepos {
+  environment.variables = lib.mkIf hasAllRepos {
     CLAB_RENDERER_REPO = toString rendererRepo;
     CLAB_NETWORK_LABS = toString labsRepo;
     CLAB_CONTROL_PLANE_MODEL = toString cpmRepo;
     CLAB_FRR_TOOLING_CACHE_DIR = "/persist/docker-image-cache/network-renderer-containerlab-linux-backend";
-  });
+  };
 
-  systemd.services.s-router-clab-render-live = lib.mkDefault (lib.mkIf (hasAllRepos && s-router-clab-render-live != null) {
+  systemd.services.s-router-clab-render-live = lib.mkIf (hasAllRepos && s-router-clab-render-live != null) {
     description = "Render and deploy the s-router Containerlab topology";
     wantedBy = [ "multi-user.target" ];
     after = [
@@ -323,5 +323,5 @@ in
     script = ''
       exec ${s-router-clab-render-live}/bin/s-router-clab-render-live /persist/s-router-clab/live-boot
     '';
-  });
+  };
 }
