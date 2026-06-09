@@ -30,6 +30,9 @@ def _interface_name_map(
         if not isinstance(logical_name, str) or not isinstance(iface, dict):
             continue
         if logical_name not in eth_map:
+            # Allow PPPoE session interfaces to map to themselves
+            if iface.get("sourceKind") == "pppoe-session":
+                result[logical_name] = logical_name
             continue
         target_name = eth_map[logical_name]
         result[logical_name] = target_name
