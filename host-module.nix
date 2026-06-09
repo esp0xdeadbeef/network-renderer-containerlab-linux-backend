@@ -4,13 +4,14 @@
 , containerlabLinuxRendererInput
 , containerlabLinuxRendererSelf  ? null
 , containerlabLinuxRendererInputs ? { }
+ , sRouterClabLabProfile ? { }
 ,
 }:
 let
   inherit (lib) mkDefault mkForce optionalString;
 
-  labSource = containerlabLinuxRendererInput.labSource or "sat";
-  deploymentHost = containerlabLinuxRendererInput.deploymentHost or "s-router-clab";
+  deploymentHost = sRouterClabLabProfile.deploymentHost or containerlabLinuxRendererInput.deploymentHost or "s-router-clab";
+  labSource = sRouterClabLabProfile.labSource or containerlabLinuxRendererInput.labSource or "sat";
 
   # Repos come from renderer's own flake inputs, baked into host-module.nix
   rendererRepo = containerlabLinuxRendererSelf or null;
