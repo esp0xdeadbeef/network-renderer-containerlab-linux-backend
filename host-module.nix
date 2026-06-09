@@ -14,11 +14,11 @@ let
   labSource = sRouterClabLabProfile.labSource or containerlabLinuxRendererInput.labSource or "sat";
 
   # Repos come from renderer's own flake inputs, baked into host-module.nix
-  rendererRepo = containerlabLinuxRendererSelf or null;
-  labsRepo = containerlabLinuxRendererInputs.network-labs or null;
-  compilerRepo = containerlabLinuxRendererInputs.network-compiler or null;
-  forwardingRepo = containerlabLinuxRendererInputs.network-forwarding-model or null;
-  cpmRepo = containerlabLinuxRendererInputs.network-control-plane-model or null;
+  rendererRepo = if containerlabLinuxRendererSelf == null then null else containerlabLinuxRendererSelf;
+  labsRepo = if containerlabLinuxRendererInputs ? "network-labs" then containerlabLinuxRendererInputs.network-labs else null;
+  compilerRepo = if containerlabLinuxRendererInputs ? "network-compiler" then containerlabLinuxRendererInputs.network-compiler else null;
+  forwardingRepo = if containerlabLinuxRendererInputs ? "network-forwarding-model" then containerlabLinuxRendererInputs.network-forwarding-model else null;
+  cpmRepo = if containerlabLinuxRendererInputs ? "network-control-plane-model" then containerlabLinuxRendererInputs.network-control-plane-model else null;
 
   hasAllRepos = rendererRepo != null && labsRepo != null && compilerRepo != null
              && forwardingRepo != null && cpmRepo != null;
