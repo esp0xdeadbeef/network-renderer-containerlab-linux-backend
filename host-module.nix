@@ -291,7 +291,7 @@ in
   environment.systemPackages = lib.mkDefault (lib.mkIf (hasAllRepos && s-router-clab-render-live != null) [
     s-router-clab-render-live
     pkgs.containerlab
-  ];
+  ]);
 
   virtualisation.docker = lib.mkDefault (lib.mkIf hasAllRepos {
     enable = true;
