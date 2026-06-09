@@ -8,9 +8,16 @@
     network-control-plane-model.inputs.nixpkgs.follows = "nixpkgs";
 
     network-labs.url = "github:esp0xdeadbeef/network-labs";
+
+    network-compiler.url = "github:esp0xdeadbeef/network-compiler";
+    network-forwarding-model.url = "github:esp0xdeadbeef/network-forwarding-model";
+
+    network-compiler.inputs.nixpkgs.follows = "nixpkgs";
+    network-forwarding-model.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
+    inputs @
     { self
     , nixpkgs
     , ...
@@ -54,6 +61,15 @@
             ];
 
             networking.hostName = lib.mkDefault rendererInput.hostName;
+
+            imports = [
+              (import ./host-module.nix {
+                inherit (rendererInput) lib;
+              })
+            ];
+
+            _module.args.containerlabLinuxRendererSelf = self.outPath or self;
+            _module.args.containerlabLinuxRendererInputs = inputs;
           };
       };
     in
