@@ -4,16 +4,15 @@
 , containerlabLinuxRendererInput
 , containerlabLinuxRendererSelf  ? null
 , containerlabLinuxRendererInputs ? { }
- , sRouterClabLabProfile ? { }
+, sRouterClabLabProfile ? { }
 , ...
 }:
 let
   inherit (lib) mkDefault mkForce optionalString;
 
-  deploymentHost = sRouterClabLabProfile.deploymentHost or containerlabLinuxRendererInput.deploymentHost or "s-router-clab";
   labSource = sRouterClabLabProfile.labSource or containerlabLinuxRendererInput.labSource or "sat";
+  deploymentHost = sRouterClabLabProfile.deploymentHost or containerlabLinuxRendererInput.deploymentHost or "s-router-clab";
 
-  # Repos come from renderer's own flake inputs, baked into host-module.nix
   rendererRepo = if containerlabLinuxRendererSelf == null then null else containerlabLinuxRendererSelf;
   labsRepo = if containerlabLinuxRendererInputs ? "network-labs" then containerlabLinuxRendererInputs.network-labs else null;
   compilerRepo = if containerlabLinuxRendererInputs ? "network-compiler" then containerlabLinuxRendererInputs.network-compiler else null;
@@ -320,7 +319,7 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
       TimeoutStartSec = "30min";
-  });
+    };
     script = ''
       exec ${s-router-clab-render-live}/bin/s-router-clab-render-live /persist/s-router-clab/live-boot
     '';
