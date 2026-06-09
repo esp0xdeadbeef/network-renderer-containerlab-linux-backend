@@ -17,8 +17,7 @@
   };
 
   outputs =
-    inputs @
-    { self
+    inputs @ { self
     , nixpkgs
     , ...
     }:
@@ -44,6 +43,8 @@
           { lib, ... }:
           {
             _module.args.containerlabLinuxRendererInput = rendererInput;
+            _module.args.containerlabLinuxRendererSelf = self.outPath or self;
+            _module.args.containerlabLinuxRendererInputs = inputs;
 
             assertions = [
               {
@@ -62,14 +63,7 @@
 
             networking.hostName = lib.mkDefault rendererInput.hostName;
 
-            imports = [
-              (import ./host-module.nix {
-                inherit (rendererInput) lib;
-              })
-            ];
-
-            _module.args.containerlabLinuxRendererSelf = self.outPath or self;
-            _module.args.containerlabLinuxRendererInputs = inputs;
+            imports = [ ./host-module.nix ];
           };
       };
     in
