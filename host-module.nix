@@ -324,4 +324,69 @@ in
       exec ${s-router-clab-render-live}/bin/s-router-clab-render-live /persist/s-router-clab/live-boot
     '';
   };
+
+  # ----- VLAN 4 upstream internet (persistent across reboots) -----
+  # VLAN 4 is the emulated internet uplink: eth0.4 → br-uplink0 → container WAN
+  # These netdevs/networks persist across reboots, complementing the
+  # render-live service's containerlab-managed bridge infrastructure.
+  systemd.network.netdevs = lib.mkDefault ((config.systemd.network.netdevs or {}) // {
+    "10-eth0.4" = {
+      netdevConfig = {
+        Kind = "vlan";
+        Name = "eth0.4";
+      };
+      vlanConfig = {
+        Id = 4;
+      };
+    };
+    "50-br-uplink0" = {
+      netdevConfig = {
+        Kind = "bridge";
+        Name = "br-uplink0";
+      };
+    };
+  });
+
+  systemd.network.networks = lib.mkDefault ((config.systemd.network.networks or {}) // {
+    "10-eth0.4" = {
+      matchConfig.Name = "eth0.4";
+      linkConfig.ActivationPolicy = "always-up";
+      networkConfig = {
+        ConfigureWithoutCarrier = true;
+        DHCP = "no";
+        IPv6AcceptRA = false;
+      };
+    };
+    "50-br-uplink0" = {
+      matchConfig.Name = "br-uplink0";
+      linkConfig.ActivationPolicy = "always-up";
+      networkConfig = {
+        Address = "10.11.0.1/24";
+        DHCPServer = "yes";
+        IPMasquerade = "both";
+        IPForward = "yes";
+        ConfigureWithoutCarrier = true;
+      };
+    };
+  });
+
+  # nftables NAT masquerade for VLAN 4 internet egress
+  # Applied on boot and persists across containerlab destroy cycles
+  systemd.services.clab-vlan4-nat = {
+    description = "CLAB VLAN 4 upstream NAT masquerade";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "systemd-networkd.service" "network-online.target" ];
+    wants = [ "systemd-networkd.service" "network-online.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      # Ensure masquerade on the uplink bridge for fabric internet access
+      nft add rule ip nat postrouting oifname br-uplink0 masquerade 2>/dev/null || true
+    '';
+    preStop = ''
+      nft flush chain ip nat postrouting 2>/dev/null || true
+    '';
+  };
 }
