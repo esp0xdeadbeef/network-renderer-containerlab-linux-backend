@@ -43,7 +43,7 @@
           { lib, ... }:
           {
             _module.args.containerlabLinuxRendererInput = rendererInput;
-            _module.args.containerlabLinuxRendererSelf = self.outPath or self;
+            _module.args.containerlabLinuxRendererSelf = self.outPath;
             _module.args.containerlabLinuxRendererInputs = inputs;
 
             assertions = [

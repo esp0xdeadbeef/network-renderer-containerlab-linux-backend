@@ -5,7 +5,7 @@
 , containerlabLinuxRendererSelf  ? null
 , containerlabLinuxRendererInputs ? { }
  , sRouterClabLabProfile ? { }
-,
+, ...
 }:
 let
   inherit (lib) mkDefault mkForce optionalString;
