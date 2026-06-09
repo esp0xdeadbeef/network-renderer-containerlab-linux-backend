@@ -9,7 +9,7 @@ def require_runtime_name(value: Any, name_map: Dict[str, str], context: str) -> 
     translated = name_map.get(value)
     if not isinstance(translated, str) or not translated:
         # Allow PPPoE session interfaces to pass through unchanged
-        if value == "ppp0":
+        if value.startswith("ppp"):
             return value
         raise ValueError(
             f"{context} references interface {value!r} without explicit CPM runtimeIfName"
