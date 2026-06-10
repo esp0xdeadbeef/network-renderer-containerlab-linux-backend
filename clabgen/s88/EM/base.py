@@ -99,7 +99,36 @@ def _forwarding_cm_input(node_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _masquerade_from_nat_intent(nat_intent: Dict[str, Any]) -> Dict[str, Any]:
+def _interface_subnets4(interfaces: Dict[str, Any]) -> List[str]:
+    """Derive IPv4 subnets from node interfaces for NAT masquerade augmentation."""
+    import ipaddress
+    subnets: List[str] = []
+    for _ln, iface in interfaces.items():
+        if not isinstance(iface, dict):
+            continue
+        # Skip WAN/overlay interfaces — those are egress surfaces, not internal subnets
+        kind = iface.get("kind", "")
+        if kind in ("wan", "overlay"):
+            continue
+        addr4 = iface.get("addr4")
+        if isinstance(addr4, str) and addr4:
+            try:
+                net = ipaddress.IPv4Network(addr4, strict=False)
+                subnets.append(str(net))
+            except ValueError:
+                pass
+    return subnets
+
+
+def _fabric_private_ranges() -> List[str]:
+    """Broad private IPv4 ranges that cover all fabric-internal addressing."""
+    return ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+
+
+def _masquerade_from_nat_intent(
+    nat_intent: Dict[str, Any],
+    interfaces: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
     if nat_intent.get("enabled") is not True:
         return {}
 
@@ -115,6 +144,14 @@ def _masquerade_from_nat_intent(nat_intent: Dict[str, Any]) -> Dict[str, Any]:
         result["saddr6"] = source6
 
     source4 = _list_strings(nat_intent.get("masqueradeSourcePrefixes4"))
+    # Augment with all fabric-internal private ranges so transit traffic
+    # from any node (provider, selector, access) gets NATed through the core.
+    fabric_ranges = _fabric_private_ranges()
+    seen = set(source4)
+    for s in fabric_ranges:
+        if s not in seen:
+            source4.append(s)
+            seen.add(s)
     if source4:
         result["saddr4"] = source4
 
@@ -141,7 +178,7 @@ def _wan_firewall_cm_input(
             "forwardingIntent.uplinkInterfaces",
         )
 
-    masquerade = _masquerade_from_nat_intent(nat_intent)
+    masquerade = _masquerade_from_nat_intent(nat_intent, node_data.get("interfaces"))
     if masquerade:
         masquerade["oifnames"] = translate_names(
             _list_strings(masquerade.get("oifnames")),
