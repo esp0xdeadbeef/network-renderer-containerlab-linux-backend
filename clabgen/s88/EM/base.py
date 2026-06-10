@@ -33,6 +33,10 @@ def _interface_name_map(
             # Allow PPPoE session interfaces to map to themselves
             if iface.get("sourceKind") == "pppoe-session":
                 result[logical_name] = logical_name
+            # Allow synthetic interfaces with explicit runtimeIfName to self-map
+            runtime_name = iface.get("runtimeIfName")
+            if isinstance(runtime_name, str) and runtime_name:
+                result[runtime_name] = runtime_name
             continue
         target_name = eth_map[logical_name]
         result[logical_name] = target_name
