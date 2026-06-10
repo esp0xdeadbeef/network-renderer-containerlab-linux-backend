@@ -54,6 +54,33 @@ def _dhcp4_command(interface_name: str) -> str:
     )
 
 
+def _static_wan4_commands(
+    interface_name: str, host_uplink: Dict[str, Any], wan_index: int, pool_base: str = "10.11.0"
+) -> List[str]:
+    """Generate static IP commands for WAN interfaces when DHCP is unreliable.
+    
+    Assigns deterministic IPs from the VLAN4 pool: 10.11.0.(100 + wan_index)/24
+    with gateway 10.11.0.1. This avoids dependence on the systemd-networkd DHCP
+    server which can fail silently after Containerlab redeploys.
+    """
+    octets = pool_base.split(".")
+    if len(octets) != 3:
+        return [_dhcp4_command(interface_name)]
+    try:
+        base = int(octets[2])
+    except (ValueError, IndexError):
+        return [_dhcp4_command(interface_name)]
+    client_octet = 100 + wan_index
+    if client_octet > 254:
+        return [_dhcp4_command(interface_name)]
+    client_ip = f"{octets[0]}.{octets[1]}.{base}.{client_octet}"
+    gateway_ip = f"{octets[0]}.{octets[1]}.{base}.1"
+    return [
+        _sh(f"ip addr replace {client_ip}/24 dev {interface_name}"),
+        _sh(f"ip route replace default via {gateway_ip} dev {interface_name} onlink"),
+    ]
+
+
 def _slaac_command(interface_name: str) -> str:
     return (
         f"sysctl -qw net.ipv6.conf.{interface_name}.accept_ra=2 "
@@ -93,7 +120,8 @@ def _nat4_commands(interface_name: str, host_uplink: Dict[str, Any]) -> List[str
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
 
-    for interface_data in _wan_interfaces(node, eth_map):
+    wan_ifaces = _wan_interfaces(node, eth_map)
+    for idx, interface_data in enumerate(wan_ifaces):
         interface_name = interface_data["name"]
         host_uplink = interface_data["host_uplink"]
         cmds.append(_sh(_slaac_command(interface_name)))
@@ -101,6 +129,9 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             for command in _nat4_commands(interface_name, host_uplink):
                 cmds.append(_sh(command))
         else:
-            cmds.append(_sh(_dhcp4_command(interface_name)))
+            # Use static IPs instead of DHCP — systemd-networkd DHCPServer
+            # is unreliable across Containerlab redeploys and silently ignores
+            # new DHCP DISCOVER requests after a fresh render-live cycle.
+            cmds.extend(_static_wan4_commands(interface_name, host_uplink, idx))
 
     return cmds
