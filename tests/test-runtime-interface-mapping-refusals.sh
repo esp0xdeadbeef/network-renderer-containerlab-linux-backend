@@ -89,8 +89,8 @@ cm_node.forwarding_intent = {
             "fromInterface": "inside",
             "toInterface": "outside",
             "action": "accept",
-            "relationId": "selector-handoff-forward--router--selector-transport-to-access-to-selector--no-uplink",
-            "comment": "selector-handoff-forward--router--selector-transport-to-access-to-selector--no-uplink",
+            "relationId": "selector-handoff-forward--router--selector-transport-to-access-to-selector--fabric",
+            "comment": "selector-handoff-forward--router--selector-transport-to-access-to-selector--fabric",
             "direction": "forward",
             "relationCardinality": {
                 "unit": "selector-forwarding-rule",
@@ -158,7 +158,7 @@ wan_audit = selector_audit.get("wan-target0", [])
 if len(wan_audit) != 1:
     raise AssertionError(f"selector-relation-audit-cardinality: unexpected audit {selector_audit!r}")
 wan_record = wan_audit[0]
-if wan_record.get("relationId") != "selector-handoff-forward--router--selector-transport-to-access-to-selector--no-uplink":
+if wan_record.get("relationId") != "selector-handoff-forward--router--selector-transport-to-access-to-selector--fabric":
     raise AssertionError(f"selector-relation-audit-id: unexpected record {wan_record!r}")
 if wan_record.get("relationPurpose") != "access-to-selector":
     raise AssertionError(f"selector-relation-audit-purpose: unexpected record {wan_record!r}")
