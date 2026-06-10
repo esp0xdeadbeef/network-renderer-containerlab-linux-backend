@@ -363,9 +363,10 @@ in
       linkConfig.ActivationPolicy = "always-up";
       networkConfig = {
         Address = "10.11.0.1/24";
-        DHCPServer = "yes";
+        DHCPServer = true;
         IPMasquerade = "both";
-        IPForward = "yes";
+        IPv4Forwarding = true;
+        IPv6Forwarding = true;
         ConfigureWithoutCarrier = true;
       };
     };
