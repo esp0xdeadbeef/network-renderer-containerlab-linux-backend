@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 from clabgen.s88.CM.linux_route_values import _dst, _normalize_prefix, _route_lists
 from clabgen.s88.CM.linux_route_via import _effective_via4, _effective_via6
@@ -162,6 +162,34 @@ def _render_policy_table(
         cmds.append(_render_group(ip_cmd, table_id, dst, groups[dst]))
 
 
+def _shared_source_rules(
+    table_id: int,
+    priority: int,
+    routes4: Dict[str, List[Tuple[str, str]]],
+    routes6: Dict[str, List[Tuple[str, str]]],
+    source_eths: List[str],
+    lane_eth: str,
+) -> List[str]:
+    cmds: List[str] = []
+    shared = [s for s in source_eths if s != lane_eth]
+    if not shared:
+        return cmds
+    # For shared source interfaces (e.g. core-facing iface used by multiple lanes),
+    # emit destination-based ip rules so each subnet routes through its correct lane.
+    # Without this, first-matching iif rule captures all return traffic (guest wins).
+    for dst in sorted(routes4.keys()):
+        for src_eth in shared:
+            cmds.append(
+                f"sh -c 'ip rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+            )
+    for dst in sorted(routes6.keys()):
+        for src_eth in shared:
+            cmds.append(
+                f"sh -c 'ip -6 rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+            )
+    return cmds
+
+
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
 
@@ -189,6 +217,11 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                 cmds.append(
                     f"sh -c 'ip rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                 )
+            cmds.extend(
+                _shared_source_rules(
+                    table_id, priority, routes4, routes6, source_eths, eth
+                )
+            )
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
             for source_eth in source_eths:
