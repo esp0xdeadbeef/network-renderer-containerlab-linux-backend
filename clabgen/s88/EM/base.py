@@ -26,6 +26,22 @@ def _interface_name_map(
 ) -> Dict[str, str]:
     result: Dict[str, str] = {}
     interfaces = _dict(node_data.get("interfaces"))
+    # Diagnostic: check if core-uplink-egress is in interfaces
+    has_egress = "core-uplink-egress" in interfaces
+    if not has_egress:
+        for ln, iface in interfaces.items():
+            if isinstance(iface, dict) and iface.get("runtimeIfName") == "core-uplink-egress":
+                has_egress = True
+                break
+    if not has_egress:
+        import sys
+        node_name = node_data.get("name", node_data.get("nodeName", "unknown"))
+        all_runtime_names = [
+            iface.get("runtimeIfName") if isinstance(iface, dict) else None
+            for iface in interfaces.values()
+        ]
+        print(f"DIAGNOSTIC: node={node_name!r} has core-uplink-egress? {has_egress}", file=sys.stderr)
+        print(f"DIAGNOSTIC: node={node_name!r} interface runtimeNames: {[r for r in all_runtime_names if r]}", file=sys.stderr)
     for logical_name, iface in interfaces.items():
         if not isinstance(logical_name, str) or not isinstance(iface, dict):
             continue
