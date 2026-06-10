@@ -163,6 +163,21 @@ def _firewall_cm_input(
 ) -> Dict[str, Any]:
     name_map = _interface_name_map(node_data, eth_map)
     forwarding_intent = _dict(node_data.get("forwardingIntent"))
+    # Self-map any forwarding-rule interface references not in the per-node name_map.
+    # Synthetic interfaces (e.g. core-uplink-egress) live on a different node
+    # but forwarding rules on peer nodes reference them by runtime name.
+    def _add_missing_key(value: Any) -> None:
+        if isinstance(value, str) and value and value not in name_map:
+            # Allow any string that looks like a valid interface name to self-map.
+            # PPPoE session names are already handled in require_runtime_name.
+            if not value.startswith("ppp"):
+                name_map[value] = value
+    rules_list = forwarding_intent.get("rules")
+    if isinstance(rules_list, list):
+        for rule in rules_list:
+            if isinstance(rule, dict):
+                _add_missing_key(rule.get("fromInterface"))
+                _add_missing_key(rule.get("toInterface"))
     rules = _translated_forwarding_rules(forwarding_intent, name_map)
     if not rules:
         return {}
