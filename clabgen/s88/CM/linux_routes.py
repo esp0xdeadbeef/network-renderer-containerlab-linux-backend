@@ -173,10 +173,14 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> Lis
                 from_eth = eth_map.get(from_if)
                 to_eth = eth_map.get(to_if)
                 if from_eth and to_eth:
-                    from_iface = (node.get("interfaces", {}) or {}).get(from_if, {})
+                    # Use TO interface (core-facing) for peer address,
+                    # not FROM interface (policy-facing). The nexthop
+                    # toward internet is the core's p2p address, not
+                    # the policy's address.
+                    to_iface = (node.get("interfaces", {}) or {}).get(to_if, {})
                     peer_addr = None
-                    if isinstance(from_iface, dict):
-                        addr4 = from_iface.get("addr4", "")
+                    if isinstance(to_iface, dict):
+                        addr4 = to_iface.get("addr4", "")
                         if isinstance(addr4, str) and "/" in addr4:
                             parts = addr4.split("/")
                             prefix = parts[0].split(".")
