@@ -130,6 +130,63 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> Lis
             if via:
                 _add_route(defaults6, "default", via, eth)
 
+    # Fabric-chain default routes for selector nodes.
+    # Per PBR design rule: selectors MUST have default routes even when
+    # CPM routingAuthority.defaultReachability=false.
+    role = node.get("role", "")
+    if role in ("downstream-selector", "upstream-selector") and not defaults4:
+        forwarding_intent = node.get("forwardingIntent") or {}
+        forwarding_rules = forwarding_intent.get("rules", []) or []
+        for rule in forwarding_rules:
+            if not isinstance(rule, dict):
+                continue
+            purpose = (
+                rule.get("candidateEgress", {})
+                .get("backingRef", {})
+                .get("lane", {})
+                .get("kind", "")
+            )
+            # For downstream-selector: find the interface toward policy
+            # For upstream-selector: find the interface toward core
+            from_if = rule.get("fromInterface", "")
+            to_if = rule.get("toInterface", "")
+            if role == "downstream-selector" and "policy" in to_if:
+                from_eth = eth_map.get(from_if)
+                to_eth = eth_map.get(to_if)
+                if from_eth and to_eth:
+                    # The peer IP on the link toward policy
+                    from_iface = (node.get("interfaces", {}) or {}).get(from_if, {})
+                    peer_addr = None
+                    if isinstance(from_iface, dict):
+                        addr4 = from_iface.get("addr4", "")
+                        if isinstance(addr4, str) and "/" in addr4:
+                            parts = addr4.split("/")
+                            prefix = parts[0].split(".")
+                            if len(prefix) == 4:
+                                # Compute peer address: same /31
+                                host = int(prefix[3])
+                                peer_host = host + 1 if host % 2 == 0 else host - 1
+                                peer_addr = f"{prefix[0]}.{prefix[1]}.{prefix[2]}.{peer_host}"
+                    if peer_addr:
+                        _add_route(defaults4, "default", peer_addr, to_eth)
+            elif role == "upstream-selector" and ("upstream-vlan4" in to_if or "core-upstream" in to_if):
+                from_eth = eth_map.get(from_if)
+                to_eth = eth_map.get(to_if)
+                if from_eth and to_eth:
+                    from_iface = (node.get("interfaces", {}) or {}).get(from_if, {})
+                    peer_addr = None
+                    if isinstance(from_iface, dict):
+                        addr4 = from_iface.get("addr4", "")
+                        if isinstance(addr4, str) and "/" in addr4:
+                            parts = addr4.split("/")
+                            prefix = parts[0].split(".")
+                            if len(prefix) == 4:
+                                host = int(prefix[3])
+                                peer_host = host + 1 if host % 2 == 0 else host - 1
+                                peer_addr = f"{prefix[0]}.{prefix[1]}.{prefix[2]}.{peer_host}"
+                    if peer_addr:
+                        _add_route(defaults4, "default", peer_addr, to_eth)
+
     _append_route_groups(cmds, seen, "ip", defaults4)
     _append_route_groups(cmds, seen, "ip -6", defaults6)
     return cmds

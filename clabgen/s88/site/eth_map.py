@@ -1,8 +1,19 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Dict
 
 from clabgen.models import SiteModel
+
+MAX_IFNAME = 15
+
+
+def _short_ifname(seed: str) -> str:
+    """Generate a deterministic short interface name for names exceeding IFNAMSIZ."""
+    if len(seed) <= MAX_IFNAME:
+        return seed
+    digest = hashlib.blake2s(seed.encode(), digest_size=6).hexdigest()
+    return f"if-{digest}"[:MAX_IFNAME]
 
 
 def _target_ifname(site: SiteModel, node_name: str, logical_ifname: str) -> str:
@@ -19,7 +30,7 @@ def _target_ifname(site: SiteModel, node_name: str, logical_ifname: str) -> str:
         raise ValueError(
             f"interface {node_name!r}.{logical_ifname!r} missing CPM runtimeIfName"
         )
-    return target_ifname
+    return _short_ifname(target_ifname)
 
 
 def _add_mapping(
