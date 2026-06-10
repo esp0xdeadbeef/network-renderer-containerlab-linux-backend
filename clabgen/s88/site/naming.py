@@ -34,7 +34,13 @@ def host_uplink_interface(host_uplink: Dict[str, Any]) -> str | None:
     mode = host_uplink.get("mode")
     parent = host_uplink.get("parent")
 
-    if not isinstance(mode, str) or not isinstance(parent, str) or not parent:
+    if not isinstance(parent, str) or not parent:
+        return None
+
+    ipv4_method = (host_uplink.get("ipv4") or {}).get("method")
+    if not isinstance(mode, str) or not mode:
+        if ipv4_method == "dhcp" or ipv4_method == "static":
+            return parent
         return None
 
     if mode == "native" or mode == "nat":
