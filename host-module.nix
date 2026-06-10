@@ -329,7 +329,7 @@ in
   # VLAN 4 is the emulated internet uplink: eth0.4 → br-uplink0 → container WAN
   # These netdevs/networks persist across reboots, complementing the
   # render-live service's containerlab-managed bridge infrastructure.
-  systemd.network.netdevs = (config.systemd.network.netdevs or {}) // {
+  systemd.network.netdevs = {
     "10-eth0.4" = {
       netdevConfig = {
         Kind = "vlan";
@@ -348,7 +348,7 @@ in
 
   };
 
-  systemd.network.networks = (config.systemd.network.networks or {}) // {
+  systemd.network.networks = {
     "10-eth0.4" = {
       matchConfig.Name = "eth0.4";
       linkConfig.ActivationPolicy = "always-up";
