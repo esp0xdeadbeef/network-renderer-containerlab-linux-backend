@@ -77,7 +77,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
             cmds.extend(
                 [
                     "nft add table ip nat",
-                    "nft 'add chain ip nat postrouting { type nat hook postrouting priority srcnat ; policy accept ; }'",
+                    "nft 'add chain ip nat postrouting { type nat hook postrouting priority 101 ; policy accept ; }'",
                 ]
             )
             srcset = ",".join(saddr4)
@@ -90,7 +90,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
             cmds.extend(
                 [
                     "nft add table ip6 nat",
-                    "nft 'add chain ip6 nat postrouting { type nat hook postrouting priority srcnat ; policy accept ; }'",
+                    "nft 'add chain ip6 nat postrouting { type nat hook postrouting priority 101 ; policy accept ; }'",
                 ]
             )
             srcset6 = ",".join(saddr6)
@@ -124,7 +124,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
         cmds.extend(
             [
                 "nft add table ip nat",
-                "nft 'add chain ip nat postrouting { type nat hook postrouting priority srcnat ; policy accept ; }'",
+                "nft 'add chain ip nat postrouting { type nat hook postrouting priority 101 ; policy accept ; }'",
             ]
         )
         srcset = ",".join(saddr4)
@@ -137,7 +137,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
         cmds.extend(
             [
                 "nft add table ip6 nat",
-                "nft 'add chain ip6 nat postrouting { type nat hook postrouting priority srcnat ; policy accept ; }'",
+                "nft 'add chain ip6 nat postrouting { type nat hook postrouting priority 101 ; policy accept ; }'",
             ]
         )
         srcset6 = ",".join(saddr6)
