@@ -369,6 +369,12 @@ in
         IPv6Forwarding = true;
         ConfigureWithoutCarrier = true;
       };
+      dhcpServerConfig = {
+        PoolOffset = 100;
+        PoolSize = 50;
+        EmitDNS = true;
+        EmitRouter = true;
+      };
     };
   };
 
