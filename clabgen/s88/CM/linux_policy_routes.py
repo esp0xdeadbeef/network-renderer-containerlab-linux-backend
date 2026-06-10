@@ -211,22 +211,34 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             source_eth = eth_map.get(source)
             if source_eth is not None:
                 source_eths.append(source_eth)
+        # Determine which source interfaces are this lane's own vs shared.
+        lane_eths = [eth]
+        shared_eths = [s for s in source_eths if s != eth]
         if routes4 != {}:
             _render_policy_table(cmds, "ip", table_id, routes4)
-            for source_eth in source_eths:
+            # Add generic iif rule for this lane's own interface
+            for source_eth in lane_eths:
                 cmds.append(
                     f"sh -c 'ip rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                 )
-            cmds.extend(
-                _shared_source_rules(
-                    table_id, priority, routes4, routes6, source_eths, eth
-                )
-            )
+            # For shared interfaces, use destination-based rules so each
+            # subnet routes through its correct lane instead of all traffic
+            # going to the first-matching generic iif rule.
+            for dst in sorted(routes4.keys()):
+                for src_eth in shared_eths:
+                    cmds.append(
+                        f"sh -c 'ip rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                    )
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
-            for source_eth in source_eths:
+            for source_eth in lane_eths:
                 cmds.append(
                     f"sh -c 'ip -6 rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                 )
+            for dst in sorted(routes6.keys()):
+                for src_eth in shared_eths:
+                    cmds.append(
+                        f"sh -c 'ip -6 rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                    )
 
     return cmds
