@@ -5,6 +5,10 @@ from typing import Any, Dict, List
 
 from clabgen.s88.CM.linux_shell import _sh
 
+# Global WAN index counter — persists across render() calls so each
+# container gets a unique static IP from the VLAN4 pool.
+_wan_global_index = 0
+
 
 def _wan_interfaces(
     node: Dict[str, Any], eth_map: Dict[str, str]
@@ -118,10 +122,11 @@ def _nat4_commands(interface_name: str, host_uplink: Dict[str, Any]) -> List[str
 
 
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
+    global _wan_global_index
     cmds: List[str] = []
 
     wan_ifaces = _wan_interfaces(node, eth_map)
-    for idx, interface_data in enumerate(wan_ifaces):
+    for interface_data in wan_ifaces:
         interface_name = interface_data["name"]
         host_uplink = interface_data["host_uplink"]
         cmds.append(_sh(_slaac_command(interface_name)))
@@ -132,6 +137,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             # Use static IPs instead of DHCP — systemd-networkd DHCPServer
             # is unreliable across Containerlab redeploys and silently ignores
             # new DHCP DISCOVER requests after a fresh render-live cycle.
-            cmds.extend(_static_wan4_commands(interface_name, host_uplink, idx))
+            cmds.extend(_static_wan4_commands(interface_name, host_uplink, _wan_global_index))
+            _wan_global_index += 1
 
     return cmds
