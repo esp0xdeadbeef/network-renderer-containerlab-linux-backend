@@ -346,6 +346,8 @@ in
       };
     };
 
+  };
+
   systemd.network.networks = (config.systemd.network.networks or {}) // {
     "10-eth0.4" = {
       matchConfig.Name = "eth0.4";
