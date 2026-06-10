@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 
 from .default import render as render_default
 from .interface_names import require_runtime_name, translate_names
-from ..CM._wan_index import next_wan_index
+from ..CM._wan_index import peek_wan_index
 
 
 def _dict(value: Any) -> Dict[str, Any]:
@@ -190,7 +190,7 @@ def _wan_firewall_cm_input(
         # linux_wan_dynamic.py. Uses the shared _wan_index counter so
         # both modules produce the same IP per container.
         if masquerade.get("ipv4") and masquerade.get("oifnames"):
-            snat_idx = next_wan_index()
+            snat_idx = peek_wan_index()
             masquerade["snat_ip"] = f"10.11.0.{200 + snat_idx}"
     if not wan_interfaces and not masquerade:
         return {}
