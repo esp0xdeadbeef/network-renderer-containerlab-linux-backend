@@ -5,6 +5,7 @@ from typing import Any, Dict
 
 from clabgen.models import SiteModel
 from clabgen.s88.CM.lab_emulation import render_lab_emulation_artifacts
+from clabgen.s88.CM._wan_index import reset_wan_index
 from clabgen.s88.site.bridge_networks import renderer_bridge_networks
 from clabgen.s88.site.eth_map import build_eth_maps
 from clabgen.s88.site.links import render_links
@@ -74,6 +75,7 @@ def _normalize_bridge_references(site: SiteModel) -> None:
 
 
 def render_site_topology(site: SiteModel) -> Dict[str, Any]:
+    reset_wan_index()
     site = copy.deepcopy(site)
     _validate_pppoe_pairs(site)
     bridge_networks = renderer_bridge_networks(site)

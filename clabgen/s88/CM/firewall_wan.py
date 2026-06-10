@@ -66,6 +66,11 @@ def render(input_data: Dict[str, Any]) -> List[str]:
             normalized_saddr6.append(source_prefix)
     saddr6 = normalized_saddr6
 
+    # Read the SNAT IP from the input data — computed by the caller using
+    # the shared _wan_index counter so it matches the /32 IP assigned by
+    # linux_wan_dynamic.py.
+    snat_ip = masquerade.get("snat_ip")
+
     cmds: List[str] = []
     first = True
 
@@ -128,16 +133,15 @@ def render(input_data: Dict[str, Any]) -> List[str]:
             ]
         )
         srcset = ",".join(saddr4)
-        for idx, oif in enumerate(oifnames):
-            # Use snat to a dedicated IP from the VLAN4 pool (10.11.0.200+)
-            # instead of masquerade. masquerade NATs to the outgoing interface's
-            # own IP, causing return traffic to be delivered locally (INPUT)
-            # instead of forwarded (FORWARD) back through the fabric chain.
-            # A dedicated IP ensures replies arrive as forwarded traffic.
-            snat_ip = f"10.11.0.{200 + idx}"
-            cmds.append(
-                f'nft add rule ip nat postrouting ip saddr {{ {srcset} }} oifname "{oif}" snat to {snat_ip}'
-            )
+        for oif in oifnames:
+            if snat_ip:
+                cmds.append(
+                    f'nft add rule ip nat postrouting ip saddr {{ {srcset} }} oifname "{oif}" snat to {snat_ip}'
+                )
+            else:
+                cmds.append(
+                    f'nft add rule ip nat postrouting ip saddr {{ {srcset} }} oifname "{oif}" masquerade'
+                )
 
     if oifnames and enable_nat6 and saddr6:
         cmds.extend(
