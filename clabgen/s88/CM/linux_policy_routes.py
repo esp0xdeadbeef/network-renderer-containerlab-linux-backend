@@ -224,7 +224,14 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             # For shared interfaces, use destination-based rules so each
             # subnet routes through its correct lane instead of all traffic
             # going to the first-matching generic iif rule.
+            # Skip default destinations (0.0.0.0/0, ::/0) — a dest-based
+            # default rule is functionally equivalent to a generic iif
+            # catch-all and would shadow higher-priority-number lanes.
+            # Per SMS-100: default-route dest-based rules on shared ifaces
+            # are prohibited.
             for dst in sorted(routes4.keys()):
+                if dst == "0.0.0.0/0":
+                    continue
                 for src_eth in shared_eths:
                     cmds.append(
                         f"sh -c 'ip rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
@@ -236,6 +243,8 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                     f"sh -c 'ip -6 rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                 )
             for dst in sorted(routes6.keys()):
+                if dst == "::/0":
+                    continue
                 for src_eth in shared_eths:
                     cmds.append(
                         f"sh -c 'ip -6 rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
