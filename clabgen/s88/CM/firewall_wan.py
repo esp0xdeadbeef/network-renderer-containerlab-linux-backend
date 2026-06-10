@@ -128,9 +128,15 @@ def render(input_data: Dict[str, Any]) -> List[str]:
             ]
         )
         srcset = ",".join(saddr4)
-        for oif in oifnames:
+        for idx, oif in enumerate(oifnames):
+            # Use snat to a dedicated IP from the VLAN4 pool (10.11.0.200+)
+            # instead of masquerade. masquerade NATs to the outgoing interface's
+            # own IP, causing return traffic to be delivered locally (INPUT)
+            # instead of forwarded (FORWARD) back through the fabric chain.
+            # A dedicated IP ensures replies arrive as forwarded traffic.
+            snat_ip = f"10.11.0.{200 + idx}"
             cmds.append(
-                f'nft add rule ip nat postrouting ip saddr {{ {srcset} }} oifname "{oif}" masquerade'
+                f'nft add rule ip nat postrouting ip saddr {{ {srcset} }} oifname "{oif}" snat to {snat_ip}'
             )
 
     if oifnames and enable_nat6 and saddr6:

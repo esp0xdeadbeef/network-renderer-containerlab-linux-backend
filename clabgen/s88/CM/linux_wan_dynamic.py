@@ -66,6 +66,11 @@ def _static_wan4_commands(
     Assigns deterministic IPs from the VLAN4 pool: 10.11.0.(100 + wan_index)/24
     with gateway 10.11.0.1. This avoids dependence on the systemd-networkd DHCP
     server which can fail silently after Containerlab redeploys.
+    
+    Also assigns a dedicated SNAT IP (10.11.0.(200 + wan_index)/32) for outbound
+    NAT. Using masquerade NATs to the interface's own IP, causing return traffic
+    to be delivered locally (INPUT) instead of forwarded (FORWARD). The dedicated
+    SNAT IP ensures replies arrive as forwarded traffic back through the fabric.
     """
     octets = pool_base.split(".")
     if len(octets) != 3:
@@ -75,12 +80,15 @@ def _static_wan4_commands(
     except (ValueError, IndexError):
         return [_dhcp4_command(interface_name)]
     client_octet = 100 + wan_index
-    if client_octet > 254:
+    snat_octet = 200 + wan_index
+    if client_octet > 254 or snat_octet > 254:
         return [_dhcp4_command(interface_name)]
     client_ip = f"{octets[0]}.{octets[1]}.{base}.{client_octet}"
+    snat_ip = f"{octets[0]}.{octets[1]}.{base}.{snat_octet}"
     gateway_ip = f"{octets[0]}.{octets[1]}.{base}.1"
     return [
         _sh(f"ip addr replace {client_ip}/24 dev {interface_name}"),
+        _sh(f"ip addr add {snat_ip}/32 dev {interface_name}"),
         _sh(f"ip route replace default via {gateway_ip} dev {interface_name} onlink"),
     ]
 
