@@ -224,13 +224,16 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             # For shared interfaces, use destination-based rules so each
             # subnet routes through its correct lane instead of all traffic
             # going to the first-matching generic iif rule.
-            # Skip default destinations (0.0.0.0/0, ::/0) — a dest-based
-            # default rule is functionally equivalent to a generic iif
-            # catch-all and would shadow higher-priority-number lanes.
-            # Per SMS-100: default-route dest-based rules on shared ifaces
-            # are prohibited.
+            # Only include destinations whose route nexthop exits through
+            # one of this lane's own source interfaces. If the route exits
+            # via a foreign interface, the destination is owned by another
+            # lane and a dest-based rule here would shadow that lane.
+            # Also skip default destinations (0.0.0.0/0, ::/0) per SMS-100.
             for dst in sorted(routes4.keys()):
                 if dst == "0.0.0.0/0":
+                    continue
+                hops = routes4.get(dst, [])
+                if not any(hop_eth in source_eths for _, hop_eth in hops):
                     continue
                 for src_eth in shared_eths:
                     cmds.append(
@@ -244,6 +247,9 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                 )
             for dst in sorted(routes6.keys()):
                 if dst == "::/0":
+                    continue
+                hops = routes6.get(dst, [])
+                if not any(hop_eth in source_eths for _, hop_eth in hops):
                     continue
                 for src_eth in shared_eths:
                     cmds.append(
