@@ -95,6 +95,38 @@ def _policy_groups_for_lane(
     preferred4: set[str] = set()
     preferred6: set[str] = set()
 
+    # Collect addr4/addr6 of OTHER interfaces with different lane.access
+    # and collect non-policyOnly destinations that belong to other lanes
+    target_access = _lane_access(target_lane)
+    other_addrs4: set[str] = set()
+    other_addrs6: set[str] = set()
+    other_owned_dsts4: set[str] = set()
+    other_owned_dsts6: set[str] = set()
+    for oname, oiface in (node.get("interfaces", {}) or {}).items():
+        if oname == target_ifname:
+            continue
+        olane = _lane(oiface)
+        oaccess = _lane_access(olane)
+        if target_access is not None and oaccess is not None and oaccess != target_access:
+            a4 = oiface.get("addr4")
+            a6 = oiface.get("addr6")
+            if isinstance(a4, str):
+                other_addrs4.add(a4)
+            if isinstance(a6, str):
+                other_addrs6.add(a6)
+            # Collect non-policyOnly destinations that belong to this other lane
+            oroutes = _route_lists(oiface)
+            for r in oroutes["ipv4"]:
+                if r.get("policyOnly") is not True:
+                    d = _dst(r)
+                    if d:
+                        other_owned_dsts4.add(_normalize_prefix(d))
+            for r in oroutes["ipv6"]:
+                if r.get("policyOnly") is not True:
+                    d = _dst(r)
+                    if d:
+                        other_owned_dsts6.add(_normalize_prefix(d))
+
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
         iface = node["interfaces"][ifname]
         eth = eth_map.get(ifname)
@@ -109,6 +141,12 @@ def _policy_groups_for_lane(
             if not _route_matches_ingress(target_lane, route_lane):
                 continue
             dst = _dst(route)
+            # Skip routes whose dst is the addr4/addr6 of another lane's interface
+            # or a non-policyOnly destination owned by another lane
+            if dst and (dst in other_addrs4 or dst in other_addrs6 or
+                        _normalize_prefix(dst) in other_owned_dsts4 or
+                        _normalize_prefix(dst) in other_owned_dsts6):
+                continue
             if ifname != target_ifname and dst in preferred4:
                 continue
             if ifname == target_ifname and not _is_default(dst):
@@ -123,6 +161,12 @@ def _policy_groups_for_lane(
             if not _route_matches_ingress(target_lane, route_lane):
                 continue
             dst = _dst(route)
+            # Skip routes whose dst is the addr4/addr6 of another lane's interface
+            # or a non-policyOnly destination owned by another lane
+            if dst and (dst in other_addrs4 or dst in other_addrs6 or
+                        _normalize_prefix(dst) in other_owned_dsts4 or
+                        _normalize_prefix(dst) in other_owned_dsts6):
+                continue
             if ifname != target_ifname and dst in preferred6:
                 continue
             if ifname == target_ifname and not _is_default(dst):
