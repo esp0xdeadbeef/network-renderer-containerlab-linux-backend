@@ -379,6 +379,7 @@ in
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-networkd.service" "network-online.target" ];
     wants = [ "systemd-networkd.service" "network-online.target" ];
+    path = [ pkgs.nftables pkgs.iproute2 ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
