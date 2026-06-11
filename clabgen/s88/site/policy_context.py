@@ -104,7 +104,13 @@ def build_node_firewall_state(
     node: NodeModel,
     eth_map: Dict[str, str],
 ):
-    if node.role == "policy":
+    # Policy, downstream-selector, and upstream-selector nodes all need
+    # policy_firewall_state wrapping for CPM firewall rule materialization.
+    # The DS and US are selector nodes that forward traffic between access
+    # and policy; they benefit from interface_tags for tenant-aware nft
+    # rule generation and cpm_firewall_rules wrapping for deny-by-default
+    # enforcement at the selector boundary.
+    if node.role in {"policy", "downstream-selector", "upstream-selector"}:
         return {
             "policy_firewall_state": build_policy_firewall_state(
                 site,
