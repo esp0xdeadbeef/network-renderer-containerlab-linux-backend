@@ -276,11 +276,43 @@ def is_fabric_augmented(prefix):
     return prefix in FABRIC_PRIVATE_RANGES
 
 
+def cpm_authorized_masquerade_runtime_ifaces(solver_json, cpm_auth):
+    """Extract the set of runtime interface names authorized for NAT masquerade.
+
+    Walks the solver JSON nodes to find interfaces whose logical name
+    appears in CPM masqueradeInterfaces, then collects their runtimeIfName.
+    Returns a set of runtime interface names that are CPM-authorized for
+    NAT masquerade/SNAT egress.
+    """
+    masquerade_logical = set(cpm_auth.get("masqueradeInterfaces", []))
+    if not masquerade_logical:
+        return set()
+
+    nodes = (
+        solver_json.get("enterprise", {})
+        .get("esp0xdeadbeef", {})
+        .get("site", {})
+        .get("site-a", {})
+        .get("nodes", {})
+    )
+    authorized = set()
+    for node_name, node_def in nodes.items():
+        if not isinstance(node_def, dict):
+            continue
+        interfaces = node_def.get("interfaces", {})
+        for logical_name, iface in interfaces.items():
+            if logical_name in masquerade_logical:
+                rt = iface.get("runtimeIfName")
+                if rt:
+                    authorized.add(rt)
+    return authorized
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 6. Classify NAT primitives against CPM authority
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def classify_primitives(primitives, cpm_auth):
+def classify_primitives(primitives, cpm_auth, solver_json):
     """Classify each NAT primitive as CPM-traced, platform-registry,
     renderer-computed, fabric-augmented, or UNBOUND.
 
@@ -338,12 +370,14 @@ def classify_primitives(primitives, cpm_auth):
     # ── Egress interfaces ──
     report.append("  egress_interfaces:")
     cpm_masq_ifaces = set(cpm_auth.get("masqueradeInterfaces", []))
+    authorized_runtime_ifaces = cpm_authorized_masquerade_runtime_ifaces(solver_json, cpm_auth)
     for entry in primitives.get("egress_interfaces", []):
         iface = entry["interface"]
-        # Runtime names are mapped from logical names; in mock, ens11 maps to to-wan
-        # The test checks: the rendered interface name (ens11) is the runtime name
-        # for a CPM masqueradeInterface (to-wan), so it traces to CPM authority
-        report.append(f"    OK: {iface} (source: CPM natIntent.masqueradeInterfaces → runtime-mapped)")
+        if iface in authorized_runtime_ifaces:
+            report.append(f"    OK: {iface} (source: CPM natIntent.masqueradeInterfaces → runtime-mapped)")
+        else:
+            violations.append(("egress_interface", iface))
+            report.append(f"    VIOLATION: {iface} — UNBOUND (not in CPM masqueradeInterfaces, not runtime-mapped from any CPM-authorized interface)")
 
     # ── Source prefixes IPv4 ──
     report.append("  source_prefixes_ipv4:")
@@ -531,7 +565,7 @@ for cat, entries in primitives.items():
 print()
 
 # Classify against CPM authority
-violations, report = classify_primitives(primitives, cpm_auth)
+violations, report = classify_primitives(primitives, cpm_auth, solver_json)
 print("NAT primitive source-binding classification:")
 for line in report:
     print(line)
@@ -564,7 +598,7 @@ print(f"Injected command detected: {eth999_commands[0][:120]}")
 
 # Parse and classify seeded primitives
 seeded_primitives = parse_nat_primitives(seeded_nat_commands)
-seeded_violations, seeded_report = classify_primitives(seeded_primitives, cpm_auth)
+seeded_violations, seeded_report = classify_primitives(seeded_primitives, cpm_auth, solver_json)
 
 # Verify eth999 is flagged as unbound in egress_interfaces
 eth999_violations = [
