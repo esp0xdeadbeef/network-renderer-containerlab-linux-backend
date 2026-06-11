@@ -280,28 +280,56 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                 )
 
     # Phase 3: shared-interface destination-based rules.
-    # Process lanes in DESCENDING priority order so higher-priority-number
-    # lanes (generic uplinks like provider-handoff) claim destinations on
-    # shared interfaces first. Lower-priority-number lanes (specific
-    # access-node lanes like guest, client, trusted) process second and
-    # have lower rule priority numbers, giving their rules HIGHER
-    # precedence at evaluation time.
-    # SMS-100: "Ensure lower-priority-number lanes do not capture
-    # higher-priority-number lane traffic."
+    # Build connected subnet sets per lane (from the lane's own interface
+    # addr4/addr6).  Only claim destinations that are within one of the
+    # lane's own connected subnets on the shared interface.  This prevents
+    # lanes from claiming destinations that belong to other lanes (CPM's
+    # policyTableComplements adds cross-lane routes — the renderer must
+    # filter them per SMS-100).
+    lane_subnets4: Dict[int, Set[ipaddress.IPv4Network]] = {}
+    lane_subnets6: Dict[int, Set[ipaddress.IPv6Network]] = {}
+    for _slot, table_id, _priority, lane_eths, _shared_eths, _routes4, _routes6 in lanes:
+        sub4: Set[ipaddress.IPv4Network] = set()
+        sub6: Set[ipaddress.IPv6Network] = set()
+        for src_eth in lane_eths:
+            for ifname, eth in eth_map.items():
+                if eth == src_eth:
+                    iface = node.get("interfaces", {}).get(ifname, {})
+                    for field, sset in (("addr4", sub4), ("addr6", sub6)):
+                        cidr = iface.get(field)
+                        if isinstance(cidr, str) and cidr:
+                            try:
+                                net = ipaddress.ip_interface(cidr).network
+                                sset.add(net)
+                            except Exception:
+                                pass
+                    break
+        lane_subnets4[table_id] = sub4
+        lane_subnets6[table_id] = sub6
+
     claimed4: Set[Tuple[str, str]] = set()  # (dst, src_eth)
     claimed6: Set[Tuple[str, str]] = set()
 
-    # Sort by priority descending (highest number first) — only for Phase 3.
-    # Generic uplinks claim first so their destinations are reserved before
-    # specific access-node lanes process. Access-node rules still have lower
-    # priority numbers (higher precedence), but they won't claim destinations
-    # that generic uplinks already reserved.
-    sorted_lanes_asc = sorted(lanes, key=lambda x: x[2], reverse=True)
+    sorted_lanes_asc = sorted(lanes, key=lambda x: x[2])
 
     for _slot, table_id, priority, _lane_eths, shared_eths, routes4, routes6 in sorted_lanes_asc:
+        sub4 = lane_subnets4.get(table_id, set())
+        sub6 = lane_subnets6.get(table_id, set())
         if routes4 != {} and shared_eths:
             for dst in sorted(routes4.keys()):
                 if dst == "0.0.0.0/0":
+                    continue
+                # Only claim if destination is within one of this lane's
+                # connected subnets (SMS-100).
+                dst_in_subnet = False
+                try:
+                    dst_net = ipaddress.ip_network(dst, strict=False)
+                    dst_in_subnet = any(
+                        dst_net.subnet_of(s) or dst_net == s for s in sub4
+                    )
+                except Exception:
+                    pass
+                if not dst_in_subnet:
                     continue
                 for src_eth in shared_eths:
                     if (dst, src_eth) in claimed4:
@@ -313,6 +341,16 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         if routes6 != {} and shared_eths:
             for dst in sorted(routes6.keys()):
                 if dst == "::/0":
+                    continue
+                dst_in_subnet = False
+                try:
+                    dst_net = ipaddress.ip_network(dst, strict=False)
+                    dst_in_subnet = any(
+                        dst_net.subnet_of(s) or dst_net == s for s in sub6
+                    )
+                except Exception:
+                    pass
+                if not dst_in_subnet:
                     continue
                 for src_eth in shared_eths:
                     if (dst, src_eth) in claimed6:
