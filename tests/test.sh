@@ -35,6 +35,7 @@ tests=(
   test-policy-interface-tags-no-generated-link-parsing.sh
   test-fs310-hds010-sds010-sms040-interface-name-source-binding.sh
   test-fs310-hds010-sds010-sms050-nftables-primitive-source-binding.sh
+  test-fs310-hds010-sds010-sms060-route-command-source-binding.sh
   test-runtime-interface-mapping-refusals.sh
   test-bridge-link-realization-contracts.sh
   test-lab-emulation-capability-gate.sh
