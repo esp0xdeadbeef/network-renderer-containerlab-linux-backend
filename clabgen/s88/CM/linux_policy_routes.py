@@ -349,7 +349,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                             continue
                         for via, eth in routes4[dst]:
                             cmds.append(
-                                f"ip route replace table {us_table} {dst} via {via} dev {eth} onlink"
+                                f"sh -c 'ip route replace table {us_table} {dst} via {via} dev {eth} onlink 2>/dev/null || true'"
                             )
                 if routes6:
                     for dst in sorted(routes6.keys()):
@@ -357,7 +357,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                             continue
                         for via, eth in routes6[dst]:
                             cmds.append(
-                                f"ip -6 route replace table {us_table} {dst} via {via} dev {eth} onlink"
+                                f"sh -c 'ip -6 route replace table {us_table} {dst} via {via} dev {eth} onlink 2>/dev/null || true'"
                             )
 
     return cmds
