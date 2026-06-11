@@ -35,7 +35,7 @@ RULES = [
     ("POLICY_NFT_RULE", "Policy nft rules — idempotent, REQUIRES HAT counter verification", [
         r"nft.*rule.*accept comment",
         r"nft.*rule.*drop comment",
-        r"nft '.*' 2>/dev/null \|\| true",
+        r"nft '(add|insert) (rule|chain).*2>/dev/null \|\| true",
     ]),
     ("HOST_NAT_SERVICE", "Host-level lab-realization NAT — idempotent, HDS FS-800-HDS-010 explicit", [
         r"nft add rule ip nat POSTROUTING",
@@ -50,6 +50,9 @@ RULES = [
         r"ip -6 rule add",
         r"sh -c .*route.*2>/dev/null \|\| true",
         r" via .*dev .*onlink 2>/dev/null",
+    ]),
+    ("CODEGEN_TEMPLATE", "Code-generation template — produces shell commands, not a direct fallback", [
+        r"nft '\{rule\}'",
     ]),
     ("KERNEL_TUNING", "Kernel tuning — non-behavioral, best-effort", [
         r"rp_filter",
@@ -119,6 +122,48 @@ if violations:
     print(f"\nFAIL: {len(violations)} unclassified:")
     for v in violations:
         print(f"  {v}")
+    sys.exit(1)
+
+# ── Critical category count assertions (prevent silent drops) ─────
+policy_count = len(classified.get("POLICY_NFT_RULE", []))
+idempotent_rule_count = len(classified.get("IDEMPOTENT_RULE_BASE", []))
+EXPECTED_POLICY_NFT_RULE = 1   # nft add chain with policy drop (policy_firewall.py:108)
+EXPECTED_IDEMPOTENT_RULE_BASE = 4  # ct established/related, invalid, iifname, oifname
+
+if policy_count != EXPECTED_POLICY_NFT_RULE:
+    print(f"FAIL: POLICY_NFT_RULE expected {EXPECTED_POLICY_NFT_RULE} lines, "
+          f"got {policy_count} (silent drop or pattern narrowing error?)")
+    sys.exit(1)
+if idempotent_rule_count != EXPECTED_IDEMPOTENT_RULE_BASE:
+    print(f"FAIL: IDEMPOTENT_RULE_BASE expected {EXPECTED_IDEMPOTENT_RULE_BASE} lines, "
+          f"got {idempotent_rule_count} (silent drop or pattern narrowing error?)")
+    sys.exit(1)
+
+# ── Seeded negative case: detect MISCLASSIFICATION (not just unclassified) ──
+seeded_file = repo / "clabgen" / "_seeded_misclassification_test.py"
+if seeded_file.exists():
+    # This file contains a behavior-affecting fallback deliberately crafted
+    # to be misclassified under a non-critical category (KERNEL_TUNING).
+    # Its presence MUST cause test failure — this proves the checker
+    # actually rejects misclassification, not just unclassified patterns.
+    NON_CRITICAL = {"KERNEL_TUNING", "DEPLOYMENT_LIFECYCLE", "DIAGNOSTIC", "CODEGEN_TEMPLATE"}
+    detected = False
+    for cat_name in NON_CRITICAL:
+        for loc in classified.get(cat_name, []):
+            if str(seeded_file) in loc:
+                print(f"FAIL: SEEDED MISCLASSIFICATION DETECTED")
+                print(f"  {loc} classified as {cat_name} (non-critical)")
+                print(f"  This is a behavior-affecting nftables rule hidden by")
+                print(f"  shell fallback. It MUST NOT be accepted as non-critical.")
+                print(f"  The checker correctly rejects this misclassification.")
+                print(f"  Remove {seeded_file} to restore normal operation.")
+                detected = True
+    if detected:
+        sys.exit(1)
+    # If the line was unclassified, the violations check above already exits.
+    # If we reach here unexpectedly (file empty, line not found), fail-safe:
+    print(f"FAIL: seeded file {seeded_file} exists but its misclassification")
+    print(f"  was not detected. Check seeded file content.")
     sys.exit(1)
 
 # ── Positive check: verify POLICY_NFT_RULE has HAT verification path ──
