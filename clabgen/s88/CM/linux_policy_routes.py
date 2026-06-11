@@ -262,16 +262,19 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                     )
 
     # Phase 3: shared-interface destination-based rules.
-    # Process lanes in DESCENDING priority order so higher-priority-number
-    # lanes claim destinations first. Lower-priority-number lanes skip
-    # destinations already claimed by a higher-priority-number lane.
+    # Process lanes in ASCENDING priority order so lower-priority-number
+    # lanes claim destinations first. Lower-priority lanes represent the
+    # primary (most-specific) lane for their access node. Higher-priority
+    # lanes (generic uplinks like provider-handoff) must not claim
+    # destinations that belong to specific access-node lanes.
     claimed4: Set[Tuple[str, str]] = set()  # (dst, src_eth)
     claimed6: Set[Tuple[str, str]] = set()
 
-    # Sort by priority descending (highest number first)
-    sorted_lanes = sorted(lanes, key=lambda x: x[2], reverse=True)
+    # Sort by priority ascending (lowest number first) — only for Phase 3.
+    # Phase 4 and 5 below still use descending order.
+    sorted_lanes_asc = sorted(lanes, key=lambda x: x[2])
 
-    for _slot, table_id, priority, _lane_eths, shared_eths, routes4, routes6 in sorted_lanes:
+    for _slot, table_id, priority, _lane_eths, shared_eths, routes4, routes6 in sorted_lanes_asc:
         if routes4 != {} and shared_eths:
             for dst in sorted(routes4.keys()):
                 if dst == "0.0.0.0/0":
@@ -314,7 +317,10 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     downstream_by_access: Dict[str, List[Tuple[int, int, Dict, Dict, Dict[str, Any], str]]] = {}
     upstream_by_access: Dict[str, List[Tuple[int, int, List[str]]]] = {}
 
-    for _slot, table_id, priority, lane_eths, _shared_eths, routes4, routes6 in sorted_lanes:
+    # Use descending sort for Phase 4/5 (original behavior)
+    sorted_lanes_desc = sorted(lanes, key=lambda x: x[2], reverse=True)
+
+    for _slot, table_id, priority, lane_eths, _shared_eths, routes4, routes6 in sorted_lanes_desc:
         if routes4 == {} and routes6 == {}:
             continue
         for src_eth in lane_eths:
