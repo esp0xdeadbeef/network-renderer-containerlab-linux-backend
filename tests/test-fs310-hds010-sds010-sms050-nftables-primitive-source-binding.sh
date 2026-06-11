@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 
 from clabgen.s88.enterprise.enterprise import Enterprise
-from clabgen.nftables_primitive_registry import (
+from clabgen.nftables_primitive_registry_fs310_hds010_sds010_sms050 import (
     REGISTRY,
     is_registered,
     get_binding,
@@ -371,5 +371,130 @@ for category, value in evil_violations:
     print(f"  {unregistered_report(category, value)}")
 print()
 
-print("PASS fs310-sms050-nftables-primitive-source-binding")
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. Source code scan: scan clabgen/ Python files for nftables primitives
+#    embedded in source code strings (separate from emitted artifact scan).
+#    Reuses parse_nft_primitives after extracting nft command strings from code.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+print("--- Source code scan ---")
+clabgen_dir = Path("clabgen")
+py_files = sorted(clabgen_dir.rglob("*.py"))
+print(f"Scanning {len(py_files)} Python file(s) in {clabgen_dir}")
+
+# Regex to find nft command string literals in Python source code.
+# Matches double and single quoted strings containing nft commands.
+NFT_STRING_RE = re.compile(
+    r'''["']((?:[^"'\\]|\\.)*?\bnft\b(?:[^"'\\]|\\.)*?)["']''',
+    re.DOTALL,
+)
+
+source_nft_commands = []
+for py_file in py_files:
+    try:
+        content = py_file.read_text()
+    except Exception:
+        continue
+    for m in NFT_STRING_RE.finditer(content):
+        cmd = m.group(1)
+        # Unescape common escape sequences
+        cmd = cmd.replace("\\'", "'").replace('\\"', '"').replace("\\n", " ")
+        source_nft_commands.append(cmd)
+
+# Also scan comments (lines starting with '# nft ')
+for py_file in py_files:
+    try:
+        for line in py_file.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("# nft ") or stripped.startswith("#nft "):
+                cmd = stripped.lstrip("#").strip()
+                source_nft_commands.append(cmd)
+    except Exception:
+        continue
+
+print(f"Extracted {len(source_nft_commands)} nft command string(s) from source code")
+
+# Reuse the existing parse_nft_primitives function on extracted source commands
+source_primitives = parse_nft_primitives(source_nft_commands)
+# Filter out Python f-string/format template placeholders (values containing {})
+for cat in list(source_primitives):
+    source_primitives[cat] = {v for v in source_primitives[cat] if "{" not in v and "}" not in v}
+source_violations = []
+
+for category in all_categories():
+    found = sorted(source_primitives.get(category, set()))
+    if not found:
+        continue
+    print(f"  source {category}: {found}")
+    for value in found:
+        if not is_registered(category, value):
+            source_violations.append((category, value))
+            print(f"    -> {unregistered_report(category, value)}")
+        else:
+            binding = get_binding(category, value)
+            print(f"    -> OK: {value!r} (source: {binding['source']})")
+
+if source_violations:
+    print(f"FAIL: {len(source_violations)} unregistered nftables primitive(s) found in clabgen/ source code")
+    for category, value in source_violations:
+        print(f"  {unregistered_report(category, value)}")
+    sys.exit(1)
+
+print("PASS: All nftables primitives in clabgen/ source code are registered")
+print()
+
+# ── Seeded negative for source code scan ──
+print("--- Seeded negative for source code scan ---")
+# Pick the first .py file in clabgen/ to inject an evil comment
+target_py = py_files[0]
+print(f"Seeding evil comment into {target_py}")
+original_content = target_py.read_text()
+evil_comment = "# nft add table inet evil_source_table"
+try:
+    # Write file with evil comment prepended
+    target_py.write_text(evil_comment + "\n" + original_content)
+    # Re-extract commands from the seeded file
+    seeded_cmds = []
+    for m in NFT_STRING_RE.finditer(target_py.read_text()):
+        cmd = m.group(1)
+        cmd = cmd.replace("\\'", "'").replace('\\"', '"').replace("\\n", " ")
+        seeded_cmds.append(cmd)
+    for line in target_py.read_text().splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# nft ") or stripped.startswith("#nft "):
+            cmd = stripped.lstrip("#").strip()
+            seeded_cmds.append(cmd)
+    seeded_primitives = parse_nft_primitives(seeded_cmds)
+    # Filter out template placeholders
+    for cat in list(seeded_primitives):
+        seeded_primitives[cat] = {v for v in seeded_primitives[cat] if "{" not in v and "}" not in v}
+
+    # Check for evil_source_table
+    evil_source_found = any(
+        "evil_source_table" in v
+        for cat_vals in seeded_primitives.values()
+        for v in cat_vals
+    )
+    unreg_source_found = False
+    for cat in all_categories():
+        for v in seeded_primitives.get(cat, set()):
+            if "evil_source_table" in v and not is_registered(cat, v):
+                unreg_source_found = True
+                break
+
+    if not evil_source_found:
+        print("FAIL: Seeded evil_source_table not detected in source scan")
+        sys.exit(1)
+    if not unreg_source_found:
+        print("FAIL: Seeded evil_source_table not flagged as UNREGISTERED in source scan")
+        sys.exit(1)
+
+    print("SEEDED SOURCE NEGATIVE PASS: 'inet evil_source_table' correctly flagged in source scan")
+finally:
+    # Restore original file content
+    target_py.write_text(original_content)
+    print(f"Restored {target_py}")
+print()
+
+print("PASS fs310-hds010-sds010-sms050-nftables-primitive-source-binding")
 PY
