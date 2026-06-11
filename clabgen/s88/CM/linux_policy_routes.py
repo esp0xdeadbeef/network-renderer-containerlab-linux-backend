@@ -101,7 +101,7 @@ def _policy_groups_for_lane(
         for route in routes["ipv4"]:
             if route.get("policyOnly") is not True:
                 continue
-            route_lane = _lane(route) or (_lane(iface) if _is_default(_dst(route)) else {})  # fmt: skip
+            route_lane = _lane(route) or _lane(iface)
             if not _route_matches_ingress(target_lane, route_lane):
                 continue
             dst = _dst(route)
@@ -115,7 +115,7 @@ def _policy_groups_for_lane(
         for route in routes["ipv6"]:
             if route.get("policyOnly") is not True:
                 continue
-            route_lane = _lane(route) or (_lane(iface) if _is_default(_dst(route)) else {})  # fmt: skip
+            route_lane = _lane(route) or _lane(iface)
             if not _route_matches_ingress(target_lane, route_lane):
                 continue
             dst = _dst(route)
