@@ -96,12 +96,9 @@ def _policy_groups_for_lane(
     preferred6: set[str] = set()
 
     # Collect addr4/addr6 of OTHER interfaces with different lane.access
-    # and collect non-policyOnly destinations that belong to other lanes
     target_access = _lane_access(target_lane)
     other_addrs4: set[str] = set()
     other_addrs6: set[str] = set()
-    other_owned_dsts4: set[str] = set()
-    other_owned_dsts6: set[str] = set()
     for oname, oiface in (node.get("interfaces", {}) or {}).items():
         if oname == target_ifname:
             continue
@@ -114,18 +111,6 @@ def _policy_groups_for_lane(
                 other_addrs4.add(a4)
             if isinstance(a6, str):
                 other_addrs6.add(a6)
-            # Collect non-policyOnly destinations that belong to this other lane
-            oroutes = _route_lists(oiface)
-            for r in oroutes["ipv4"]:
-                if r.get("policyOnly") is not True:
-                    d = _dst(r)
-                    if d:
-                        other_owned_dsts4.add(_normalize_prefix(d))
-            for r in oroutes["ipv6"]:
-                if r.get("policyOnly") is not True:
-                    d = _dst(r)
-                    if d:
-                        other_owned_dsts6.add(_normalize_prefix(d))
 
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
         iface = node["interfaces"][ifname]
@@ -142,10 +127,7 @@ def _policy_groups_for_lane(
                 continue
             dst = _dst(route)
             # Skip routes whose dst is the addr4/addr6 of another lane's interface
-            # or a non-policyOnly destination owned by another lane
-            if dst and (dst in other_addrs4 or dst in other_addrs6 or
-                        _normalize_prefix(dst) in other_owned_dsts4 or
-                        _normalize_prefix(dst) in other_owned_dsts6):
+            if dst and (dst in other_addrs4 or dst in other_addrs6):
                 continue
             if ifname != target_ifname and dst in preferred4:
                 continue
@@ -162,10 +144,7 @@ def _policy_groups_for_lane(
                 continue
             dst = _dst(route)
             # Skip routes whose dst is the addr4/addr6 of another lane's interface
-            # or a non-policyOnly destination owned by another lane
-            if dst and (dst in other_addrs4 or dst in other_addrs6 or
-                        _normalize_prefix(dst) in other_owned_dsts4 or
-                        _normalize_prefix(dst) in other_owned_dsts6):
+            if dst and (dst in other_addrs4 or dst in other_addrs6):
                 continue
             if ifname != target_ifname and dst in preferred6:
                 continue
@@ -281,6 +260,47 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         lane_eths = [eth]
         shared_eths = [s for s in source_eths if s != eth]
         lanes.append((slot, table_id, priority, lane_eths, shared_eths, routes4, routes6))
+
+    # Post-Phase-1 dedup: remove cross-lane routes.
+    # For each lane, collect non-policyOnly dsts owned by OTHER lanes'
+    # interfaces (different lane.access). Remove any policy route whose
+    # dst matches a non-policyOnly route owned by another lane.
+    for idx in range(len(lanes)):
+        slot, tid, prio, leths, seths, r4, r6 = lanes[idx]
+        # Find this lane's access
+        this_access = None
+        for ifname in (node.get("interfaces", {}) or {}).keys():
+            if eth_map.get(ifname) in leths:
+                this_access = _lane_access(_lane(node["interfaces"][ifname]))
+                break
+        if this_access is None:
+            continue
+        # Collect non-policyOnly dsts from OTHER lanes' interfaces
+        other_native4: set[str] = set()
+        other_native6: set[str] = set()
+        for oname, oiface in (node.get("interfaces", {}) or {}).items():
+            oaccess = _lane_access(_lane(oiface))
+            if oaccess is None or oaccess == this_access:
+                continue
+            oroutes = _route_lists(oiface)
+            for r in oroutes["ipv4"]:
+                if r.get("policyOnly") is not True:
+                    d = _dst(r)
+                    if d:
+                        nd = _normalize_prefix(d)
+                        if nd:
+                            other_native4.add(nd)
+            for r in oroutes["ipv6"]:
+                if r.get("policyOnly") is not True:
+                    d = _dst(r)
+                    if d:
+                        nd = _normalize_prefix(d)
+                        if nd:
+                            other_native6.add(nd)
+        # Remove cross-lane routes
+        r4 = {k: v for k, v in r4.items() if k not in other_native4}
+        r6 = {k: v for k, v in r6.items() if k not in other_native6}
+        lanes[idx] = (slot, tid, prio, leths, seths, r4, r6)
 
     # Phase 2: render policy tables and generic iif rules (order-independent).
     # Skip generic iif rules for access-uplink interfaces — their return-path
