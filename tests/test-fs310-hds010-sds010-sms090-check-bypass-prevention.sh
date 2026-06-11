@@ -103,7 +103,7 @@ if host_module.exists():
             )
 
 if violations:
-    print(f"FAIL fs310-sms090-bypass-prevention: {len(violations)} violation(s)")
+    print(f"FAIL fs310-hds010-sds010-sms090-check-bypass-prevention: {len(violations)} violation(s)")
     for v in violations:
         print(f"  {v}")
     sys.exit(1)
@@ -118,5 +118,5 @@ test_input2 = '"ip" + " route"'
 assert split_concat_pattern.search(test_input2), \
     "SEEDED_BYPASS_NOT_CAUGHT: split-concat pattern must match seeded bypass"
 
-print("PASS fs310-sms090-bypass-prevention")
+print("PASS fs310-hds010-sds010-sms090-check-bypass-prevention")
 PY
