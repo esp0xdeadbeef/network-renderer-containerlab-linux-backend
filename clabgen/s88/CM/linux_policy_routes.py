@@ -10,6 +10,10 @@ from clabgen.s88.CM.linux_route_via import _effective_via4, _effective_via6
 
 def _lane(iface_or_route: Dict[str, Any]) -> Dict[str, Any]:
     value = iface_or_route.get("lane")
+    if not isinstance(value, dict) or not value:
+        backing = iface_or_route.get("backingRef")
+        if isinstance(backing, dict):
+            value = backing.get("lane")
     return value if isinstance(value, dict) else {}
 
 
