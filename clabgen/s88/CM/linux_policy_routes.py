@@ -161,7 +161,10 @@ def _render_policy_table(
     groups: Dict[str, List[Tuple[str, str]]],
 ) -> None:
     for dst in sorted(groups.keys()):
-        cmds.append(_render_group(ip_cmd, table_id, dst, groups[dst]))
+        route = _render_group(ip_cmd, table_id, dst, groups[dst])
+        cmds.append(
+            f"sh -c '{route} 2>/dev/null || true'"
+        )
 
 
 def _add_connected_subnet_route(
