@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ipaddress
 from typing import Any, Dict, List, Set, Tuple
 
+from clabgen.s88.CM.linux_addressing import _peer_in_subnet
 from clabgen.s88.CM.linux_route_values import _dst, _normalize_prefix, _route_lists
 from clabgen.s88.CM.linux_route_via import _effective_via4, _effective_via6
 
@@ -162,6 +164,41 @@ def _render_policy_table(
         cmds.append(_render_group(ip_cmd, table_id, dst, groups[dst]))
 
 
+def _add_connected_subnet_route(
+    cmds: List[str],
+    *,
+    ip_cmd: str,
+    table_id: int,
+    iface: Dict[str, Any],
+    eth: str,
+    field: str,
+) -> None:
+    """Add a route for the directly-connected subnet of *iface* to *table_id*.
+
+    Policy-only routes in the CPM describe via-remote destinations. The
+    connected subnet of the downstream interface itself is not a policyOnly
+    route — it is a kernel scope-link route. Without an explicit table route,
+    return traffic for a peer on that link falls through to the default route,
+    which may loop back to the upstream node (SMS-101).
+    """
+    cidr = iface.get(field)
+    if not isinstance(cidr, str) or not cidr:
+        return
+    try:
+        subnet = str(ipaddress.ip_interface(cidr).network)
+    except Exception:
+        return
+    if _is_default(subnet):
+        return
+    peer = _peer_in_subnet(cidr)
+    if not peer:
+        return
+    cmds.append(
+        f"sh -c '{ip_cmd} route replace table {table_id} {subnet}"
+        f" via {peer} dev {eth} onlink 2>/dev/null || true'"
+    )
+
+
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
 
@@ -274,7 +311,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     #     (interfaces that face downstream — access or access-edge)
     #   upstream_by_access: access -> [(table, priority, eths)]
     #     (interfaces that face upstream — access-uplink or access)
-    downstream_by_access: Dict[str, List[Tuple[int, int, Dict, Dict]]] = {}
+    downstream_by_access: Dict[str, List[Tuple[int, int, Dict, Dict, Dict[str, Any], str]]] = {}
     upstream_by_access: Dict[str, List[Tuple[int, int, List[str]]]] = {}
 
     for _slot, table_id, priority, lane_eths, _shared_eths, routes4, routes6 in sorted_lanes:
@@ -295,7 +332,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                         )
                     if kind in ("access", "access-edge"):
                         downstream_by_access.setdefault(access, []).append(
-                            (table_id, priority, routes4, routes6)
+                            (table_id, priority, routes4, routes6, iface, eth)
                         )
                     break
             else:
@@ -305,7 +342,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     # downstream tables via destination-based ip rules.
     for access in sorted(set(upstream_by_access.keys()) & set(downstream_by_access.keys())):
         for us_table, us_priority, us_eths in upstream_by_access[access]:
-            for ds_table, ds_priority, routes4, routes6 in downstream_by_access[access]:
+            for ds_table, ds_priority, routes4, routes6, _ds_iface, _ds_eth in downstream_by_access[access]:
                 # Skip self-references (same table)
                 if us_table == ds_table:
                     continue
@@ -340,7 +377,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     # (which may point back to the upstream node causing a loop).
     for access in sorted(set(upstream_by_access.keys()) & set(downstream_by_access.keys())):
         for us_table, us_priority, us_eths in upstream_by_access[access]:
-            for ds_table, ds_priority, routes4, routes6 in downstream_by_access[access]:
+            for ds_table, ds_priority, routes4, routes6, ds_iface, ds_eth in downstream_by_access[access]:
                 if us_table == ds_table:
                     continue
                 if routes4:
@@ -359,5 +396,16 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                             cmds.append(
                                 f"sh -c 'ip -6 route replace table {us_table} {dst} via {via} dev {eth} onlink 2>/dev/null || true'"
                             )
+                # Add connected-subnet route for the downstream interface.
+                # The upstream-facing table needs to reach subnets that are
+                # directly connected on the downstream interface, not just
+                # policyOnly routes (which are via-remote). Without this,
+                # return traffic destined for a peer on the downstream link
+                # hits the upstream table's default route, which may loop
+                # back to the upstream node (SMS-101).
+                _add_connected_subnet_route(cmds, ip_cmd="ip", table_id=us_table,
+                    iface=ds_iface, eth=ds_eth, field="addr4")
+                _add_connected_subnet_route(cmds, ip_cmd="ip -6", table_id=us_table,
+                    iface=ds_iface, eth=ds_eth, field="addr6")
 
     return cmds
