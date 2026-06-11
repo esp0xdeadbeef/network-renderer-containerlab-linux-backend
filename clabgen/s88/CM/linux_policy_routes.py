@@ -310,47 +310,28 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                 )
 
     # Phase 3: shared-interface destination-based rules.
-    # Each lane generates ip rules for its destinations. When a destination
-    # appears in multiple lanes (cross-lane complement pollution), determine
-    # which lane's route is "native" by checking if the via address is the
-    # peer of the lane's own interface (addr4). Only the native lane claims
-    # the destination.
+    # Process lanes in DESCENDING priority order so higher-priority-number
+    # lanes (generic uplinks like provider-handoff) claim destinations on
+    # shared interfaces first. Lower-priority-number lanes (specific
+    # access-node lanes like guest, client, trusted) process second and
+    # have lower rule priority numbers, giving their rules HIGHER
+    # precedence at evaluation time.
     # SMS-100: "Ensure lower-priority-number lanes do not capture
     # higher-priority-number lane traffic."
-    claimed4: Set[Tuple[str, str]] = set()
+    claimed4: Set[Tuple[str, str]] = set()  # (dst, src_eth)
     claimed6: Set[Tuple[str, str]] = set()
 
-    # Build a map of each lane's interface addr4 for native-route detection
-    lane_addr4s: Dict[int, Set[str]] = {}  # table_id -> set of addr4
-    lane_peer4s: Dict[int, Set[str]] = {}  # table_id -> set of via (peer) addresses
-    for _slot, table_id, _prio, lane_eths, _shared, _r4, _r6 in lanes:
-        addrs: Set[str] = set()
-        peers: Set[str] = set()
-        for eth in lane_eths:
-            for ifname, e in eth_map.items():
-                if e == eth:
-                    iface = (node.get("interfaces", {}) or {}).get(ifname, {})
-                    a4 = iface.get("addr4")
-                    if isinstance(a4, str):
-                        addrs.add(a4)
-                        p = _peer_in_subnet(a4)
-                        if p:
-                            peers.add(p)
-        lane_addr4s[table_id] = addrs
-        lane_peer4s[table_id] = peers
+    # Sort by priority descending (highest number first) — only for Phase 3.
+    # Generic uplinks claim first so their destinations are reserved before
+    # specific access-node lanes process. Access-node rules still have lower
+    # priority numbers (higher precedence), but they won't claim destinations
+    # that generic uplinks already reserved.
+    sorted_lanes_asc = sorted(lanes, key=lambda x: x[2], reverse=True)
 
-    for _slot, table_id, priority, _lane_eths, shared_eths, routes4, routes6 in lanes:
+    for _slot, table_id, priority, _lane_eths, shared_eths, routes4, routes6 in sorted_lanes_asc:
         if routes4 != {} and shared_eths:
             for dst in sorted(routes4.keys()):
                 if dst == "0.0.0.0/0":
-                    continue
-                # Check if this lane's route is "native": the via address
-                # must be the peer of this lane's own interface addr4.
-                native = any(
-                    via in lane_peer4s.get(table_id, set())
-                    for via, _eth in routes4[dst]
-                )
-                if not native:
                     continue
                 for src_eth in shared_eths:
                     if (dst, src_eth) in claimed4:
