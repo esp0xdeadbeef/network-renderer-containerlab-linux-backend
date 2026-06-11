@@ -280,17 +280,23 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                 )
 
     # Phase 3: shared-interface destination-based rules.
-    # Process lanes in ASCENDING priority order so lower-priority-number
-    # lanes claim destinations first. Lower-priority lanes represent the
-    # primary (most-specific) lane for their access node. Higher-priority
-    # lanes (generic uplinks like provider-handoff) must not claim
-    # destinations that belong to specific access-node lanes.
+    # Process lanes in DESCENDING priority order so higher-priority-number
+    # lanes (generic uplinks like provider-handoff) claim destinations on
+    # shared interfaces first. Lower-priority-number lanes (specific
+    # access-node lanes like guest, client, trusted) process second and
+    # have lower rule priority numbers, giving their rules HIGHER
+    # precedence at evaluation time.
+    # SMS-100: "Ensure lower-priority-number lanes do not capture
+    # higher-priority-number lane traffic."
     claimed4: Set[Tuple[str, str]] = set()  # (dst, src_eth)
     claimed6: Set[Tuple[str, str]] = set()
 
-    # Sort by priority ascending (lowest number first) — only for Phase 3.
-    # Phase 4 and 5 below still use descending order.
-    sorted_lanes_asc = sorted(lanes, key=lambda x: x[2])
+    # Sort by priority descending (highest number first) — only for Phase 3.
+    # Generic uplinks claim first so their destinations are reserved before
+    # specific access-node lanes process. Access-node rules still have lower
+    # priority numbers (higher precedence), but they won't claim destinations
+    # that generic uplinks already reserved.
+    sorted_lanes_asc = sorted(lanes, key=lambda x: x[2], reverse=True)
 
     for _slot, table_id, priority, _lane_eths, shared_eths, routes4, routes6 in sorted_lanes_asc:
         if routes4 != {} and shared_eths:
