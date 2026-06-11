@@ -86,7 +86,9 @@ def _rule_for_match(
             rule += f" dport {{ {ports} }}"
 
     rule += f" counter {action}"
-    return f"sh -c '{rule} 2>/dev/null || true'"
+    # sh -c with double quotes protects { } ; from shell metachar interpretation.
+    # nft args wrapped in single quotes prevent word splitting.
+    return f"sh -c \"nft '{rule}' 2>/dev/null || true\""
 
 
 def render(input_data: Dict[str, Any]) -> List[str]:
@@ -103,7 +105,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
         "sh -c 'echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter 2>/dev/null || true'",
         "sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > $i 2>/dev/null; done || true'",
         "sh -c 'nft add table inet fw 2>/dev/null || true'",
-        "sh -c 'nft add chain inet fw forward { type filter hook forward priority 0 ; policy drop ; }' 2>/dev/null || true",
+        "sh -c \"nft 'add chain inet fw forward { type filter hook forward priority 0 ; policy drop ; }' 2>/dev/null || true\"",
         "sh -c 'nft add rule inet fw forward ct state established,related accept 2>/dev/null || true'",
         "sh -c 'nft add rule inet fw forward ct state invalid drop 2>/dev/null || true'",
         "sh -c 'nft add rule inet fw forward iifname eth0 drop 2>/dev/null || true'",
