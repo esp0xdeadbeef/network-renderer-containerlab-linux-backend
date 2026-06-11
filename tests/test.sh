@@ -83,6 +83,7 @@ tests=(
   test-single-overlay-interface-link.sh
   test-vm-example-lab-cleanup.sh
   test-vm-docker-readiness.sh
+  test-fs960-hds010-sds016-sms050-clab-privileged-inspect.sh
 )
 
 if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" == "1" ]]; then

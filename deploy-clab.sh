@@ -236,6 +236,8 @@ materialize_bridges() {
 }
 
 wait_for_docker() {
+  # FS-960-HDS-010-SDS-016-SMS-050: privileged Docker inspection with distinguishable
+  # failure diagnostics (permission denial, daemon absence, sudo misconfiguration).
   local wait_seconds="${CLAB_DOCKER_WAIT_SECONDS:-120}"
   local deadline=$((SECONDS + wait_seconds))
 
@@ -243,12 +245,30 @@ wait_for_docker() {
     systemctl start docker >/dev/null 2>&1 || true
   fi
 
+  local docker_cmd=(docker)
+  local euid="${CLAB_TEST_EUID:-${EUID:-$(id -u 2>/dev/null || echo 0)}}"
+  if [[ "${euid}" -ne 0 ]]; then
+    if command -v sudo >/dev/null 2>&1; then
+      docker_cmd=(sudo -n docker)
+    fi
+  fi
+
+  local last_stderr=""
   while ((SECONDS < deadline)); do
-    docker info >/dev/null 2>&1 && return 0
+    if last_stderr="$("${docker_cmd[@]}" info 2>&1 >/dev/null)"; then
+      return 0
+    fi
     sleep 1
   done
 
-  fail "docker did not become ready after ${wait_seconds}s"
+  # FS-960-HDS-010-SDS-016-SMS-050: distinguishable failure diagnostics.
+  if [[ "${last_stderr}" == *"permission denied"* ]] || [[ "${last_stderr}" == *"Permission denied"* ]]; then
+    fail "docker permission denied — user not authorized to access Docker daemon (verify docker group membership or sudo NOPASSWD configuration)"
+  elif [[ "${last_stderr}" == *"password is required"* ]]; then
+    fail "docker privilege check failed — sudo -n requires NOPASSWD or an active sudo ticket"
+  else
+    fail "docker did not become ready after ${wait_seconds}s (daemon may not be running or unreachable)"
+  fi
 }
 
 ensure_tooling_image_cache() {

@@ -45,20 +45,40 @@ wait_for_required_bridges() {
 }
 
 wait_for_docker() {
+  # FS-960-HDS-010-SDS-016-SMS-050: privileged Docker inspection with distinguishable
+  # failure diagnostics (permission denial, daemon absence, sudo misconfiguration).
   if command -v systemctl >/dev/null 2>&1; then
     systemctl start docker >/dev/null 2>&1 || true
   fi
 
+  local docker_cmd=(docker)
+  local euid="${CLAB_TEST_EUID:-${EUID:-$(id -u 2>/dev/null || echo 0)}}"
+  if [[ "${euid}" -ne 0 ]]; then
+    if command -v sudo >/dev/null 2>&1; then
+      docker_cmd=(sudo -n docker)
+    fi
+  fi
+
   local deadline=$((SECONDS + docker_wait_seconds))
+  local last_stderr=""
   while ((SECONDS < deadline)); do
-    if docker info >/dev/null 2>&1; then
+    if last_stderr="$("${docker_cmd[@]}" info 2>&1 >/dev/null)"; then
       return 0
     fi
     sleep 1
   done
 
-  printf 'docker did not become ready after %ss\n' "${docker_wait_seconds}" >&2
-  exit 1
+  # FS-960-HDS-010-SDS-016-SMS-050: distinguishable failure diagnostics.
+  if [[ "${last_stderr}" == *"permission denied"* ]] || [[ "${last_stderr}" == *"Permission denied"* ]]; then
+    printf 'docker permission denied — user not authorized to access Docker daemon (verify docker group membership or sudo NOPASSWD configuration)\n' >&2
+    exit 1
+  elif [[ "${last_stderr}" == *"password is required"* ]]; then
+    printf 'docker privilege check failed — sudo -n requires NOPASSWD or an active sudo ticket\n' >&2
+    exit 1
+  else
+    printf 'docker did not become ready after %ss (daemon may not be running or unreachable)\n' "${docker_wait_seconds}" >&2
+    exit 1
+  fi
 }
 
 wait_for_docker
