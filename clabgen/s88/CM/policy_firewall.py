@@ -103,11 +103,11 @@ def render(input_data: Dict[str, Any]) -> List[str]:
         "sh -c 'echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter 2>/dev/null || true'",
         "sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > $i 2>/dev/null; done || true'",
         "sh -c 'nft add table inet fw 2>/dev/null || true'",
-        "sh -c "nft 'add chain inet fw forward { type filter hook forward priority 0 ; policy drop ; }' 2>/dev/null || true"",
+        "sh -c 'nft add chain inet fw forward { type filter hook forward priority 0 ; policy drop ; }' 2>/dev/null || true",
         "sh -c 'nft add rule inet fw forward ct state established,related accept 2>/dev/null || true'",
         "sh -c 'nft add rule inet fw forward ct state invalid drop 2>/dev/null || true'",
-        "sh -c 'nft add rule inet fw forward iifname "eth0" drop 2>/dev/null || true'",
-        "sh -c 'nft add rule inet fw forward oifname "eth0" drop 2>/dev/null || true'",
+        "sh -c 'nft add rule inet fw forward iifname eth0 drop 2>/dev/null || true'",
+        "sh -c 'nft add rule inet fw forward oifname eth0 drop 2>/dev/null || true'",
     ]
 
     emitted: set[str] = set()
