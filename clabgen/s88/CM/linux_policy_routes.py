@@ -258,22 +258,29 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                         f"sh -c 'ip -6 rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                     )
 
-    # Phase 4: policy-node return-path routing.
+    # Phase 4: policy-node and DS return-path routing.
     # For nodes where each lane has a dedicated uplink-facing and
     # downstream-facing interface pair (policy node, downstream-selector),
     # generate destination-based ip rules on the uplink-facing interface
     # that direct return traffic to the correct downstream-facing table.
     #
-    # Build mappings: access -> [(ds_table, ds_priority, ds_routes4, ds_routes6), ...]
-    #                 access -> [(us_table, us_priority, us_eths), ...]
-    ds_by_access: Dict[str, List[Tuple[int, int, Dict, Dict]]] = {}
-    us_by_access: Dict[str, List[Tuple[int, int, List[str]]]] = {}
+    # Pattern: access-uplink interfaces (toward US) need routes for
+    # subnets behind access/access-edge interfaces (toward DS/access).
+    # Pattern: access interfaces (toward policy) need routes for
+    # subnets behind access-edge interfaces (toward access nodes).
+    #
+    # Build mappings:
+    #   downstream_by_access: access -> [(table, priority, routes4, routes6)]
+    #     (interfaces that face downstream — access or access-edge)
+    #   upstream_by_access: access -> [(table, priority, eths)]
+    #     (interfaces that face upstream — access-uplink or access)
+    downstream_by_access: Dict[str, List[Tuple[int, int, Dict, Dict]]] = {}
+    upstream_by_access: Dict[str, List[Tuple[int, int, List[str]]]] = {}
 
     for _slot, table_id, priority, lane_eths, _shared_eths, routes4, routes6 in sorted_lanes:
         if routes4 == {} and routes6 == {}:
             continue
         for src_eth in lane_eths:
-            # Find the original lane data for this interface
             for ifname, eth in eth_map.items():
                 if eth == src_eth:
                     iface = node.get("interfaces", {}).get(ifname, {})
@@ -282,23 +289,26 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                     kind = lane.get("kind")
                     if access is None:
                         continue
-                    if kind == "access-uplink":
-                        us_by_access.setdefault(access, []).append(
+                    if kind in ("access-uplink", "access"):
+                        upstream_by_access.setdefault(access, []).append(
                             (table_id, priority, lane_eths)
                         )
-                    elif kind in ("access", "access-edge"):
-                        ds_by_access.setdefault(access, []).append(
+                    if kind in ("access", "access-edge"):
+                        downstream_by_access.setdefault(access, []).append(
                             (table_id, priority, routes4, routes6)
                         )
                     break
             else:
                 continue
 
-    # Generate cross-rules: for each access, link US-facing interfaces to
-    # DS-facing tables via destination-based ip rules.
-    for access in sorted(set(ds_by_access.keys()) & set(us_by_access.keys())):
-        for us_table, us_priority, us_eths in us_by_access[access]:
-            for ds_table, ds_priority, routes4, routes6 in ds_by_access[access]:
+    # Generate cross-rules: for each access, link upstream interfaces to
+    # downstream tables via destination-based ip rules.
+    for access in sorted(set(upstream_by_access.keys()) & set(downstream_by_access.keys())):
+        for us_table, us_priority, us_eths in upstream_by_access[access]:
+            for ds_table, ds_priority, routes4, routes6 in downstream_by_access[access]:
+                # Skip self-references (same table)
+                if us_table == ds_table:
+                    continue
                 if routes4:
                     for dst in sorted(routes4.keys()):
                         if dst == "0.0.0.0/0":
@@ -320,6 +330,34 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                             claimed6.add((dst, src_eth))
                             cmds.append(
                                 f"sh -c 'ip -6 rule add to {dst} iif {src_eth} priority {us_priority} table {ds_table} 2>/dev/null || true'"
+                            )
+
+    # Phase 5: return-path policy table route augmentation.
+    # For access/access-edge interfaces, add routes for subnets reachable
+    # via downstream interfaces that share the same access.
+    # This ensures the upstream-facing table has direct routes to
+    # downstream subnets instead of falling back to the default route
+    # (which may point back to the upstream node causing a loop).
+    for access in sorted(set(upstream_by_access.keys()) & set(downstream_by_access.keys())):
+        for us_table, us_priority, us_eths in upstream_by_access[access]:
+            for ds_table, ds_priority, routes4, routes6 in downstream_by_access[access]:
+                if us_table == ds_table:
+                    continue
+                if routes4:
+                    for dst in sorted(routes4.keys()):
+                        if dst == "0.0.0.0/0":
+                            continue
+                        for via, eth in routes4[dst]:
+                            cmds.append(
+                                f"ip route replace table {us_table} {dst} via {via} dev {eth} onlink"
+                            )
+                if routes6:
+                    for dst in sorted(routes6.keys()):
+                        if dst == "::/0":
+                            continue
+                        for via, eth in routes6[dst]:
+                            cmds.append(
+                                f"ip -6 route replace table {us_table} {dst} via {via} dev {eth} onlink"
                             )
 
     return cmds
