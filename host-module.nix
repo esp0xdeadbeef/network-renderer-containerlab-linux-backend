@@ -385,11 +385,11 @@ in
     };
     script = ''
       # Ensure masquerade on the uplink bridge for fabric internet access
-      nft add rule ip nat postrouting oifname br-uplink0 masquerade 2>/dev/null || true
+      nft add rule ip nat postrouting oifname br-uplink0 masquerade 2>/dev/null
       # Route fabric subnets back through the uplink bridge so return traffic
       # from VLAN4/internet reaches the core container.
-      ip route replace 10.50.0.0/16 dev br-uplink0 2>/dev/null || true
-      ip route replace 10.10.0.0/16 dev br-uplink0 2>/dev/null || true
+      ip route replace 10.50.0.0/16 dev br-uplink0 2>/dev/null
+      ip route replace 10.10.0.0/16 dev br-uplink0 2>/dev/null
     '';
     preStop = ''
       nft flush chain ip nat postrouting 2>/dev/null || true
