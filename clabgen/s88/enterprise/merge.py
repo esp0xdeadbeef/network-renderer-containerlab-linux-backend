@@ -9,6 +9,43 @@ from clabgen.s88.site.naming import bridge_name, host_ifname
 from clabgen.s88.site.topology import render_site_topology
 
 
+def _dict(value: Any) -> Dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _list_strings(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    strings: List[str] = []
+    for item in value:
+        if isinstance(item, str) and item:
+            strings.append(item)
+    return strings
+
+
+def _host_nat_commands(site: SiteModel) -> List[str]:
+    hn = _dict(site.host_nat)
+    if hn.get("required") is not True:
+        return []
+    bridge = hn.get("egressBridge")
+    if not isinstance(bridge, str) or not bridge:
+        return []
+    prefixes = _list_strings(hn.get("hostMasqueradePrefixes4"))
+    if not prefixes:
+        return []
+    vlan = hn.get("vlanId")
+    if isinstance(vlan, int) and vlan > 0:
+        oif = f"{bridge}.{vlan}"
+    else:
+        oif = bridge
+    saddr = ", ".join(sorted(prefixes))
+    return [
+        f"nft add table ip nat",
+        f"nft 'add chain ip nat POSTROUTING {{ type nat hook postrouting priority 101 ; policy accept ; }}'",
+        f"nft add rule ip nat POSTROUTING oifname \"{oif}\" ip saddr {{ {saddr} }} masquerade",
+    ]
+
+
 def _rewrite_endpoint(
     endpoint: str, node_name_map: Dict[str, str], site: SiteModel
 ) -> str:
@@ -58,6 +95,7 @@ def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
     overlay_links: Dict[str, List[str]] = {}
     defaults: Dict[str, Any] | None = None
     solver_meta: Dict[str, Any] | None = None
+    merged_host_nat_cmds: List[str] = []
 
     for site_key in sorted(sites.keys()):
         site = sites[site_key]
@@ -102,6 +140,9 @@ def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
         merged_bridges.extend(list(topo.get("bridges", [])))
         merged_bridge_networks.update(dict(topo.get("bridge_networks", {}) or {}))
 
+    for _site_key in sorted(sites.keys()):
+        merged_host_nat_cmds.extend(_host_nat_commands(sites[_site_key]))
+
     for overlay_name in sorted(overlay_links.keys()):
         endpoints = sorted(set(overlay_links[overlay_name]))
         if not endpoints:
@@ -137,6 +178,6 @@ def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
         },
         "bridges": sorted(set(merged_bridges)),
         "bridge_networks": merged_bridge_networks,
-        "bridge_control_modules": {},
+        "bridge_control_modules": {"hostNat": {"cmds": merged_host_nat_cmds}},
         "solver_meta": solver_meta or {},
     }

@@ -142,6 +142,7 @@ def load_sites(
                 site.get("upstreamSelectorNodeName", "") or ""
             ),
             tenant_prefix_owners=owners,
+            host_nat=dict(site.get("hostNat", {}) or {}),
         )
 
     if target_host is not None and not result:

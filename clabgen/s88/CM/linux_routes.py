@@ -16,6 +16,10 @@ from clabgen.s88.CM.linux_route_values import (
 )
 
 
+def _dict(value: Any) -> Dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
     seen: set[str] = set()
@@ -140,12 +144,10 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> Lis
         for rule in forwarding_rules:
             if not isinstance(rule, dict):
                 continue
-            purpose = (
-                rule.get("candidateEgress", {})
-                .get("backingRef", {})
-                .get("lane", {})
-                .get("kind", "")
-            )
+            eg = _dict(rule.get("candidateEgress"))
+            br = _dict(eg.get("backingRef"))
+            lane = _dict(br.get("lane"))
+            purpose = lane.get("kind", "")
             # For downstream-selector: find the interface toward policy
             # For upstream-selector: find the interface toward core
             from_if = rule.get("fromInterface", "")
