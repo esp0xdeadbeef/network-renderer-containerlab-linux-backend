@@ -213,8 +213,10 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             continue
 
         routes4, routes6 = _policy_groups_for_lane(node, eth_map, ifname, iface)
-        if routes4 == {} and routes6 == {}:
-            continue
+        # Do NOT skip lanes with empty routes — deny-by-default lanes
+        # must still get an ip rule so the kernel can route (to blackhole)
+        # instead of generating ICMP "Network Unreachable" before nftables
+        # policy drop can act.  (FS-170 silent-drop / D9)
 
         slot = _table_slot(eth_map, eth)
         table_id = 1000 + slot
@@ -253,6 +255,16 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                     cmds.append(
                         f"sh -c 'ip rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                     )
+        elif not is_uplink:
+            # Deny-by-default lane: add blackhole default so the kernel
+            # can route silently instead of generating ICMP (FS-170/D9).
+            cmds.append(
+                f"sh -c 'ip route replace table {table_id} 0.0.0.0/0 blackhole 2>/dev/null || true'"
+            )
+            for source_eth in lane_eths:
+                cmds.append(
+                    f"sh -c 'ip rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                )
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
             if not is_uplink:
@@ -260,6 +272,12 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                     cmds.append(
                         f"sh -c 'ip -6 rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                     )
+        elif routes4 == {} and not is_uplink:
+            # Deny-by-default lane: add IPv6 ip rule too.
+            for source_eth in lane_eths:
+                cmds.append(
+                    f"sh -c 'ip -6 rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                )
 
     # Phase 3: shared-interface destination-based rules.
     # Process lanes in ASCENDING priority order so lower-priority-number
