@@ -371,30 +371,4 @@ in
       };
     };
   };
-
-  # nftables NAT masquerade for VLAN 4 internet egress
-  # Applied on boot and persists across containerlab destroy cycles
-  systemd.services.clab-vlan4-nat = {
-    description = "CLAB VLAN 4 upstream NAT masquerade";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "systemd-networkd.service" "network-online.target" ];
-    wants = [ "systemd-networkd.service" "network-online.target" ];
-    path = [ pkgs.nftables pkgs.iproute2 ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    script = ''
-      # Ensure masquerade on the uplink bridge for fabric internet access.
-      # Docker manages table ip nat via iptables-nft — chain names are UPPERCASE.
-      nft add rule ip nat POSTROUTING oifname br-uplink0 masquerade 2>/dev/null || true
-      # Route fabric subnets back through the uplink bridge so return traffic
-      # from VLAN4/internet reaches the core container.
-      ip route replace 10.50.0.0/16 dev br-uplink0 2>/dev/null || true
-      ip route replace 10.10.0.0/16 dev br-uplink0 2>/dev/null || true
-    '';
-    preStop = ''
-      nft flush chain ip nat POSTROUTING 2>/dev/null || true
-    '';
-  };
 }
