@@ -261,47 +261,6 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         shared_eths = [s for s in source_eths if s != eth]
         lanes.append((slot, table_id, priority, lane_eths, shared_eths, routes4, routes6))
 
-    # Post-Phase-1 dedup: remove cross-lane routes.
-    # For each lane, collect non-policyOnly dsts owned by OTHER lanes'
-    # interfaces (different lane.access). Remove any policy route whose
-    # dst matches a non-policyOnly route owned by another lane.
-    for idx in range(len(lanes)):
-        slot, tid, prio, leths, seths, r4, r6 = lanes[idx]
-        # Find this lane's access
-        this_access = None
-        for ifname in (node.get("interfaces", {}) or {}).keys():
-            if eth_map.get(ifname) in leths:
-                this_access = _lane_access(_lane(node["interfaces"][ifname]))
-                break
-        if this_access is None:
-            continue
-        # Collect non-policyOnly dsts from OTHER lanes' interfaces
-        other_native4: set[str] = set()
-        other_native6: set[str] = set()
-        for oname, oiface in (node.get("interfaces", {}) or {}).items():
-            oaccess = _lane_access(_lane(oiface))
-            if oaccess is None or oaccess == this_access:
-                continue
-            oroutes = _route_lists(oiface)
-            for r in oroutes["ipv4"]:
-                if r.get("policyOnly") is not True:
-                    d = _dst(r)
-                    if d:
-                        nd = _normalize_prefix(d)
-                        if nd:
-                            other_native4.add(nd)
-            for r in oroutes["ipv6"]:
-                if r.get("policyOnly") is not True:
-                    d = _dst(r)
-                    if d:
-                        nd = _normalize_prefix(d)
-                        if nd:
-                            other_native6.add(nd)
-        # Remove cross-lane routes
-        r4 = {k: v for k, v in r4.items() if k not in other_native4}
-        r6 = {k: v for k, v in r6.items() if k not in other_native6}
-        lanes[idx] = (slot, tid, prio, leths, seths, r4, r6)
-
     # Phase 2: render policy tables and generic iif rules (order-independent).
     # Skip generic iif rules for access-uplink interfaces — their return-path
     # routing is handled by Phase 4 cross-rules (SMS-101).
