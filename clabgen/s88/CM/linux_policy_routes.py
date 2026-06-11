@@ -259,7 +259,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             # Deny-by-default lane: add blackhole default so the kernel
             # can route silently instead of generating ICMP (FS-170/D9).
             cmds.append(
-                f"sh -c 'ip route replace table {table_id} 0.0.0.0/0 blackhole 2>/dev/null || true'"
+                f"sh -c 'ip route replace table {table_id} blackhole 0.0.0.0/0 2>/dev/null || true'"
             )
             for source_eth in lane_eths:
                 cmds.append(
