@@ -211,8 +211,6 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     # Process lanes in DESCENDING priority order so higher-priority-number
     # lanes claim destinations first. Lower-priority-number lanes skip
     # destinations already claimed by a higher-priority-number lane.
-    # This prevents the guest lane (priority 10002) from shadowing the
-    # provider lane (priority 10009) for provider-handoff subnets.
     claimed4: Set[Tuple[str, str]] = set()  # (dst, src_eth)
     claimed6: Set[Tuple[str, str]] = set()
 
@@ -242,5 +240,69 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                     cmds.append(
                         f"sh -c 'ip -6 rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                     )
+
+    # Phase 4: policy-node return-path routing.
+    # For nodes where each lane has a dedicated uplink-facing and
+    # downstream-facing interface pair (policy node, downstream-selector),
+    # generate destination-based ip rules on the uplink-facing interface
+    # that direct return traffic to the correct downstream-facing table.
+    #
+    # Build mappings: access -> [(ds_table, ds_priority, ds_routes4, ds_routes6), ...]
+    #                 access -> [(us_table, us_priority, us_eths), ...]
+    ds_by_access: Dict[str, List[Tuple[int, int, Dict, Dict]]] = {}
+    us_by_access: Dict[str, List[Tuple[int, int, List[str]]]] = {}
+
+    for _slot, table_id, priority, lane_eths, _shared_eths, routes4, routes6 in sorted_lanes:
+        if routes4 == {} and routes6 == {}:
+            continue
+        for src_eth in lane_eths:
+            # Find the original lane data for this interface
+            for ifname, eth in eth_map.items():
+                if eth == src_eth:
+                    iface = node.get("interfaces", {}).get(ifname, {})
+                    lane = _lane(iface)
+                    access = _lane_access(lane)
+                    kind = lane.get("kind")
+                    if access is None:
+                        continue
+                    if kind == "access-uplink":
+                        us_by_access.setdefault(access, []).append(
+                            (table_id, priority, lane_eths)
+                        )
+                    elif kind in ("access", "access-edge"):
+                        ds_by_access.setdefault(access, []).append(
+                            (table_id, priority, routes4, routes6)
+                        )
+                    break
+            else:
+                continue
+
+    # Generate cross-rules: for each access, link US-facing interfaces to
+    # DS-facing tables via destination-based ip rules.
+    for access in sorted(set(ds_by_access.keys()) & set(us_by_access.keys())):
+        for us_table, us_priority, us_eths in us_by_access[access]:
+            for ds_table, ds_priority, routes4, routes6 in ds_by_access[access]:
+                if routes4:
+                    for dst in sorted(routes4.keys()):
+                        if dst == "0.0.0.0/0":
+                            continue
+                        for src_eth in us_eths:
+                            if (dst, src_eth) in claimed4:
+                                continue
+                            claimed4.add((dst, src_eth))
+                            cmds.append(
+                                f"sh -c 'ip rule add to {dst} iif {src_eth} priority {us_priority} table {ds_table} 2>/dev/null || true'"
+                            )
+                if routes6:
+                    for dst in sorted(routes6.keys()):
+                        if dst == "::/0":
+                            continue
+                        for src_eth in us_eths:
+                            if (dst, src_eth) in claimed6:
+                                continue
+                            claimed6.add((dst, src_eth))
+                            cmds.append(
+                                f"sh -c 'ip -6 rule add to {dst} iif {src_eth} priority {us_priority} table {ds_table} 2>/dev/null || true'"
+                            )
 
     return cmds
