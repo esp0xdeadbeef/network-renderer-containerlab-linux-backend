@@ -162,36 +162,12 @@ def _render_policy_table(
         cmds.append(_render_group(ip_cmd, table_id, dst, groups[dst]))
 
 
-def _shared_source_rules(
-    table_id: int,
-    priority: int,
-    routes4: Dict[str, List[Tuple[str, str]]],
-    routes6: Dict[str, List[Tuple[str, str]]],
-    source_eths: List[str],
-    lane_eth: str,
-) -> List[str]:
-    cmds: List[str] = []
-    shared = [s for s in source_eths if s != lane_eth]
-    if not shared:
-        return cmds
-    # For shared source interfaces (e.g. core-facing iface used by multiple lanes),
-    # emit destination-based ip rules so each subnet routes through its correct lane.
-    # Without this, first-matching iif rule captures all return traffic (guest wins).
-    for dst in sorted(routes4.keys()):
-        for src_eth in shared:
-            cmds.append(
-                f"sh -c 'ip rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
-            )
-    for dst in sorted(routes6.keys()):
-        for src_eth in shared:
-            cmds.append(
-                f"sh -c 'ip -6 rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
-            )
-    return cmds
-
-
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
+
+    # Phase 1: collect lane data for all lanes that have policy routes.
+    # Each entry: (slot, table_id, priority, lane_eths, shared_eths, routes4, routes6)
+    lanes: List[Tuple[int, int, int, List[str], List[str], Dict, Dict]] = []
 
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
         iface = node["interfaces"][ifname]
@@ -211,47 +187,58 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             source_eth = eth_map.get(source)
             if source_eth is not None:
                 source_eths.append(source_eth)
-        # Determine which source interfaces are this lane's own vs shared.
+
         lane_eths = [eth]
         shared_eths = [s for s in source_eths if s != eth]
+        lanes.append((slot, table_id, priority, lane_eths, shared_eths, routes4, routes6))
+
+    # Phase 2: render policy tables and generic iif rules (order-independent).
+    for _slot, table_id, priority, lane_eths, _shared_eths, routes4, routes6 in lanes:
         if routes4 != {}:
             _render_policy_table(cmds, "ip", table_id, routes4)
-            # Add generic iif rule for this lane's own interface
             for source_eth in lane_eths:
                 cmds.append(
                     f"sh -c 'ip rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                 )
-            # For shared interfaces, use destination-based rules so each
-            # subnet routes through its correct lane instead of all traffic
-            # going to the first-matching generic iif rule.
-            # Only include destinations whose route nexthop exits through
-            # one of this lane's own source interfaces. If the route exits
-            # via a foreign interface, the destination is owned by another
-            # lane and a dest-based rule here would shadow that lane.
-            # Also skip default destinations (0.0.0.0/0, ::/0) per SMS-100.
-            for dst in sorted(routes4.keys()):
-                if dst == "0.0.0.0/0":
-                    continue
-                hops = routes4.get(dst, [])
-                if not any(hop_eth in source_eths for _, hop_eth in hops):
-                    continue
-                for src_eth in shared_eths:
-                    cmds.append(
-                        f"sh -c 'ip rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
-                    )
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
             for source_eth in lane_eths:
                 cmds.append(
                     f"sh -c 'ip -6 rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                 )
+
+    # Phase 3: shared-interface destination-based rules.
+    # Process lanes in DESCENDING priority order so higher-priority-number
+    # lanes claim destinations first. Lower-priority-number lanes skip
+    # destinations already claimed by a higher-priority-number lane.
+    # This prevents the guest lane (priority 10002) from shadowing the
+    # provider lane (priority 10009) for provider-handoff subnets.
+    claimed4: Set[Tuple[str, str]] = set()  # (dst, src_eth)
+    claimed6: Set[Tuple[str, str]] = set()
+
+    # Sort by priority descending (highest number first)
+    sorted_lanes = sorted(lanes, key=lambda x: x[2], reverse=True)
+
+    for _slot, table_id, priority, _lane_eths, shared_eths, routes4, routes6 in sorted_lanes:
+        if routes4 != {} and shared_eths:
+            for dst in sorted(routes4.keys()):
+                if dst == "0.0.0.0/0":
+                    continue
+                for src_eth in shared_eths:
+                    if (dst, src_eth) in claimed4:
+                        continue
+                    claimed4.add((dst, src_eth))
+                    cmds.append(
+                        f"sh -c 'ip rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                    )
+        if routes6 != {} and shared_eths:
             for dst in sorted(routes6.keys()):
                 if dst == "::/0":
                     continue
-                hops = routes6.get(dst, [])
-                if not any(hop_eth in source_eths for _, hop_eth in hops):
-                    continue
                 for src_eth in shared_eths:
+                    if (dst, src_eth) in claimed6:
+                        continue
+                    claimed6.add((dst, src_eth))
                     cmds.append(
                         f"sh -c 'ip -6 rule add to {dst} iif {src_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                     )
