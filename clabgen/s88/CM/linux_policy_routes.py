@@ -193,19 +193,36 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         lanes.append((slot, table_id, priority, lane_eths, shared_eths, routes4, routes6))
 
     # Phase 2: render policy tables and generic iif rules (order-independent).
+    # Skip generic iif rules for access-uplink interfaces — their return-path
+    # routing is handled by Phase 4 cross-rules (SMS-101).
     for _slot, table_id, priority, lane_eths, _shared_eths, routes4, routes6 in lanes:
+        # Find whether this lane is an access-uplink (US-facing) interface
+        is_uplink = False
+        for src_eth in lane_eths:
+            for ifname, eth in eth_map.items():
+                if eth == src_eth:
+                    iface = node.get("interfaces", {}).get(ifname, {})
+                    lane = _lane(iface)
+                    if lane.get("kind") == "access-uplink":
+                        is_uplink = True
+                    break
+            if is_uplink:
+                break
+
         if routes4 != {}:
             _render_policy_table(cmds, "ip", table_id, routes4)
-            for source_eth in lane_eths:
-                cmds.append(
-                    f"sh -c 'ip rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
-                )
+            if not is_uplink:
+                for source_eth in lane_eths:
+                    cmds.append(
+                        f"sh -c 'ip rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                    )
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
-            for source_eth in lane_eths:
-                cmds.append(
-                    f"sh -c 'ip -6 rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
-                )
+            if not is_uplink:
+                for source_eth in lane_eths:
+                    cmds.append(
+                        f"sh -c 'ip -6 rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                    )
 
     # Phase 3: shared-interface destination-based rules.
     # Process lanes in DESCENDING priority order so higher-priority-number
