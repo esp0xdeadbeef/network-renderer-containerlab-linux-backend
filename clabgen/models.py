@@ -94,6 +94,7 @@ class SiteModel:
     solver_meta: Dict[str, Any] = field(default_factory=dict)
     bridge_networks: Dict[str, Any] = field(default_factory=dict)
     bridge_control_modules: Dict[str, ControlModuleModel] = field(default_factory=dict)
+    host_nat: Dict[str, Any] = field(default_factory=dict)
     policy_node_name: str = ""
     upstream_selector_node_name: str = ""
     tenant_prefix_owners: Dict[str, Any] = field(default_factory=dict)
