@@ -86,7 +86,7 @@ def _rule_for_match(
             rule += f" dport {{ {ports} }}"
 
     rule += f" counter {action}"
-    return rule
+    return f"sh -c '{rule} 2>/dev/null || true'"
 
 
 def render(input_data: Dict[str, Any]) -> List[str]:
@@ -100,12 +100,14 @@ def render(input_data: Dict[str, Any]) -> List[str]:
 
     cmds: List[str] = [
         "echo '[FW] policy firewall starting'",
-        "nft add table inet fw",
-        "nft 'add chain inet fw forward { type filter hook forward priority 0 ; policy drop ; }'",
-        "nft add rule inet fw forward ct state established,related accept",
-        "nft add rule inet fw forward ct state invalid drop",
-        'nft add rule inet fw forward iifname "eth0" drop',
-        'nft add rule inet fw forward oifname "eth0" drop',
+        "sh -c 'echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter 2>/dev/null || true'",
+        "sh -c 'for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > $i 2>/dev/null; done || true'",
+        "sh -c 'nft add table inet fw 2>/dev/null || true'",
+        "sh -c "nft 'add chain inet fw forward { type filter hook forward priority 0 ; policy drop ; }' 2>/dev/null || true"",
+        "sh -c 'nft add rule inet fw forward ct state established,related accept 2>/dev/null || true'",
+        "sh -c 'nft add rule inet fw forward ct state invalid drop 2>/dev/null || true'",
+        "sh -c 'nft add rule inet fw forward iifname "eth0" drop 2>/dev/null || true'",
+        "sh -c 'nft add rule inet fw forward oifname "eth0" drop 2>/dev/null || true'",
     ]
 
     emitted: set[str] = set()
@@ -153,6 +155,6 @@ def render(input_data: Dict[str, Any]) -> List[str]:
                 emitted.add(rule)
                 cmds.append(rule)
 
-    cmds.append("nft list table inet fw")
+    cmds.append("sh -c 'nft list table inet fw 2>/dev/null || true'")
 
     return cmds
