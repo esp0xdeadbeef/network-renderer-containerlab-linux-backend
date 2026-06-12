@@ -124,7 +124,7 @@ let
         nix eval --impure --json --expr "
           let
             flake = builtins.getFlake \"path:$cpm_repo\";
-            lib = flake.lib.\"\${builtins.currentSystem}\";
+            lib = flake.lib.\"''${builtins.currentSystem}\";
             intent = import \"$lab_dir/intent.nix\";
             inventory = import \"$work_dir/resolved-inventory-clab.nix\";
             result = lib.compileAndBuild {
