@@ -58,7 +58,10 @@ def _public_resolver_drop_commands(dns: Dict[str, Any]) -> List[str]:
     return commands
 
 
-def render_dns_service(node: Dict[str, Any]) -> List[str]:
+def render_dns_service(
+    node: Dict[str, Any],
+    node_name: str = "container",
+) -> List[str]:
     services = node.get("services")
     if not isinstance(services, dict):
         return []
@@ -77,6 +80,21 @@ def render_dns_service(node: Dict[str, Any]) -> List[str]:
         "outgoingInterfaces": _string_list(dns.get("outgoingInterfaces", [])),
         "localRecords": _local_records(dns.get("localRecords", [])),
     }
+
+    # GAMP: FS-540-HDS-010-SDS-010-SMS-035 self-referential forwarder guard.
+    # If a forwarder address matches a non-loopback listen address, the DNS proxy
+    # would forward queries to itself, creating a forwarding loop.
+    _nonLoopback = set(listen)
+    _selfRef = [f for f in payload["forwarders"] if f in _nonLoopback]
+    if _selfRef:
+        raise ValueError(
+            "CLAB DNS renderer rejects self-referential forwarder: "
+            + "; ".join(
+                f"forward-addr {f} matches listen address on {node_name}"
+                for f in _selfRef
+            )
+            + ". GAMP: FS-540-HDS-010-SDS-010-SMS-035"
+        )
     namespace_fallback = _namespace_fallback(dns.get("namespaceFallback", {}))
     if namespace_fallback:
         payload["namespaceFallback"] = namespace_fallback
