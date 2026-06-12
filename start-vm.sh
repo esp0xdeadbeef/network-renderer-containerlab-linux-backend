@@ -101,10 +101,21 @@ echo "[*] Building control-plane model from resolved network-labs input (${examp
 (
   # Some upstream tools write debug artifacts to CWD; keep this repo clean.
   cd "${tmp_dir}"
-  nix run --show-trace "${cpm_path}#compile-and-build-control-plane-model" -- \
-    "${intent_path}" \
-    "${inventory_path}" \
-    "${tmp_dir}/cpm.json" >/dev/null
+  # Pass emulationSubnets from inventory to CPM (FS-260-HDS-010-SDS-010-SMS-012)
+  nix eval --impure --json --expr "
+    let
+      flake = builtins.getFlake \"path:${cpm_path}\";
+      lib = flake.lib.\"\${builtins.currentSystem}\";
+      intent = import \"$(realpath "${intent_path}")\";
+      inventory = import \"$(realpath "${inventory_path}")\";
+      result = lib.compileAndBuild {
+        input = intent;
+        inherit inventory;
+        emulationSubnets = inventory.hat.emulationSubnets or [];
+      };
+    in
+      result
+  " > "${tmp_dir}/cpm.json"
 )
 
 echo "[*] Rendering Containerlab topology + bridges..."

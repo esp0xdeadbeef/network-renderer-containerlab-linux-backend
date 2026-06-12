@@ -105,8 +105,21 @@ seed_one() {
   echo "  inventory: ${inventory}"
 
   # Run the full pipeline: compiler -> NFM -> CPM -> emit CPM JSON
-  nix run --show-trace "${cpm_path}#compile-and-build-control-plane-model" -- \
-    "${intent}" "${inventory}" "${cpm_json}"
+  # Pass emulationSubnets from inventory to CPM (FS-260-HDS-010-SDS-010-SMS-012)
+  nix eval --impure --json --expr "
+    let
+      flake = builtins.getFlake \"path:${cpm_path}\";
+      lib = flake.lib.\"\${builtins.currentSystem}\";
+      intent = import \"$(realpath "${intent}")\";
+      inventory = import \"$(realpath "${inventory}")\";
+      result = lib.compileAndBuild {
+        input = intent;
+        inherit inventory;
+        emulationSubnets = inventory.hat.emulationSubnets or [];
+      };
+    in
+      result
+  " > "${cpm_json}"
 
   if [[ ! -f "${cpm_json}" ]]; then
     echo "seed.sh: ERROR: CPM did not produce ${cpm_json}" >&2

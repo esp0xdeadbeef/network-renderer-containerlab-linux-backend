@@ -63,8 +63,21 @@ run_cpm_build() {
 
   local cpm_path
   cpm_path="$(resolve_input_path network-control-plane-model)"
-  nix run --show-trace "${cpm_path}#compile-and-build-control-plane-model" -- \
-    "$intent" "$inventory" "$out" >/dev/null
+  # Pass emulationSubnets from inventory to CPM (FS-260-HDS-010-SDS-010-SMS-012)
+  nix eval --impure --json --expr "
+    let
+      flake = builtins.getFlake \"path:${cpm_path}\";
+      lib = flake.lib.\"\${builtins.currentSystem}\";
+      intent = import \"$(realpath "$intent")\";
+      inventory = import \"$(realpath "$inventory")\";
+      result = lib.compileAndBuild {
+        input = intent;
+        inherit inventory;
+        emulationSubnets = inventory.hat.emulationSubnets or [];
+      };
+    in
+      result
+  " > "$out"
 }
 
 mkdir -p "$out_root"

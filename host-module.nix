@@ -120,10 +120,21 @@ let
           "$lab_dir/intent.nix" \
           | jq -S . > "$artifact_dir/forwarding.json"
 
-        nix run --show-trace "path:$cpm_repo#compile-and-build-control-plane-model" -- \
-          "$lab_dir/intent.nix" \
-          "$work_dir/resolved-inventory-clab.nix" \
-          "$work_dir/cpm.json" >/dev/null
+        # Pass emulationSubnets from inventory to CPM (FS-260-HDS-010-SDS-010-SMS-012)
+        nix eval --impure --json --expr "
+          let
+            flake = builtins.getFlake \"path:$cpm_repo\";
+            lib = flake.lib.\"\${builtins.currentSystem}\";
+            intent = import \"$lab_dir/intent.nix\";
+            inventory = import \"$work_dir/resolved-inventory-clab.nix\";
+            result = lib.compileAndBuild {
+              input = intent;
+              inherit inventory;
+              emulationSubnets = inventory.hat.emulationSubnets or [];
+            };
+          in
+            result
+        " > "$work_dir/cpm.json"
         jq -S . "$work_dir/cpm.json" > "$artifact_dir/control-plane.json"
 
         cp "$artifact_dir/inventory.json" "$work_dir/renderer-inventory.json"
