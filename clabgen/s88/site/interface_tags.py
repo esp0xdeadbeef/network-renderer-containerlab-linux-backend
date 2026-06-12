@@ -143,7 +143,7 @@ def tag_from_peer_role(
         return True
     if peer_node.role == "upstream-selector":
         uplinks = _lane_uplinks(site, peer)
-        for uplink in uplinks or ["wan"]:
+        for uplink in uplinks:
             add_interface_tag(interface_tags, iface_name, uplink)
         return True
     if peer_node.role == "downstream-selector":
@@ -162,7 +162,7 @@ def tag_from_peer_role(
             if getattr(iface, "kind", None) == "wan" and isinstance(upstream, str):
                 wan_uplink_set.add(upstream)
         wan_uplinks = sorted(wan_uplink_set)
-        for uplink in wan_uplinks or ["wan"]:
+        for uplink in wan_uplinks:
             add_interface_tag(interface_tags, iface_name, uplink)
         return True
     return False
