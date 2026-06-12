@@ -81,7 +81,13 @@ def _nat4_commands(interface_name: str, host_uplink: Dict[str, Any]) -> List[str
     if gateway.ip.version != 4 or network.num_addresses < 4:
         return []
 
-    client_ip = str(ipv4.get("clientAddress") or network[2])
+    client_ip = str(ipv4.get("clientAddress"))
+    if not client_ip:
+        raise ValueError(
+            "CLAB WAN NAT requires clientAddress in hostUplink.ipv4. "
+            "CPM must provide the client address for NAT mode interfaces. "
+            "CPM_GAP: no clientAddress field in current CPM hostUplink contract."
+        )
     prefixlen = gateway.network.prefixlen
     gateway_ip = str(gateway.ip)
     return [
@@ -98,10 +104,25 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         interface_name = interface_data["name"]
         host_uplink = interface_data["host_uplink"]
         cmds.append(_sh(_slaac_command(interface_name)))
-        if isinstance(host_uplink, dict) and host_uplink.get("mode") == "nat":
-            for command in _nat4_commands(interface_name, host_uplink):
-                cmds.append(_sh(command))
+        if isinstance(host_uplink, dict) and host_uplink:
+            # CPM provided hostUplink data
+            host_mode = host_uplink.get("mode")
+            if host_mode == "nat":
+                for command in _nat4_commands(interface_name, host_uplink):
+                    cmds.append(_sh(command))
+            elif host_mode is None:
+                raise ValueError(
+                    f"CLAB WAN interface {interface_name} has hostUplink "
+                    "without mode. CPM must provide explicit 'mode' field "
+                    "(e.g., 'nat' or 'dhcp'). "
+                    "CPM_GAP: hostUplink.mode is not consistently populated."
+                )
+            else:
+                cmds.append(_sh(_dhcp4_command(interface_name)))
         else:
+            # CPM_GAP: no hostUplink data — fall back to DHCP (legacy behavior,
+            # pending CPM hostUplink contract completion).
+            # Trace: FS-380-HDS-010-SDS-010-SMS-060 (core WAN IP assignment).
             cmds.append(_sh(_dhcp4_command(interface_name)))
 
     return cmds

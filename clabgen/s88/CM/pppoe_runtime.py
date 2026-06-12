@@ -37,26 +37,38 @@ def _credential_command(credentials: Dict[str, Any], field: str) -> str:
     raise ValueError(f"CLAB PPPoE service requires credentials.{field}")
 
 
-def _bool_option(config: Dict[str, Any], field: str, default: bool) -> bool:
+def _bool_option(config: Dict[str, Any], field: str, default: bool | None = None) -> bool:
     value = config.get(field)
     if value is None:
-        return default
+        if default is not None:
+            return default
+        raise ValueError(
+            f"CLAB PPPoE service requires {field} — CPM must provide explicit True/False"
+        )
     return value is not False
 
 
 def _client_command(config: Dict[str, Any], eth_map: Dict[str, str]) -> str:
     ifname = _interface(config, eth_map, "client")
     credentials = _dict(config.get("credentials"))
-    ppp_name = config.get("runtimeInterface") or "ppp0"
+    ppp_name = config.get("runtimeInterface")
     if not isinstance(ppp_name, str) or not ppp_name:
-        raise ValueError("CLAB PPPoE client runtimeInterface must be a string")
-    mtu = str(config.get("mtu") or 1492)
+        raise ValueError(
+            "CLAB PPPoE client runtimeInterface must come from CPM "
+            "services.pppoe.client.runtimeInterface"
+        )
+    mtu_raw = config.get("mtu")
+    if mtu_raw is None:
+        raise ValueError(
+            "CLAB PPPoE client requires mtu from CPM services.pppoe.client.mtu"
+        )
+    mtu = str(mtu_raw)
     default_route = (
         "defaultroute replacedefaultroute"
-        if _bool_option(config, "defaultRoute", True)
+        if _bool_option(config, "defaultRoute")
         else "nodefaultroute"
     )
-    use_peer_dns = "usepeerdns" if _bool_option(config, "usePeerDns", True) else ""
+    use_peer_dns = "usepeerdns" if _bool_option(config, "usePeerDns") else ""
     return "\n".join(
         [
             "command -v pppd >/dev/null || { echo 'missing pppd' >&2; exit 1; }",
@@ -94,8 +106,18 @@ def _server_command(config: Dict[str, Any], eth_map: Dict[str, str]) -> str:
     customer_address = _string(
         config.get("customerAddress"), "services.pppoe.server.customerAddress"
     )
-    mtu = str(config.get("mtu") or 1492)
-    max_sessions = str(config.get("maxSessions") or 32)
+    mtu_raw = config.get("mtu")
+    if mtu_raw is None:
+        raise ValueError(
+            "CLAB PPPoE server requires mtu from CPM services.pppoe.server.mtu"
+        )
+    mtu = str(mtu_raw)
+    max_sessions_raw = config.get("maxSessions")
+    if max_sessions_raw is None:
+        raise ValueError(
+            "CLAB PPPoE server requires maxSessions from CPM services.pppoe.server.maxSessions"
+        )
+    max_sessions = str(max_sessions_raw)
     return "\n".join(
         [
             "command -v pppoe-server >/dev/null || { echo 'missing pppoe-server' >&2; exit 1; }",

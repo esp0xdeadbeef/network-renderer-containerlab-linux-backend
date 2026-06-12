@@ -42,7 +42,12 @@ def _first_router_id(node: Dict[str, Any]) -> str:
                 pass
 
     if not candidates:
-        return "1.1.1.1"
+        raise ValueError(
+            "CLAB BGP health check requires at least one candidate router ID "
+            "from loopback or non-/31 interface addresses. No candidates found "
+            "for node; CPM must provide routerId or valid interface addresses. "
+            "CPM_GAP: health check target should come from CPM BGP contract."
+        )
 
     return sorted(candidates)[0]
 
