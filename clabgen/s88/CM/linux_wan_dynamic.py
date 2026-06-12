@@ -105,19 +105,19 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         host_uplink = interface_data["host_uplink"]
         cmds.append(_sh(_slaac_command(interface_name)))
         if isinstance(host_uplink, dict) and host_uplink:
-            # CPM provided hostUplink data
-            host_mode = host_uplink.get("mode")
-            if host_mode == "nat":
+            # CPM provided hostUplink data — derive mode from ipv4.method/ipv6.method
+            # CPM emits hostUplink with ipv4.method/ipv6.method, not a top-level 'mode'.
+            # Trace: FS-380-HDS-010-SDS-010-SMS-060 (core WAN IP assignment).
+            ipv4_method = (host_uplink.get("ipv4") or {}).get("method")
+            ipv6_method = (host_uplink.get("ipv6") or {}).get("method")
+            host_mode = ipv4_method or ipv6_method
+            if host_mode == "static":
                 for command in _nat4_commands(interface_name, host_uplink):
                     cmds.append(_sh(command))
-            elif host_mode is None:
-                raise ValueError(
-                    f"CLAB WAN interface {interface_name} has hostUplink "
-                    "without mode. CPM must provide explicit 'mode' field "
-                    "(e.g., 'nat' or 'dhcp'). "
-                    "CPM_GAP: hostUplink.mode is not consistently populated."
-                )
+            elif host_mode in ("dhcp", None):
+                cmds.append(_sh(_dhcp4_command(interface_name)))
             else:
+                # Unknown method — treat as DHCP (legacy)
                 cmds.append(_sh(_dhcp4_command(interface_name)))
         else:
             # CPM_GAP: no hostUplink data — fall back to DHCP (legacy behavior,
