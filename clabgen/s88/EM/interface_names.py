@@ -8,6 +8,11 @@ def require_runtime_name(value: Any, name_map: Dict[str, str], context: str) -> 
         raise ValueError(f"{context} is missing explicit interface name")
     translated = name_map.get(value)
     if not isinstance(translated, str) or not translated:
+        # PPPoE runtime interfaces (ppp0, ppp1, etc.) are dynamically created
+        # by the PPPoE daemon and may not appear in the static CPM interface records.
+        # Accept bare PPPoE interface names without requiring name_map translation.
+        if isinstance(value, str) and value.startswith("ppp"):
+            return value
         import sys
         print(f"DIAGNOSTIC: require_runtime_name failed for {value!r} in {context}", file=sys.stderr)
         print(f"DIAGNOSTIC: name_map keys (partial): {list(name_map.keys())[:20]}", file=sys.stderr)
