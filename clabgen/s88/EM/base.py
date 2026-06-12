@@ -252,7 +252,53 @@ def _cm_inputs_from_contracts(
 
     cm_inputs["management_egress"] = {"interface": "eth0"}
 
+    nat = _nat_cm_input(node_data, eth_map)
+    if nat:
+        cm_inputs["nat"] = nat
+
     return cm_inputs
+
+
+def _nat_cm_input(
+    node_data: Dict[str, Any],
+    eth_map: Dict[str, str],
+) -> Dict[str, Any]:
+    nat_intent = _dict(node_data.get("natIntent"))
+    if nat_intent.get("enabled") is not True:
+        return {}
+
+    name_map = _interface_name_map(node_data, eth_map)
+    families = _dict(nat_intent.get("families"))
+    ipv4 = bool(families.get("ipv4", False))
+    ipv6 = bool(families.get("ipv6", False))
+
+    masquerade_ifaces = translate_names(
+        _list_strings(nat_intent.get("masqueradeInterfaces")),
+        name_map,
+        "natIntent.masqueradeInterfaces",
+    )
+
+    translation_records = nat_intent.get("translationRecords")
+    if isinstance(translation_records, list):
+        for record in translation_records:
+            if not isinstance(record, dict):
+                continue
+            egress = _dict(record.get("egressSurface"))
+            selected = _list_strings(egress.get("selectedUplinkInterfaces"))
+            translated = translate_names(
+                selected,
+                name_map,
+                "translationRecords.egressSurface.selectedUplinkInterfaces",
+            )
+            for iface in translated:
+                if iface not in masquerade_ifaces:
+                    masquerade_ifaces.append(iface)
+
+    return {
+        "ipv4": ipv4,
+        "ipv6": ipv6,
+        "masqueradeInterfaces": masquerade_ifaces,
+    }
 
 
 def render(

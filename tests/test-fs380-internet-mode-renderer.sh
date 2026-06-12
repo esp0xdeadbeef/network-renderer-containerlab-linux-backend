@@ -9,14 +9,16 @@ cd "${repo_root}"
 
 echo "=== Test CLAB NAT generates masquerade ==="
 
-# Run nat.py render with mock input
+# Run nat.py render with mock input including translationRecords
 result="$(python3 -c '
 import sys
 sys.path.insert(0, ".")
 from clabgen.s88.CM.nat import render
 
 input_data = {
-    "inside_interfaces": [],
+    "ipv4": True,
+    "ipv6": False,
+    "masqueradeInterfaces": ["eth2"],
     "routes_v4": [],
     "routes_v6": [],
 }
@@ -25,13 +27,21 @@ for cmd in cmds:
     print(cmd)
 ')"
 
-# Verify masquerade rule exists
-if ! echo "$result" | grep -q 'nft add rule ip nat postrouting oifname.*masquerade'; then
-  echo "FAIL: CLAB NAT missing masquerade rule"
+# Verify masquerade rule exists on the correct interface
+if ! echo "$result" | grep -q 'nft add rule ip nat postrouting oifname "eth2" masquerade'; then
+  echo "FAIL: CLAB NAT missing masquerade rule on eth2"
   echo "$result"
   exit 1
 fi
 echo "PASS: CLAB NAT generates masquerade on WAN interface"
+
+# Verify no hardcoded eth0
+if echo "$result" | grep -q 'oifname "eth0"'; then
+  echo "FAIL: CLAB NAT still contains hardcoded eth0"
+  echo "$result"
+  exit 1
+fi
+echo "PASS: CLAB NAT no longer hardcodes eth0"
 
 # Verify ip_forward sysctl
 if ! echo "$result" | grep -q 'sysctl -w net.ipv4.ip_forward=1'; then
@@ -47,6 +57,31 @@ if ! echo "$result" | grep -q 'sysctl -w net.ipv6.conf.all.forwarding=1'; then
 fi
 echo "PASS: CLAB NAT enables IPv6 forwarding"
 
+# Verify no nat table when ipv4 disabled
+echo "=== Test CLAB NAT respects disabled families ==="
+disabled_result="$(python3 -c '
+import sys
+sys.path.insert(0, ".")
+from clabgen.s88.CM.nat import render
+
+input_data = {
+    "ipv4": False,
+    "ipv6": False,
+    "masqueradeInterfaces": [],
+    "routes_v4": [],
+    "routes_v6": [],
+}
+for cmd in render(input_data):
+    print(cmd)
+')"
+
+if echo "$disabled_result" | grep -q 'nft add table'; then
+  echo "FAIL: CLAB NAT emitted table rules with NAT disabled"
+  echo "$disabled_result"
+  exit 1
+fi
+echo "PASS: CLAB NAT skips table creation when NAT disabled"
+
 # Test with routes
 echo "=== Test CLAB NAT with routes ==="
 route_result="$(python3 -c '
@@ -55,7 +90,9 @@ sys.path.insert(0, ".")
 from clabgen.s88.CM.nat import render
 
 input_data = {
-    "inside_interfaces": [],
+    "ipv4": True,
+    "ipv6": True,
+    "masqueradeInterfaces": ["eth2"],
     "routes_v4": [{"dst": "10.50.0.0/16", "via4": "10.50.44.35"}],
     "routes_v6": [{"dst": "fd42:dead:feed::/48", "via6": "fd42:dead:feed:1000::1"}],
 }
