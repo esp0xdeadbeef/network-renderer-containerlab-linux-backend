@@ -4,7 +4,6 @@ import ipaddress
 from typing import Any, Dict, List
 
 from clabgen.s88.CM.linux_shell import _sh
-from clabgen.s88.CM._wan_index import next_wan_index
 
 
 def _wan_interfaces(
@@ -55,42 +54,6 @@ def _dhcp4_command(interface_name: str) -> str:
     )
 
 
-def _static_wan4_commands(
-    interface_name: str, host_uplink: Dict[str, Any], wan_index: int, pool_base: str = "10.11.0"
-) -> List[str]:
-    """Generate static IP commands for WAN interfaces when DHCP is unreliable.
-    
-    Assigns deterministic IPs from the VLAN4 pool: 10.11.0.(100 + wan_index)/24
-    with gateway 10.11.0.1. This avoids dependence on the systemd-networkd DHCP
-    server which can fail silently after Containerlab redeploys.
-    
-    Also assigns a dedicated SNAT IP (10.11.0.(200 + wan_index)/32) for outbound
-    NAT. Using masquerade NATs to the interface's own IP, causing return traffic
-    to be delivered locally (INPUT) instead of forwarded (FORWARD). The dedicated
-    SNAT IP ensures replies arrive as forwarded traffic back through the fabric.
-    """
-    octets = pool_base.split(".")
-    if len(octets) != 3:
-        return [_dhcp4_command(interface_name)]
-    try:
-        base = int(octets[2])
-    except (ValueError, IndexError):
-        return [_dhcp4_command(interface_name)]
-    client_octet = 100 + wan_index
-    snat_octet = 200 + wan_index
-    if client_octet > 254 or snat_octet > 254:
-        return [_dhcp4_command(interface_name)]
-    client_ip = f"{octets[0]}.{octets[1]}.{base}.{client_octet}"
-    snat_ip = f"{octets[0]}.{octets[1]}.{base}.{snat_octet}"
-    gateway_ip = f"{octets[0]}.{octets[1]}.{base}.1"
-    return [
-        _sh(f"ip addr replace {client_ip}/24 dev {interface_name}"),
-        _sh(f"ip addr add {snat_ip}/32 dev {interface_name}"),
-        _sh(f"ip route replace default via {gateway_ip} dev {interface_name} onlink"),
-        _sh(f"echo nameserver {gateway_ip} > /etc/resolv.conf"),
-    ]
-
-
 def _slaac_command(interface_name: str) -> str:
     return (
         f"sysctl -qw net.ipv6.conf.{interface_name}.accept_ra=2 "
@@ -139,9 +102,6 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             for command in _nat4_commands(interface_name, host_uplink):
                 cmds.append(_sh(command))
         else:
-            # Use static IPs instead of DHCP — systemd-networkd DHCPServer
-            # is unreliable across Containerlab redeploys and silently ignores
-            # new DHCP DISCOVER requests after a fresh render-live cycle.
-            cmds.extend(_static_wan4_commands(interface_name, host_uplink, next_wan_index()))
+            cmds.append(_sh(_dhcp4_command(interface_name)))
 
     return cmds
