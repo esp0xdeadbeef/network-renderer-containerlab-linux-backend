@@ -61,6 +61,7 @@ def _endpoint_fallbacks(
         or link.get("upstream")
         or link.get("uplink"),
         "tenant": iface.get("tenant") or ep.get("tenant") or link.get("tenant"),
+        "explicit_role": iface.get("explicit") or ep.get("explicit") or link.get("explicit") or {},
     }
 
 
@@ -119,6 +120,7 @@ def build_interfaces(
             runtime_if_name=iface.get("runtimeIfName")
             if isinstance(iface.get("runtimeIfName"), str)
             else None,
+            explicit_role=dict(fb.get("explicit_role", {}) or {}),
         )
 
     return interfaces

@@ -36,6 +36,7 @@ class InterfaceModel:
     host_uplink: Dict[str, Any] = field(default_factory=dict)
     lane: Dict[str, Any] = field(default_factory=dict)
     runtime_if_name: Optional[str] = None
+    explicit_role: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

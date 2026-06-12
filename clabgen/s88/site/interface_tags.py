@@ -159,7 +159,12 @@ def tag_from_peer_role(
         wan_uplink_set: set[str] = set()
         for iface in peer_node.interfaces.values():
             upstream = getattr(iface, "upstream", None)
-            if getattr(iface, "kind", None) == "wan" and isinstance(upstream, str):
+            explicit_role = getattr(iface, "explicit_role", {}) or {}
+            is_wan = (
+                getattr(iface, "kind", None) == "wan"
+                or bool(explicit_role.get("explicitWan", False))
+            )
+            if is_wan and isinstance(upstream, str):
                 wan_uplink_set.add(upstream)
         wan_uplinks = sorted(wan_uplink_set)
         for uplink in wan_uplinks:
