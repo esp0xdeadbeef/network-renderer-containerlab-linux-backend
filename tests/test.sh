@@ -28,6 +28,9 @@ tests=(
   test-fs310-hds010-sds010-sms070-nat-primitive-source-binding.sh
   test-fs310-hds010-sds010-sms080-shell-fallback-error-propagation.sh
   test-fs310-hds010-sds010-sms090-check-bypass-prevention.sh
+  test-fs310-hds010-sds010-sms190-pppoe-no-default.sh
+  test-fs310-hds010-sds010-sms200-bridge-no-default.sh
+  test-fs310-hds010-sds010-sms210-route-table-allocation.sh
   test-fs380-hds010-sds010-sms060-core-wan-ip-assignment.sh
   test-runtime-interface-mapping-refusals.sh
   test-bridge-link-realization-contracts.sh
