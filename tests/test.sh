@@ -44,6 +44,7 @@ tests=(
   test-role-independent-cm-inputs.sh
   test-access-advertisements-runtime.sh
   test-dns-namespace-fallback-cpm-contract.sh
+  test-fs540-hds010-sds010-sms035-dns-self-referential-guard.sh
   test-policy-no-main-defaults.sh
   test-fs960-hds010-sds016-sms050-clab-privileged-inspect.sh
 )
