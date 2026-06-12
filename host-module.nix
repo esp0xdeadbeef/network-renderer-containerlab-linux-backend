@@ -362,6 +362,19 @@ in
       matchConfig.Name = "br-uplink0";
       linkConfig.ActivationPolicy = "always-up";
       networkConfig = {
+        # CPM_GAP: DHCPServer and IPMasquerade are hardcoded here because
+        # the CPM does not yet emit explicitRole.dhcpServer or
+        # bridgeControlConfig.masquerade fields for host-level bridge
+        # configuration. The br-uplink0 bridge carries VLAN4 upstream
+        # internet traffic; containers connected to it need DHCP and NAT
+        # masquerade to reach the internet through the host's eth0.4
+        # interface.
+        #
+        # Trace: FS-380-HDS-010-SDS-010-SMS-060 (core WAN IP assignment).
+        # When the CPM-CMC-DHCP-DNS lane provides dhcpServer and
+        # masquerade fields, gate these behind CPM authority:
+        #   DHCPServer = if cpm.bridgeControlConfig.dhcpServer or false then true else mkForce false;
+        #   IPMasquerade = if cpm.bridgeControlConfig.masquerade or null then cpm.bridgeControlConfig.masquerade else mkForce "no";
         DHCPServer = true;
         IPMasquerade = "both";
         IPv4Forwarding = true;
