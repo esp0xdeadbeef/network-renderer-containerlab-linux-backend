@@ -87,6 +87,7 @@ def _static_wan4_commands(
         _sh(f"ip addr replace {client_ip}/24 dev {interface_name}"),
         _sh(f"ip addr add {snat_ip}/32 dev {interface_name}"),
         _sh(f"ip route replace default via {gateway_ip} dev {interface_name} onlink"),
+        _sh(f"echo nameserver {gateway_ip} > /etc/resolv.conf"),
     ]
 
 
