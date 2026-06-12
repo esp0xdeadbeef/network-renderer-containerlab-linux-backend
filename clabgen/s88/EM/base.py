@@ -26,13 +26,13 @@ def _interface_name_map(
 ) -> Dict[str, str]:
     result: Dict[str, str] = {}
     interfaces = _dict(node_data.get("interfaces"))
-    # Diagnostic: check if core-uplink-egress is in interfaces
-    has_egress = "core-uplink-egress" in interfaces
-    if not has_egress:
-        for ln, iface in interfaces.items():
-            if isinstance(iface, dict) and iface.get("runtimeIfName") == "core-uplink-egress":
-                has_egress = True
-                break
+    # Diagnostic: check if any WAN-kind egress interfaces are present.
+    # CPM emits kind="wan" for uplink/egress interfaces; the name
+    # "core-uplink-egress" is a specific synthetic instance, not the kind.
+    has_egress = any(
+        isinstance(iface, dict) and iface.get("kind") == "wan"
+        for iface in interfaces.values()
+    )
     if not has_egress:
         import sys
         node_name = node_data.get("name", node_data.get("nodeName", "unknown"))

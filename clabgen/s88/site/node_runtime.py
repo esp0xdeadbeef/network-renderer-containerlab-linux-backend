@@ -89,8 +89,7 @@ def _selector_relation_audit(
             else None
         )
         if not (
-            (isinstance(relation_id, str) and relation_id.startswith("selector-"))
-            or cardinality_unit == "selector-forwarding-rule"
+            cardinality_unit == "selector-forwarding-rule"
         ):
             continue
 
