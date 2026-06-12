@@ -249,6 +249,11 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         # policy drop can act.  (FS-170 silent-drop / D9)
 
         slot = _table_slot(eth_map, eth)
+        # CPM_GAP: table base (1000) and priority base (10000) are
+        # deterministic platform constants. CPM does not currently provide
+        # routingTableBase or routePriorityBase fields. When CPM adds these,
+        # replace the hardcoded bases with CPM-derived values.
+        # Trace: FS-310-HDS-010-SDS-010-SMS-190 (renderer no-default contract).
         table_id = 1000 + slot
         priority = 10000 + slot
         source_eths: List[str] = []
