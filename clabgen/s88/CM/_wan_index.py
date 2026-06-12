@@ -1,12 +1,10 @@
-"""Shared WAN index counter for deterministic static IP and SNAT assignment.
+"""Shared WAN index counter for deterministic IP assignment.
 
-This counter persists across render() calls so each WAN-enabled container
-gets a unique IP from the VLAN4 pool. Both linux_wan_dynamic.py (IP
-assignment) and EM/base.py (SNAT IP passthrough) use the same counter.
-
-Only linux_wan_dynamic.py increments the counter (via next_wan_index()).
-EM/base.py peeks (via peek_wan_index()) to compute the SNAT IP without
-double-incrementing.
+This counter persists across render() calls. It was previously used for
+static IP and SNAT assignment from the VLAN4 pool; after the switch to
+DHCP for WAN interfaces (FS-380-HDS-010-SDS-010-SMS-060-CMC), only
+reset_wan_index() is used by topology.py to reset the counter between
+topology renders.
 """
 
 _wan_global_index = 0

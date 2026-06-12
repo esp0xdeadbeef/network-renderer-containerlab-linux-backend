@@ -362,7 +362,6 @@ in
       matchConfig.Name = "br-uplink0";
       linkConfig.ActivationPolicy = "always-up";
       networkConfig = {
-        Address = "10.11.0.1/24";
         DHCPServer = true;
         IPMasquerade = "both";
         IPv4Forwarding = true;
