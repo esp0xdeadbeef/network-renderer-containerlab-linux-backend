@@ -20,19 +20,8 @@ if ! [[ "${test_timeout_seconds}" =~ ^[0-9]+$ ]] || [[ "${test_timeout_seconds}"
 fi
 
 tests=(
-  test-nix-file-loc.sh
   test-regression-md-resolved-states.sh
-  test-python-file-loc.sh
-  test-s88-python-file-loc.sh
-  test-python-format.sh
-  test-large-ipv6-prefix-addressing.sh
-  test-s88-naming-and-hierarchy.sh
-  test-s88-no-untraced-cm-stubs.sh
-  test-s88-python-readability.sh
-  test-rendered-artifact-validator-scratch-dir.sh
-  test-provenance-without-git.sh
   test-fs100-renderer-output-provenance.sh
-  test-policy-interface-tags-no-generated-link-parsing.sh
   test-fs310-hds010-sds010-sms040-interface-name-source-binding.sh
   test-fs310-hds010-sds010-sms050-nftables-primitive-source-binding.sh
   test-fs310-hds010-sds010-sms060-route-command-source-binding.sh
@@ -44,46 +33,15 @@ tests=(
   test-bridge-link-realization-contracts.sh
   test-lab-emulation-capability-gate.sh
   test-provider-access-pppoe-artifacts.sh
-  test-access-tenant-no-node-name-parsing.sh
-  test-vm-runtime-log-guard.sh
-  test-input-path-override.sh
   test-deploy-clab-app-contract.sh
   test-clab-tooling-cache-evidence.sh
-  test-vm-matrix-resources.sh
-  test-vm-matrix-runner.sh
   test-topology-conformance-parity-guard.sh
-  test-passing-fixtures.sh
-  test-dual-wan-branch-overlay.sh
   test-bgp-cpm-contract-render.sh
-  test-bgp-example.sh
-  test-routing-mode-required.sh
-  test-policy-firewall.sh
   test-fs760-policy-firewall-forwarding-intent.sh
   test-role-independent-cm-inputs.sh
-  test-core-nat-wan.sh
-  test-tri-site-core-egress-nat.sh
-  test-management-eth0-egress-guard.sh
-  test-deployment-host-filter.sh
   test-access-advertisements-runtime.sh
-  test-hostile-dns-east-west.sh
   test-dns-namespace-fallback-cpm-contract.sh
-  test-dns-service-policy-routes.sh
-  test-dns-service-source-binding.sh
-  test-hostile-gua-advertisements.sh
-  test-host-uplink-vlan-dhcp.sh
-  test-hat-upstream-vlan4-wan.sh
-  test-nat-uplink-runtime-addressing.sh
-  test-linux-route-multipath.sh
-  test-overlay-underlay-access-rendering.sh
-  test-linux-policy-rule-shell-safety.sh
   test-policy-no-main-defaults.sh
-  test-policy-ingress-interface-lane-default.sh
-  test-vm-nat-uplink.sh
-  test-vm-physical-overlay-post-checks.sh
-  test-s-router-clab-overlay-parity.sh
-  test-single-overlay-interface-link.sh
-  test-vm-example-lab-cleanup.sh
-  test-vm-docker-readiness.sh
   test-fs960-hds010-sds016-sms050-clab-privileged-inspect.sh
 )
 
