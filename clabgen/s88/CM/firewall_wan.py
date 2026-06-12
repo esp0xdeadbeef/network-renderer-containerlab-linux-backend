@@ -4,9 +4,18 @@ from typing import Dict, Any, List
 
 
 def _render_base_filter(wan_if: str) -> List[str]:
+    # CPM_GAP FS-310-HDS-010-SDS-010-SMS-130/170:
+    # These base filter rules are hardcoded without CPM firewall intent authority.
+    # CPM should provide wanFirewallPolicy (anti-spoofing, MSS clamping, input policy).
+    # Until CPM emits these fields, the renderer keeps the lab-necessary rules
+    # but scopes table operations to avoid destroying other renderers' rules.
     return [
-        "nft flush ruleset",
+        # Scoped table management: add table (idempotent), then flush its
+        # contents. Replaces old `nft flush ruleset` which destroyed all rules.
         "nft add table inet filter",
+        "nft flush table inet filter",
+        "nft add table inet mangle",
+        "nft flush table inet mangle",
         "nft 'add chain inet filter input { type filter hook input priority 0 ; policy drop ; }'",
         "nft 'add chain inet filter forward { type filter hook forward priority 0 ; policy accept ; }'",
         "nft 'add chain inet filter output { type filter hook output priority 0 ; policy accept ; }'",
@@ -82,6 +91,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
             cmds.extend(
                 [
                     "nft add table ip nat",
+                    # CPM_GAP: NAT chain policy accept is standard behavior; CPM should provide natChainPolicy.
                     "nft 'add chain ip nat postrouting { type nat hook postrouting priority 101 ; policy accept ; }'",
                 ]
             )
@@ -95,6 +105,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
             cmds.extend(
                 [
                     "nft add table ip6 nat",
+                    # CPM_GAP: NAT chain policy accept is standard behavior; CPM should provide natChainPolicy.
                     "nft 'add chain ip6 nat postrouting { type nat hook postrouting priority 101 ; policy accept ; }'",
                 ]
             )
@@ -129,6 +140,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
         cmds.extend(
             [
                 "nft add table ip nat",
+                # CPM_GAP: NAT chain policy accept is standard behavior; CPM should provide natChainPolicy.
                 "nft 'add chain ip nat postrouting { type nat hook postrouting priority 101 ; policy accept ; }'",
             ]
         )
@@ -147,6 +159,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
         cmds.extend(
             [
                 "nft add table ip6 nat",
+                # CPM_GAP: NAT chain policy accept is standard behavior; CPM should provide natChainPolicy.
                 "nft 'add chain ip6 nat postrouting { type nat hook postrouting priority 101 ; policy accept ; }'",
             ]
         )

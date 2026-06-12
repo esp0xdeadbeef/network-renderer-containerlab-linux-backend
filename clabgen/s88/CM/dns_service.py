@@ -27,6 +27,11 @@ def _public_resolver_drop_commands(dns: Dict[str, Any]) -> List[str]:
     if not denied_cidrs:
         return []
 
+    # CPM_AUTHORITY FS-310-HDS-010-SDS-010-SMS-130:
+    # The DNS guard table/chain names are renderer implementation details.
+    # Policy (which resolvers to block) comes from CPM 'killSwitch' and
+    # 'deniedResolverCidrs' fields. The renderer materializes CPM DNS
+    # policy into nftables grammar.
     commands = [
         "nft add table inet clab_dns_guard 2>/dev/null || true",
         "nft add chain inet clab_dns_guard forward '{ type filter hook forward priority -50; policy accept; }' 2>/dev/null || true",
