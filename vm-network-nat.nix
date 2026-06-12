@@ -25,6 +25,10 @@ in
     cfg:
     lib.optionalAttrs ((cfg.mode or "") == "nat") {
       Address = [ (addressFor cfg) ];
+      # CPM_GAP: DHCPServer and IPMasquerade are hardcoded for NAT bridge
+      # networks. The CPM does not yet emit explicitRole.dhcpServer or
+      # bridgeControlConfig.masquerade for vm-bridge NAT networks.
+      # Trace: FS-380-HDS-010-SDS-010-SMS-060
       DHCPServer = true;
       IPv4Forwarding = true;
       IPMasquerade = "ipv4";
