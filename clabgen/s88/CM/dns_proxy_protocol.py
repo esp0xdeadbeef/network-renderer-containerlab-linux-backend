@@ -1,6 +1,11 @@
 import ipaddress
+import logging
 import socket
 import struct
+
+logger = logging.getLogger(__name__)
+
+_TRACE = "FS-310-HDS-010-SDS-010-SMS-110"
 
 
 def encode_name(name):
@@ -156,11 +161,15 @@ def forward_udp(config, query, family):
         if not isinstance(forwarder, str):
             continue
         try:
-            if address_family(forwarder) != family:
-                continue
-            return query_forwarder(query, family, forwarder, outgoing_sources)
-        except Exception:
+            fam = address_family(forwarder)
+        except ValueError as e:
+            logger.error(
+                "%s: malformed DNS forwarder address '%s': %s", _TRACE, forwarder, e
+            )
             continue
+        if fam != family:
+            continue
+        return query_forwarder(query, family, forwarder, outgoing_sources)
 
     return servfail(query)
 

@@ -17,6 +17,8 @@ def _canon_v6(addr: str) -> str:
     try:
         return str(ipaddress.IPv6Interface(addr))
     except Exception:
+        # intentional: defensive wrapper — returns original input on malformed CPM data,
+        # callers apply further normalization
         return addr
 
 
@@ -24,6 +26,7 @@ def _is_network_address(addr: str) -> bool:
     try:
         iface = ipaddress.ip_interface(addr)
     except Exception:
+        # intentional: defensive wrapper — returns False on malformed CPM input
         return False
     return iface.ip == iface.network.network_address
 
@@ -72,6 +75,8 @@ def _p2p_peer(addr: str) -> str | None:
             return str(peer)
 
     except Exception:
+        # intentional: defensive wrapper — returns None on malformed CPM input,
+        # callers treat None as "no p2p peer"
         return None
 
     return None
@@ -83,6 +88,8 @@ def _addr_ip(addr: str | None) -> str | None:
     try:
         return str(ipaddress.ip_interface(addr).ip)
     except Exception:
+        # intentional: defensive wrapper — returns None on malformed CPM input,
+        # callers handle None as "no address"
         return None
 
 
