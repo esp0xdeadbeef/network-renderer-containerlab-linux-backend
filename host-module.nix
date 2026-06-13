@@ -3,27 +3,26 @@
 , pkgs
 , containerlabLinuxRendererInput
 , containerlabLinuxRendererSelf  ? null
-, containerlabLinuxRendererInputs ? { }
-, sRouterClabLabProfile ? { }
 , ...
 }:
 let
   inherit (lib) mkDefault mkForce optionalString;
 
-  labSource = sRouterClabLabProfile.labSource or containerlabLinuxRendererInput.labSource or "sat";
-  deploymentHost = sRouterClabLabProfile.deploymentHost or containerlabLinuxRendererInput.deploymentHost or "s-router-clab";
+  deploymentHost = containerlabLinuxRendererInput.deploymentHost or "s-router-clab";
+
+  # Pre-built CPM artifacts (produced upstream by the compiler pipeline).
+  # The renderer must NOT import intent.nix or inventory-clab.nix directly.
+  cpmJsonPath = containerlabLinuxRendererInput.cpmJsonPath or null;
+  rendererInventoryJsonPath = containerlabLinuxRendererInput.rendererInventoryJsonPath or null;
 
   rendererRepo = if containerlabLinuxRendererSelf == null then null else containerlabLinuxRendererSelf;
-  labsRepo = if containerlabLinuxRendererInputs ? "network-labs" then containerlabLinuxRendererInputs.network-labs else null;
-  compilerRepo = if containerlabLinuxRendererInputs ? "network-compiler" then containerlabLinuxRendererInputs.network-compiler else null;
-  forwardingRepo = if containerlabLinuxRendererInputs ? "network-forwarding-model" then containerlabLinuxRendererInputs.network-forwarding-model else null;
-  cpmRepo = if containerlabLinuxRendererInputs ? "network-control-plane-model" then containerlabLinuxRendererInputs.network-control-plane-model else null;
 
-  hasAllRepos = rendererRepo != null && labsRepo != null && compilerRepo != null
-             && forwardingRepo != null && cpmRepo != null;
+  # Renderer requires: renderer repo + pre-built CPM JSON + renderer inventory JSON.
+  # No compiler-chain repos or intent/inventory files are needed.
+  hasInputs = rendererRepo != null && cpmJsonPath != null && rendererInventoryJsonPath != null;
 
   s-router-clab-render-live =
-    if hasAllRepos then
+    if hasInputs then
     pkgs.writeShellApplication {
       name = "s-router-clab-render-live";
       runtimeInputs = [
@@ -37,7 +36,6 @@ let
         pkgs.gnumake
         pkgs.iproute2
         pkgs.jq
-        pkgs.nix
         pkgs.python3
         pkgs.systemd
         pkgs.util-linux
@@ -48,17 +46,15 @@ let
         export NIX_CONFIG="experimental-features = nix-command flakes"
 
         renderer_repo="${rendererRepo}"
-        labs_repo="${labsRepo}"
-        compiler_repo="${compilerRepo}"
-        forwarding_repo="${forwardingRepo}"
-        cpm_repo="${cpmRepo}"
         work_dir="''${1:-/persist/s-router-clab/live-$(date +%s)}"
-        lab_source="${labSource}"
-        lab_dir="$labs_repo/$lab_source"
         artifact_dir="$work_dir/network-artifacts"
         status_marker="$work_dir/s-router-clab-render-live-status.json"
         service_name="s-router-clab-render-live"
         phase="render-start"
+
+        cpm_json="${cpmJsonPath}"
+        renderer_inventory_json="${rendererInventoryJsonPath}"
+        deployment_host="${deploymentHost}"
 
         write_status() {
           local result="$1"
@@ -97,52 +93,22 @@ let
 
         mkdir -p "$work_dir" "$artifact_dir"
         write_status running "$phase" ""
-        cat > "$work_dir/resolved-inventory-clab.nix" <<EOF
-        if builtins.pathExists "$lab_dir/getResolvedInventory.nix" then
-          import "$lab_dir/getResolvedInventory.nix" { renderer = "clab"; }
-        else
-          import "$lab_dir/inventory-clab.nix"
-        EOF
 
-        phase="source-eval"
-        nix eval --impure --json --expr "import $lab_dir/intent.nix" \
-          | jq -S . > "$artifact_dir/intent.json"
+        # Validate pre-built CPM inputs (produced upstream by the compiler).
+        [[ -f "$cpm_json" ]] || {
+          echo "CPM JSON not found: $cpm_json" >&2
+          exit 1
+        }
+        [[ -f "$renderer_inventory_json" ]] || {
+          echo "Renderer inventory JSON not found: $renderer_inventory_json" >&2
+          exit 1
+        }
 
-        nix eval --impure --json --expr "import $work_dir/resolved-inventory-clab.nix" \
-          | jq -S . > "$artifact_dir/inventory.json"
-
-        phase="model-build"
-        OUTPUT_COMPILER_SIGNED_JSON="$artifact_dir/compiler.json" \
-          nix run --show-trace "path:$compiler_repo#compile" -- \
-            "$lab_dir/intent.nix" >/dev/null
-
-        nix run --show-trace "path:$forwarding_repo#compile-and-build-forwarding-model" -- \
-          "$lab_dir/intent.nix" \
-          | jq -S . > "$artifact_dir/forwarding.json"
-
-        # Pass emulationSubnets from inventory to CPM (FS-260-HDS-010-SDS-010-SMS-012)
-        nix eval --impure --json --expr "
-          let
-            flake = builtins.getFlake \"path:$cpm_repo\";
-            lib = flake.lib.\"\''${builtins.currentSystem}\";
-            intent = import \"$lab_dir/intent.nix\";
-            inventory = import \"$work_dir/resolved-inventory-clab.nix\";
-            result = lib.compileAndBuild {
-              input = intent;
-              inherit inventory;
-              emulationSubnets = inventory.hat.emulationSubnets or [];
-            };
-          in
-            result
-        " > "$work_dir/cpm.json"
-        jq -S . "$work_dir/cpm.json" > "$artifact_dir/control-plane.json"
-
-        cp "$artifact_dir/inventory.json" "$work_dir/renderer-inventory.json"
-
-        CLABGEN_RENDERER_INVENTORY_JSON="$work_dir/renderer-inventory.json" \
-        CLABGEN_DEPLOYMENT_HOST="${deploymentHost}" \
+        phase="render"
+        CLABGEN_RENDERER_INVENTORY_JSON="$renderer_inventory_json" \
+        CLABGEN_DEPLOYMENT_HOST="$deployment_host" \
           nix run --show-trace "path:$renderer_repo#generate-clab-config" -- \
-            "$work_dir/cpm.json" \
+            "$cpm_json" \
             "$work_dir/fabric.clab.yml" \
             "$work_dir/vm-bridges-generated.nix" >/dev/null
 
@@ -163,28 +129,6 @@ let
         }
         target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
         PY
-
-        jq -S -n \
-          --slurpfile intent "$artifact_dir/intent.json" \
-          --slurpfile inventory "$artifact_dir/inventory.json" \
-          --slurpfile compiler "$artifact_dir/compiler.json" \
-          --slurpfile forwarding "$artifact_dir/forwarding.json" \
-          --slurpfile controlPlane "$artifact_dir/control-plane.json" \
-          --slurpfile renderedHost "$artifact_dir/rendered-host.json" \
-          '{
-            intent: $intent[0],
-            globalInventory: $inventory[0],
-            compilerOut: $compiler[0],
-            forwardingOut: $forwarding[0],
-            controlPlaneOut: $controlPlane[0],
-            renderedHost: $renderedHost[0],
-            hostName: "s-router-clab",
-            system: "containerlab-linux",
-            artifactContract: {
-              sharedPath: "/persist/s-router-clab/live-validation/network-artifacts",
-              containerPath: "/etc/network-artifacts"
-            }
-          }' > "$artifact_dir/debug-bundle.json"
 
         python3 - "$work_dir/vm-bridges-generated.nix" "$work_dir/setup-bridge-links.sh" <<'PY'
         import json
@@ -236,6 +180,7 @@ let
 
         script_path.write_text("\n".join(commands) + "\n")
         PY
+
         cat > "$work_dir/verify-containerlab-deploy.sh" <<'VERIFY_CLAB'
         set -euo pipefail
 
@@ -263,6 +208,7 @@ let
         $containers
         EOF
         VERIFY_CLAB
+
         cat > "$work_dir/ensure-clab-tooling-image.sh" <<'ENSURE_CLAB_TOOLING'
         set -euo pipefail
 
@@ -298,24 +244,22 @@ let
 
 in
 {
-  environment.systemPackages = lib.mkIf (hasAllRepos && s-router-clab-render-live != null) [
+  environment.systemPackages = lib.mkIf (hasInputs && s-router-clab-render-live != null) [
     s-router-clab-render-live
     pkgs.containerlab
   ];
 
-  virtualisation.docker = lib.mkIf hasAllRepos {
+  virtualisation.docker = lib.mkIf hasInputs {
     enable = true;
     autoPrune.enable = true;
   };
 
-  environment.variables = lib.mkIf hasAllRepos {
+  environment.variables = lib.mkIf hasInputs {
     CLAB_RENDERER_REPO = toString rendererRepo;
-    CLAB_NETWORK_LABS = toString labsRepo;
-    CLAB_CONTROL_PLANE_MODEL = toString cpmRepo;
     CLAB_FRR_TOOLING_CACHE_DIR = "/persist/docker-image-cache/network-renderer-containerlab-linux-backend";
   };
 
-  systemd.services.s-router-clab-render-live = lib.mkIf (hasAllRepos && s-router-clab-render-live != null) {
+  systemd.services.s-router-clab-render-live = lib.mkIf (hasInputs && s-router-clab-render-live != null) {
     description = "Render and deploy the s-router Containerlab topology";
     wantedBy = [ "multi-user.target" ];
     after = [
@@ -338,8 +282,6 @@ in
 
   # ----- VLAN 4 upstream internet (persistent across reboots) -----
   # VLAN 4 is the emulated internet uplink: eth0.4 → br-uplink0 → container WAN
-  # These netdevs/networks persist across reboots, complementing the
-  # render-live service's containerlab-managed bridge infrastructure.
   systemd.network.netdevs = {
     "10-eth0.4" = {
       netdevConfig = {
@@ -356,7 +298,6 @@ in
         Name = "br-uplink0";
       };
     };
-
   };
 
   systemd.network.networks = {
@@ -380,12 +321,6 @@ in
         # internet traffic; containers connected to it need DHCP and NAT
         # masquerade to reach the internet through the host's eth0.4
         # interface.
-        #
-        # Trace: FS-380-HDS-010-SDS-010-SMS-060 (core WAN IP assignment).
-        # When the CPM-CMC-DHCP-DNS lane provides dhcpServer and
-        # masquerade fields, gate these behind CPM authority:
-        #   DHCPServer = if cpm.bridgeControlConfig.dhcpServer or false then true else mkForce false;
-        #   IPMasquerade = if cpm.bridgeControlConfig.masquerade or null then cpm.bridgeControlConfig.masquerade else mkForce "no";
         DHCPServer = true;
         IPMasquerade = "both";
         IPv4Forwarding = true;

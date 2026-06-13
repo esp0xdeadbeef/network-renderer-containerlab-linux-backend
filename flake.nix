@@ -44,20 +44,11 @@
           {
             _module.args.containerlabLinuxRendererInput = rendererInput;
             _module.args.containerlabLinuxRendererSelf = self.outPath;
-            _module.args.containerlabLinuxRendererInputs = inputs;
 
             assertions = [
               {
                 assertion = rendererInput ? hostName;
                 message = "containerlab linux renderer input must include hostName";
-              }
-              {
-                assertion = rendererInput ? intent;
-                message = "containerlab linux renderer input must include intent";
-              }
-              {
-                assertion = rendererInput ? inventory;
-                message = "containerlab linux renderer input must include inventory";
               }
             ];
 
