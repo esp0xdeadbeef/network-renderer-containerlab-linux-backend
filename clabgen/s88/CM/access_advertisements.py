@@ -15,7 +15,9 @@ def _list(value: Any) -> List[Any]:
 
 
 def _enabled(scope: Dict[str, Any]) -> bool:
-    return scope.get("enabled", True) is not False
+    # FS-310-HDS-010-SDS-010-SMS-110: fail-closed — must explicitly be True,
+    # not merely non-False. Only explicit boolean True enables.
+    return scope.get("enabled") is True
 
 
 def _interface(scope: Dict[str, Any], eth_map: Dict[str, str]) -> str | None:
@@ -60,14 +62,16 @@ def _dhcp4_config(scope: Dict[str, Any], ifname: str) -> str:
     )
     dns_servers = scope.get("dnsServers")
     if not isinstance(dns_servers, list) or not dns_servers:
-        dns_servers = [router]
+        raise ValueError(
+            "access DHCPv4 advertisement requires dnsServers with at least one server"
+        )
     resolved_dns_servers: List[str] = []
     for item in dns_servers:
         resolved_dns_servers.append(_address(item, "dnsServers[]"))
     dns = " ".join(resolved_dns_servers)
     domain = scope.get("domain")
     if not isinstance(domain, str) or not domain:
-        domain = "lan."
+        raise ValueError("access DHCPv4 advertisement requires domain")
 
     return "\n".join(
         [

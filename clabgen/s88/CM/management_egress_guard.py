@@ -4,9 +4,12 @@ from typing import Any, Dict, List
 
 
 def render(input_data: Dict[str, Any]) -> List[str]:
-    interface_name = input_data.get("interface", "eth0")
+    interface_name = input_data.get("interface")
     if not isinstance(interface_name, str) or not interface_name:
-        interface_name = "eth0"
+        raise ValueError(
+            "GAMP: FS-310-HDS-010-SDS-010-SMS-110 — "
+            "management interface must be specified, cannot default to eth0"
+        )
 
     return [
         "nft add table inet clab_guard",
