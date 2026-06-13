@@ -257,6 +257,10 @@ let
 
 in
 {
+  networking.useNetworkd = true;
+  systemd.network.enable = true;
+  networking.useDHCP = false;
+
   environment.systemPackages = lib.mkIf (hasInputs && s-router-clab-render-live != null) [
     s-router-clab-render-live
     pkgs.containerlab
