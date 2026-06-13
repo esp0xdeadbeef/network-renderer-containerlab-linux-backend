@@ -19,6 +19,11 @@ let
   rendererInventoryJsonPath = containerlabLinuxRendererInput.rendererInventoryJsonPath
     or throw "host-module: missing required input containerlabLinuxRendererInput.rendererInventoryJsonPath";
 
+  # CMC: FS-310-HDS-010-SDS-010-SMS-200 — read CPM data at eval time.
+  # CPM authority is required for bridge-network DHCPServer and IPMasquerade.
+  # The CPM JSON must be pre-built and available at this path before Nix evaluation.
+  cpmData = builtins.fromJSON (builtins.readFile cpmJsonPath);
+
   rendererRepo = if containerlabLinuxRendererSelf == null then null else containerlabLinuxRendererSelf;
 
   # Renderer requires: renderer repo + pre-built CPM JSON + renderer inventory JSON.
@@ -318,15 +323,26 @@ in
       matchConfig.Name = "br-uplink0";
       linkConfig.ActivationPolicy = "always-up";
       networkConfig = {
-        # CPM_GAP: DHCPServer and IPMasquerade are hardcoded here because
-        # the CPM does not yet emit explicitRole.dhcpServer or
-        # bridgeControlConfig.masquerade fields for host-level bridge
-        # configuration. The br-uplink0 bridge carries VLAN4 upstream
-        # internet traffic; containers connected to it need DHCP and NAT
-        # masquerade to reach the internet through the host's eth0.4
-        # interface.
-        DHCPServer = true;
-        IPMasquerade = "both";
+        # CMC: FS-310-HDS-010-SDS-010-SMS-200 — no unconditional DHCPServer/IPMasquerade.
+        # DHCPServer traces to CPM wanPool.dhcpServer; IPMasquerade traces to
+        # CPM natIntent.masqueradeInterfaces. Throw if CPM data is missing.
+        # CPM_GAP: CPM does not yet emit wanPool.dhcpServer or
+        # natIntent.masqueradeInterfaces for host-level bridge configuration.
+        # The br-uplink0 bridge carries VLAN4 upstream internet traffic;
+        # containers connected to it need DHCP and NAT masquerade to reach
+        # the internet through the host's eth0.4 interface.
+        DHCPServer =
+          if cpmData ? wanPool && cpmData.wanPool ? dhcpServer then
+            cpmData.wanPool.dhcpServer
+          else
+            throw "host-module: DHCPServer requires CPM wanPool.dhcpServer — CPM_GAP: CPM does not yet emit wanPool.dhcpServer for host-level bridge br-uplink0";
+        IPMasquerade =
+          if cpmData ? natIntent && cpmData.natIntent ? masqueradeInterfaces then
+            let masqIfaces = cpmData.natIntent.masqueradeInterfaces;
+            in if builtins.isList masqIfaces && masqIfaces != [] then "both"
+               else throw "host-module: IPMasquerade requires non-empty CPM natIntent.masqueradeInterfaces"
+          else
+            throw "host-module: IPMasquerade requires CPM natIntent.masqueradeInterfaces — CPM_GAP: CPM does not yet emit natIntent.masqueradeInterfaces for host-level bridge br-uplink0";
         IPv4Forwarding = true;
         IPv6Forwarding = true;
         ConfigureWithoutCarrier = true;
