@@ -3,6 +3,7 @@
 , pkgs
 , containerlabLinuxRendererInput
 , containerlabLinuxRendererSelf  ? null
+, cpmJsonPath ? null
 , ...
 }:
 let
@@ -14,8 +15,12 @@ let
 
   # Pre-built CPM artifacts (produced upstream by the compiler pipeline).
   # The renderer must NOT import intent.nix or inventory-clab.nix directly.
-  cpmJsonPath = containerlabLinuxRendererInput.cpmJsonPath
-    or throw "host-module: missing required input containerlabLinuxRendererInput.cpmJsonPath";
+  # cpmJsonPath is passed as a separate _module.args key to avoid attrset corruption
+  # when the value is a store-path string.
+  resolvedCpmJsonPath =
+    if cpmJsonPath != null then cpmJsonPath
+    else containerlabLinuxRendererInput.cpmJsonPath
+      or throw "host-module: missing required input: cpmJsonPath (separate arg) or containerlabLinuxRendererInput.cpmJsonPath";
   rendererInventoryJsonPath = containerlabLinuxRendererInput.rendererInventoryJsonPath
     or throw "host-module: missing required input containerlabLinuxRendererInput.rendererInventoryJsonPath";
 
@@ -23,7 +28,7 @@ let
 
   # Renderer requires: renderer repo + pre-built CPM JSON + renderer inventory JSON.
   # No compiler-chain repos or intent/inventory files are needed.
-  hasInputs = rendererRepo != null && cpmJsonPath != null && rendererInventoryJsonPath != null;
+  hasInputs = rendererRepo != null && resolvedCpmJsonPath != null && rendererInventoryJsonPath != null;
 
   s-router-clab-render-live =
     if hasInputs then
@@ -56,7 +61,7 @@ let
         service_name="s-router-clab-render-live"
         phase="render-start"
 
-        cpm_json="${cpmJsonPath}"
+        cpm_json="${resolvedCpmJsonPath}"
         renderer_inventory_json="${rendererInventoryJsonPath}"
         deployment_host="${deploymentHost}"
 

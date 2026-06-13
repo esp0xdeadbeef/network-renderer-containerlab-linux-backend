@@ -41,24 +41,25 @@
         renderer.hostModule =
           rendererInput:
           let
-            # Accept cpm (Nix CPM structure) and convert to JSON path.
-            # Format conversion only — no lab-specific file paths.
-            resolvedInput =
-              if rendererInput ? cpmJsonPath then rendererInput
+            # Accept cpm (Nix CPM structure) and produce cpmJsonPath.
+            # Passed as separate _module.args key to avoid attrset corruption.
+            cpmJsonPath =
+              if rendererInput ? cpmJsonPath then rendererInput.cpmJsonPath
               else if rendererInput ? cpm then
-                rendererInput // {
-                  cpmJsonPath = builtins.toFile
-                    "cpm-${rendererInput.hostName or "clab"}.json"
-                    (builtins.toJSON rendererInput.cpm);
-                  rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or "";
-                  deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
-                }
-              else rendererInput;
+                builtins.toFile
+                  "cpm-${rendererInput.hostName or "clab"}.json"
+                  (builtins.toJSON rendererInput.cpm)
+              else null;
+            resolvedInput = rendererInput // {
+              rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or "";
+              deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
+            };
           in
           { lib, ... }:
           {
             _module.args.containerlabLinuxRendererInput = resolvedInput;
             _module.args.containerlabLinuxRendererSelf = self.outPath;
+            _module.args.cpmJsonPath = cpmJsonPath;
 
             assertions = [
               {
