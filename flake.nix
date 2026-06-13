@@ -42,33 +42,37 @@
           rendererInput:
           let
             # Accept cpm (Nix CPM structure) and produce cpmJsonPath.
-            # Passed as separate _module.args key to avoid attrset corruption.
+            # All string values passed as separate _module.args keys to avoid
+            # NixOS attrset corruption (store paths and empty strings get
+            # extracted and replace the whole attrset).
             cpmJsonPath =
               if rendererInput ? cpmJsonPath then rendererInput.cpmJsonPath
               else if rendererInput ? cpm then
                 builtins.toFile
                   "cpm-${rendererInput.hostName or "clab"}.json"
                   (builtins.toJSON rendererInput.cpm)
-              else null;
-            resolvedInput = rendererInput // {
-              rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or "";
-              deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
-            };
+              else "";
+            deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
+            rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or "";
           in
           { lib, ... }:
           {
-            _module.args.containerlabLinuxRendererInput = resolvedInput;
+            _module.args.clabDeploymentHost = deploymentHost;
+            _module.args.clabCpmJsonPath = cpmJsonPath;
+            _module.args.clabRendererInventoryJsonPath = rendererInventoryJsonPath;
             _module.args.containerlabLinuxRendererSelf = self.outPath;
-            _module.args.cpmJsonPath = cpmJsonPath;
+            # Keep containerlabLinuxRendererInput for non-string fields (bridgeControl etc)
+            _module.args.containerlabLinuxRendererInput =
+              builtins.removeAttrs rendererInput [ "cpmJsonPath" "deploymentHost" "rendererInventoryJsonPath" "cpm" "controlPlane" ];
 
             assertions = [
               {
-                assertion = resolvedInput ? hostName;
+                assertion = rendererInput ? hostName;
                 message = "containerlab linux renderer input must include hostName";
               }
             ];
 
-            networking.hostName = lib.mkDefault resolvedInput.hostName;
+            networking.hostName = lib.mkDefault rendererInput.hostName;
 
             imports = [ ./host-module.nix ];
           };
