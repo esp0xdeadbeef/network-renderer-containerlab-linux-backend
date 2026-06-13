@@ -293,9 +293,27 @@ in
     '';
   };
 
-  # ----- VLAN 4 upstream internet (persistent across reboots) -----
-  # VLAN 4 is the emulated internet uplink: eth0.4 → br-uplink0 → container WAN
+  # ----- Management VLAN2 (persistent across reboots) -----
+  # VLAN2 provides management network access via DHCP on eth0.
+  # Read from CPM deployment hosts -> uplinks.management (URS: inventory → CPM → renderer)
   systemd.network.netdevs = {
+    "10-eth0.2" = lib.mkIf (containerlabLinuxRendererInput ? managementVlan && containerlabLinuxRendererInput.managementVlan != null) {
+      netdevConfig = {
+        Kind = "vlan";
+        Name = "eth0.2";
+      };
+      vlanConfig = {
+        Id = 2;
+      };
+    };
+    "20-vlan2" = lib.mkIf (containerlabLinuxRendererInput ? managementVlan && containerlabLinuxRendererInput.managementVlan != null) {
+      netdevConfig = {
+        Kind = "bridge";
+        Name = "vlan2";
+      };
+    };
+    # ----- VLAN 4 upstream internet (persistent across reboots) -----
+    # VLAN 4 is the emulated internet uplink: eth0.4 → br-uplink0 → container WAN
     "10-eth0.4" = {
       netdevConfig = {
         Kind = "vlan";
@@ -314,6 +332,40 @@ in
   };
 
   systemd.network.networks = {
+    # Management VLAN2: parent interface eth0 with VLAN2 tag
+    "10-eth0" = lib.mkIf (containerlabLinuxRendererInput ? managementVlan && containerlabLinuxRendererInput.managementVlan != null) {
+      matchConfig.Name = "eth0";
+      linkConfig.ActivationPolicy = "always-up";
+      networkConfig = {
+        ConfigureWithoutCarrier = true;
+        DHCP = "no";
+        LinkLocalAddressing = "no";
+        VLAN = [ "eth0.2" ];
+      };
+    };
+    # Management VLAN2: eth0.2 attach to vlan2 bridge
+    "20-eth0.2" = lib.mkIf (containerlabLinuxRendererInput ? managementVlan && containerlabLinuxRendererInput.managementVlan != null) {
+      matchConfig.Name = "eth0.2";
+      linkConfig.ActivationPolicy = "always-up";
+      networkConfig = {
+        ConfigureWithoutCarrier = true;
+        DHCP = "no";
+        LinkLocalAddressing = "no";
+        Bridge = "vlan2";
+      };
+    };
+    # Management VLAN2: vlan2 bridge with DHCP
+    "30-vlan2" = lib.mkIf (containerlabLinuxRendererInput ? managementVlan && containerlabLinuxRendererInput.managementVlan != null) {
+      matchConfig.Name = "vlan2";
+      linkConfig.ActivationPolicy = "always-up";
+      networkConfig = {
+        ConfigureWithoutCarrier = true;
+        DHCP = "ipv4";
+        LinkLocalAddressing = "no";
+        IPv6AcceptRA = "no";
+      };
+    };
+    # VLAN4: eth0.4 interface
     "10-eth0.4" = {
       matchConfig.Name = "eth0.4";
       linkConfig.ActivationPolicy = "always-up";
