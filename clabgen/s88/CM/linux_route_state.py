@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict
 import ipaddress
 
@@ -10,6 +11,10 @@ from clabgen.s88.CM.linux_addressing import (
     _peer_in_subnet,
 )
 from clabgen.s88.CM.linux_route_values import _via4, _via6
+
+logger = logging.getLogger(__name__)
+
+_TRACE = "FS-310-HDS-010-SDS-010-SMS-110"
 
 
 def _connected_prefixes(node: Dict[str, Any]) -> tuple[set[str], set[str]]:
@@ -27,8 +32,11 @@ def _connected_prefixes(node: Dict[str, Any]) -> tuple[set[str], set[str]]:
         ):
             try:
                 connected4.add(str(ipaddress.ip_interface(addr4).network))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed addr4 on interface '%s': %s", _TRACE, ifname, e
+                )
+                raise
 
         if (
             isinstance(addr6, str)
@@ -37,8 +45,11 @@ def _connected_prefixes(node: Dict[str, Any]) -> tuple[set[str], set[str]]:
         ):
             try:
                 connected6.add(str(ipaddress.ip_interface(addr6).network))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed addr6 on interface '%s': %s", _TRACE, ifname, e
+                )
+                raise
 
     loopback = node.get("loopback", {})
     if isinstance(loopback, dict):
@@ -48,14 +59,20 @@ def _connected_prefixes(node: Dict[str, Any]) -> tuple[set[str], set[str]]:
         if isinstance(loop4, str) and loop4:
             try:
                 connected4.add(str(ipaddress.ip_interface(loop4).network))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed loopback ipv4: %s", _TRACE, e
+                )
+                raise
 
         if isinstance(loop6, str) and loop6:
             try:
                 connected6.add(str(ipaddress.ip_interface(loop6).network))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed loopback ipv6: %s", _TRACE, e
+                )
+                raise
 
     return connected4, connected6
 
@@ -78,8 +95,11 @@ def _local_ips(node: Dict[str, Any]) -> tuple[set[str], set[str]]:
                 local4.add(
                     str(ipaddress.ip_interface(_normalize_l3_addr(addr4, iface)).ip)
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed addr4 on interface '%s': %s", _TRACE, ifname, e
+                )
+                raise
 
         if (
             isinstance(addr6, str)
@@ -94,8 +114,11 @@ def _local_ips(node: Dict[str, Any]) -> tuple[set[str], set[str]]:
                         ).ip
                     )
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed addr6 on interface '%s': %s", _TRACE, ifname, e
+                )
+                raise
 
         if (
             isinstance(ll6, str)
@@ -104,8 +127,11 @@ def _local_ips(node: Dict[str, Any]) -> tuple[set[str], set[str]]:
         ):
             try:
                 local6.add(str(ipaddress.ip_interface(_canon_v6(ll6)).ip))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed link-local ll6 on interface '%s': %s", _TRACE, ifname, e
+                )
+                raise
 
     loopback = node.get("loopback", {})
     if isinstance(loopback, dict):
@@ -115,13 +141,19 @@ def _local_ips(node: Dict[str, Any]) -> tuple[set[str], set[str]]:
         if isinstance(loop4, str) and loop4:
             try:
                 local4.add(str(ipaddress.ip_interface(loop4).ip))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed loopback ipv4: %s", _TRACE, e
+                )
+                raise
 
         if isinstance(loop6, str) and loop6:
             try:
                 local6.add(str(ipaddress.ip_interface(_canon_v6(loop6)).ip))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed loopback ipv6: %s", _TRACE, e
+                )
+                raise
 
     return local4, local6

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List
 import ipaddress
 
@@ -8,6 +9,10 @@ from clabgen.s88.CM.linux_addressing import (
     _conflicts_with_wan_peer,
     _normalize_l3_addr,
 )
+
+logger = logging.getLogger(__name__)
+
+_TRACE = "FS-310-HDS-010-SDS-010-SMS-110"
 
 _ROUTER_ROLES = {"access", "core", "policy", "upstream-selector", "isp"}
 
@@ -23,8 +28,11 @@ def _first_router_id(node: Dict[str, Any]) -> str:
         if isinstance(addr4, str) and addr4:
             try:
                 return str(ipaddress.ip_interface(addr4).ip)
-            except Exception:
-                pass
+            except Exception as e:
+                # intentional fallthrough: log malformed loopback, try interfaces
+                logger.error(
+                    "%s: malformed loopback ipv4 in _first_router_id: %s", _TRACE, e
+                )
 
     candidates: List[str] = []
 
@@ -38,8 +46,11 @@ def _first_router_id(node: Dict[str, Any]) -> str:
                 ipi = ipaddress.ip_interface(_normalize_l3_addr(addr4, iface))
                 if ipi.network.prefixlen != 31:
                     candidates.append(str(ipi.ip))
-            except Exception:
-                pass
+            except Exception as e:
+                # intentional fallthrough: log malformed candidate, try next interface
+                logger.error(
+                    "%s: malformed addr4 in _first_router_id candidate: %s", _TRACE, e
+                )
 
     if not candidates:
         raise ValueError(
@@ -72,14 +83,20 @@ def _collect_bgp_networks(node: Dict[str, Any]) -> tuple[List[str], List[str]]:
         if isinstance(loop4, str) and loop4:
             try:
                 networks4.add(str(ipaddress.ip_interface(loop4).network))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed loopback ipv4 in _collect_bgp_networks: %s", _TRACE, e
+                )
+                raise
 
         if isinstance(loop6, str) and loop6:
             try:
                 networks6.add(str(ipaddress.ip_interface(loop6).network))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed loopback ipv6 in _collect_bgp_networks: %s", _TRACE, e
+                )
+                raise
 
     for ifname, iface in (node.get("interfaces", {}) or {}).items():
         if not isinstance(iface, dict):
@@ -102,8 +119,14 @@ def _collect_bgp_networks(node: Dict[str, Any]) -> tuple[List[str], List[str]]:
                         ipaddress.ip_interface(_normalize_l3_addr(addr4, iface)).network
                     )
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed addr4 on interface '%s' in _collect_bgp_networks: %s",
+                    _TRACE,
+                    ifname,
+                    e,
+                )
+                raise
 
         if (
             isinstance(addr6, str)
@@ -118,13 +141,21 @@ def _collect_bgp_networks(node: Dict[str, Any]) -> tuple[List[str], List[str]]:
                         ).network
                     )
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "%s: malformed addr6 on interface '%s' in _collect_bgp_networks: %s",
+                    _TRACE,
+                    ifname,
+                    e,
+                )
+                raise
 
     return sorted(networks4), sorted(networks6)
 
 
 def _peer_ip(cidr: Any) -> str | None:
+    # intentional: defensive wrapper — returns None on malformed CPM input,
+    # callers handle None as "no peer IP"
     if not isinstance(cidr, str) or not cidr:
         return None
     try:

@@ -59,11 +59,14 @@ def _normalize_prefix(dst: str) -> str:
             if prefix_length > 32:
                 return f"{ip}/32"
         except Exception:
+            # intentional: fallthrough — if int(prefix) fails, try ip_network below
             pass
 
     try:
         return str(ipaddress.ip_network(dst, strict=False))
     except Exception:
+        # intentional: defensive wrapper — returns original dst on malformed CPM input,
+        # caller's output is human-readable and tolerant of raw strings
         return dst
 
 
@@ -71,6 +74,8 @@ def _host_prefix(value: str, family: int) -> str | None:
     try:
         ip = ipaddress.ip_address(value)
     except Exception:
+        # intentional: defensive wrapper — returns None on malformed CPM input,
+        # callers treat None as "no host prefix"
         return None
 
     if ip.version != family:

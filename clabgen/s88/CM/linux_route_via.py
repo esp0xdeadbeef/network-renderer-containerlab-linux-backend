@@ -16,6 +16,8 @@ def _same_subnet(gateway: str | None, iface_addr: str | None) -> bool:
         gw = ipaddress.ip_address(gateway)
         return gw in net
     except Exception:
+        # intentional: defensive wrapper — returns False on malformed CPM input,
+        # callers treat False as "not same subnet" (safe default)
         return False
 
 
