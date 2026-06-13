@@ -16,6 +16,32 @@ must be explicit in the README, tests, and owning layer before it is accepted.
 network-forwarding-model -> network-control-plane-model -> network-renderer-containerlab-linux-backend
 ```
 
+## Spec Chain
+
+This renderer materializes Containerlab/Linux backend artifacts from explicit CPM output.
+All behavior requirements originate from the FS spec chain.
+
+### Owning Chain: Renderer Contract and Host Configuration Boundary
+
+| Layer | ID | Description |
+|-------|----|-------------|
+| URS   | Via FS | Platform-native realization, thin host configuration |
+| FS    | FS-310 | Renderer Policy Boundary — materialize explicit CPM policy, no local allow rules |
+| FS    | FS-320 | Renderer Layout Preservation — compact layouts preserve roles/policy/hygiene |
+| FS    | FS-770 | Common Intent For Containerlab/Linux And NixOS — same modeled meaning for both lab profiles |
+| FS    | FS-780 | Containerlab/Linux And NixOS Equivalence Matrix — compare scope, policy, reachability, address authority, NAT, public ingress, routing, DNS, discovery, service exposure |
+| FS    | FS-982 | Host Configuration Renderer Boundary — NixOS and Containerlab/Linux host config stays thin; generated network realization belongs in renderers, not host profiles |
+
+### Pipeline
+
+```
+network-labs (intent + inventory) → network-compiler → NFM → CPM → network-renderer-containerlab-linux-backend
+```
+
+### Owning Repository
+
+Construction tests: `network-renderer-containerlab-linux-backend/tests/`
+
 ## Contract
 
 - The forwarding model and CPM are the source of truth.
