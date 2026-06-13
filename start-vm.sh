@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-example="${1:-single-wan}"
+# CMC: FS-310 — renderer consumes ONLY CPM output, never intent/inventory
+# start-vm.sh accepts a pre-built CPM JSON file.
+# emulationSubnets: accepted as env var from the calling environment (not read from raw inventory).
+# Renderer inventory: extracted from CPM endpointInventory (not re-imported from inventory-clab.nix).
+
+cpm_json="${1:-}"
+if [[ -z "${cpm_json}" || ! -f "${cpm_json}" ]]; then
+  echo "Usage: $0 <path-to-cpm-output.json>" >&2
+  echo "  Pre-build the CPM JSON externally:" >&2
+  echo "    nix run path:network-control-plane-model#compile-and-build-control-plane-model -- \\" >&2
+  echo "      --input intent.nix --inventory inventory-clab.nix \\" >&2
+  echo "      --emulation-subnets '\"\${EMULATION_SUBNETS:-[]}\"' > cpm.json" >&2
+  exit 1
+fi
 
 ssh_port="${CLAB_VM_SSH_PORT:-2222}"
 ssh_host="${CLAB_VM_SSH_HOST:-127.0.0.1}"
@@ -44,84 +57,21 @@ TOPO_FILE="${VM_WORK_DIR}/fabric.clab.yml"
 BRIDGES_FILE="${VM_WORK_DIR}/vm-bridges-generated.nix"
 VM_NIX="${VM_WORK_DIR}/vm.nix"
 
-resolve_input_path() {
-  local input_name="$1"
-  local override_var
-  local override_path
-  override_var="NETWORK_INPUT_PATH_${input_name^^}"
-  override_var="${override_var//-/_}"
-  override_path="${!override_var:-}"
-  if [[ -n "${override_path}" ]]; then
-    [[ -d "${override_path}" ]] || {
-      echo "start-vm: invalid ${override_var} for ${input_name}: ${override_path}" >&2
-      exit 1
-    }
-    printf '%s\n' "${override_path}"
-    return 0
-  fi
-
-  local archive_json
-  archive_json="$(mktemp)"
-
-  nix flake archive --json "path:${FLAKE_DIR}" > "${archive_json}"
-
-  INPUT_NAME="${input_name}" ARCHIVE_JSON="${archive_json}" nix eval --impure --raw --expr '
-    let
-      archived = builtins.fromJSON (builtins.readFile (builtins.getEnv "ARCHIVE_JSON"));
-      name = builtins.getEnv "INPUT_NAME";
-      input = archived.inputs.${name} or null;
-      p = if input == null then null else input.path or null;
-    in
-      if p == null then
-        throw "start-vm: missing archived input path for " + name
-      else
-        p
-  '
-
-  rm -f "${archive_json}"
-}
-
-labs_path="$(resolve_input_path network-labs)"
-cpm_path="$(resolve_input_path network-control-plane-model)"
-
-intent_path="${labs_path}/examples/${example}/intent.nix"
-inventory_path="${labs_path}/examples/${example}/inventory-clab.nix"
-
-if [[ ! -f "${intent_path}" || ! -f "${inventory_path}" ]]; then
-  echo "[!] Missing example inputs:" >&2
-  echo "    intent:     ${intent_path}" >&2
-  echo "    inventory:  ${inventory_path}" >&2
-  exit 1
-fi
-
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-echo "[*] Building control-plane model from resolved network-labs input (${example})..."
-(
-  # Some upstream tools write debug artifacts to CWD; keep this repo clean.
-  cd "${tmp_dir}"
-  # Pass emulationSubnets from inventory to CPM (FS-260-HDS-010-SDS-010-SMS-012)
-  nix eval --impure --json --expr "
-    let
-      flake = builtins.getFlake \"path:${cpm_path}\";
-      lib = flake.lib.\"\${builtins.currentSystem}\";
-      intent = import \"$(realpath "${intent_path}")\";
-      inventory = import \"$(realpath "${inventory_path}")\";
-      result = lib.compileAndBuild {
-        input = intent;
-        inherit inventory;
-        emulationSubnets = inventory.hat.emulationSubnets or [];
-      };
-    in
-      result
-  " > "${tmp_dir}/cpm.json"
-)
+# Copy the pre-built CPM JSON into the work area
+cp "${cpm_json}" "${tmp_dir}/cpm.json"
+
+echo "[*] Extracting renderer inventory from CPM endpointInventory..."
+renderer_inv="${tmp_dir}/renderer-inventory.json"
+if ! jq -e '.endpointInventory' "${tmp_dir}/cpm.json" > "${renderer_inv}" 2>/dev/null; then
+  echo "[!] CPM output missing endpointInventory — cannot extract renderer inventory." >&2
+  echo "    The CPM must emit endpointInventory for renderer consumption (SMS-100)." >&2
+  exit 1
+fi
 
 echo "[*] Rendering Containerlab topology + bridges..."
-renderer_inv="${tmp_dir}/renderer-inventory.json"
-nix eval --impure --json --expr "import ${inventory_path}" > "${renderer_inv}"
-
 CLABGEN_RENDERER_INVENTORY_JSON="${renderer_inv}" nix run .#generate-clab-config -- \
   "${tmp_dir}/cpm.json" \
   "${TOPO_FILE}" \
