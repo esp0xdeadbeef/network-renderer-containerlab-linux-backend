@@ -8,12 +8,16 @@
 let
   inherit (lib) mkDefault mkForce optionalString;
 
-  deploymentHost = containerlabLinuxRendererInput.deploymentHost or "s-router-clab";
+  # CMC: FS-310 — no hardcoded defaults. Throw when required inputs are missing.
+  deploymentHost = containerlabLinuxRendererInput.deploymentHost
+    or throw "host-module: missing required input containerlabLinuxRendererInput.deploymentHost";
 
   # Pre-built CPM artifacts (produced upstream by the compiler pipeline).
   # The renderer must NOT import intent.nix or inventory-clab.nix directly.
-  cpmJsonPath = containerlabLinuxRendererInput.cpmJsonPath or null;
-  rendererInventoryJsonPath = containerlabLinuxRendererInput.rendererInventoryJsonPath or null;
+  cpmJsonPath = containerlabLinuxRendererInput.cpmJsonPath
+    or throw "host-module: missing required input containerlabLinuxRendererInput.cpmJsonPath";
+  rendererInventoryJsonPath = containerlabLinuxRendererInput.rendererInventoryJsonPath
+    or throw "host-module: missing required input containerlabLinuxRendererInput.rendererInventoryJsonPath";
 
   rendererRepo = if containerlabLinuxRendererSelf == null then null else containerlabLinuxRendererSelf;
 

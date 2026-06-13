@@ -14,14 +14,17 @@ let
             normalized =
               if builtins.isAttrs network then
                 network // {
-                  bridge = network.bridge or name;
+                  # CMC: FS-310 — no bridge name inference. CPM must provide bridge field.
+                  bridge = network.bridge
+                    or throw "vm-network: missing CPM bridge field for network '${name}' — CPM must provide bridge name, renderer must not infer from inventory name";
                   inventoryName = name;
                 }
               else
                 network;
           in
           {
-            name = normalized.bridge or name;
+            name = normalized.bridge
+              or throw "vm-network: bridge field missing after normalization for '${name}' — CPM must provide bridge name";
             value = normalized;
           }
       )
