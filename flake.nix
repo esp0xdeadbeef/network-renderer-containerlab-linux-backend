@@ -19,6 +19,7 @@
   outputs =
     inputs @ { self
     , nixpkgs
+    , network-labs
     , ...
     }:
     let
@@ -40,19 +41,47 @@
       rendererLib = {
         renderer.hostModule =
           rendererInput:
+          let
+            # Build CPM JSON when cpmJsonPath not provided but controlPlane is
+            resolvedInput =
+              if rendererInput ? cpmJsonPath || !(rendererInput ? controlPlane) then
+                rendererInput
+              else
+                let
+                  cpm = rendererInput.controlPlane;
+                  labSource = rendererInput.labSource or "active-lab";
+                  labPath = "${network-labs}/${labSource}";
+                  builtCpm =
+                    if cpm ? control_plane_model then cpm
+                    else if cpm ? libBySystem then
+                      let
+                        cpmLib = cpm.libBySystem."x86_64-linux";
+                      in
+                        cpmLib.compileAndBuildFromPaths {
+                          inputPath = "${labPath}/intent.nix";
+                          inventoryPath = "${labPath}/inventory-clab.nix";
+                        }
+                    else cpm;
+                in
+                  rendererInput // {
+                    cpmJsonPath = builtins.toFile "cpm-${rendererInput.hostName or "clab"}.json" (builtins.toJSON builtCpm);
+                    rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or "";
+                    deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
+                  };
+          in
           { lib, ... }:
           {
-            _module.args.containerlabLinuxRendererInput = rendererInput;
+            _module.args.containerlabLinuxRendererInput = resolvedInput;
             _module.args.containerlabLinuxRendererSelf = self.outPath;
 
             assertions = [
               {
-                assertion = rendererInput ? hostName;
+                assertion = resolvedInput ? hostName;
                 message = "containerlab linux renderer input must include hostName";
               }
             ];
 
-            networking.hostName = lib.mkDefault rendererInput.hostName;
+            networking.hostName = lib.mkDefault resolvedInput.hostName;
 
             imports = [ ./host-module.nix ];
           };
