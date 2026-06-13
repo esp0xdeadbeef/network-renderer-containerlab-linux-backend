@@ -1,34 +1,37 @@
 { config
 , lib
 , pkgs
-, containerlabLinuxRendererInput
+, clabDeploymentHost ? null
+, clabCpmJsonPath ? null
+, clabRendererInventoryJsonPath ? null
 , containerlabLinuxRendererSelf  ? null
-, cpmJsonPath ? null
 , ...
 }:
 let
   inherit (lib) mkDefault mkForce optionalString;
 
   # CMC: FS-310 — no hardcoded defaults. Throw when required inputs are missing.
-  deploymentHost = containerlabLinuxRendererInput.deploymentHost
-    or throw "host-module: missing required input containerlabLinuxRendererInput.deploymentHost";
+  # All string values passed as separate _module.args keys to avoid NixOS
+  # attrset corruption (store paths and empty strings get extracted).
+  deploymentHost =
+    if clabDeploymentHost != null then clabDeploymentHost
+    else throw "host-module: missing required input: clabDeploymentHost";
 
   # Pre-built CPM artifacts (produced upstream by the compiler pipeline).
   # The renderer must NOT import intent.nix or inventory-clab.nix directly.
-  # cpmJsonPath is passed as a separate _module.args key to avoid attrset corruption
-  # when the value is a store-path string.
-  resolvedCpmJsonPath =
-    if cpmJsonPath != null then cpmJsonPath
-    else containerlabLinuxRendererInput.cpmJsonPath
-      or throw "host-module: missing required input: cpmJsonPath (separate arg) or containerlabLinuxRendererInput.cpmJsonPath";
-  rendererInventoryJsonPath = containerlabLinuxRendererInput.rendererInventoryJsonPath
-    or throw "host-module: missing required input containerlabLinuxRendererInput.rendererInventoryJsonPath";
+  cpmJsonPath =
+    if clabCpmJsonPath != null then clabCpmJsonPath
+    else throw "host-module: missing required input: clabCpmJsonPath";
+
+  rendererInventoryJsonPath =
+    if clabRendererInventoryJsonPath != null then clabRendererInventoryJsonPath
+    else throw "host-module: missing required input: clabRendererInventoryJsonPath";
 
   rendererRepo = if containerlabLinuxRendererSelf == null then null else containerlabLinuxRendererSelf;
 
   # Renderer requires: renderer repo + pre-built CPM JSON + renderer inventory JSON.
   # No compiler-chain repos or intent/inventory files are needed.
-  hasInputs = rendererRepo != null && resolvedCpmJsonPath != null && rendererInventoryJsonPath != null;
+  hasInputs = rendererRepo != null && cpmJsonPath != null && rendererInventoryJsonPath != null;
 
   s-router-clab-render-live =
     if hasInputs then
@@ -61,7 +64,7 @@ let
         service_name="s-router-clab-render-live"
         phase="render-start"
 
-        cpm_json="${resolvedCpmJsonPath}"
+        cpm_json="${cpmJsonPath}"
         renderer_inventory_json="${rendererInventoryJsonPath}"
         deployment_host="${deploymentHost}"
 
