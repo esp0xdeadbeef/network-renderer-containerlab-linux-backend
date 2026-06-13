@@ -120,11 +120,6 @@ def _interface_subnets4(interfaces: Dict[str, Any]) -> List[str]:
     return subnets
 
 
-def _fabric_private_ranges() -> List[str]:
-    """Broad private IPv4 ranges that cover all fabric-internal addressing."""
-    return ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
-
-
 def _masquerade_from_nat_intent(
     nat_intent: Dict[str, Any],
     interfaces: Dict[str, Any] | None = None,
@@ -144,14 +139,6 @@ def _masquerade_from_nat_intent(
         result["saddr6"] = source6
 
     source4 = _list_strings(nat_intent.get("masqueradeSourcePrefixes4"))
-    # Augment with all fabric-internal private ranges so transit traffic
-    # from any node (provider, selector, access) gets NATed through the core.
-    fabric_ranges = _fabric_private_ranges()
-    seen = set(source4)
-    for s in fabric_ranges:
-        if s not in seen:
-            source4.append(s)
-            seen.add(s)
     if source4:
         result["saddr4"] = source4
 
@@ -287,11 +274,19 @@ def _nat_cm_input(
                 if iface not in masquerade_ifaces:
                     masquerade_ifaces.append(iface)
 
-    return {
+    source4 = _list_strings(nat_intent.get("masqueradeSourcePrefixes4"))
+    source6 = _list_strings(nat_intent.get("masqueradeSourcePrefixes6"))
+
+    result: Dict[str, Any] = {
         "ipv4": ipv4,
         "ipv6": ipv6,
         "masqueradeInterfaces": masquerade_ifaces,
     }
+    if source4:
+        result["saddr4"] = source4
+    if source6:
+        result["saddr6"] = source6
+    return result
 
 
 def render(
