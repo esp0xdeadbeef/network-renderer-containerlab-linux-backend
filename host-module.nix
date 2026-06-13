@@ -4,6 +4,7 @@
 , clabDeploymentHost ? null
 , clabCpmJsonPath ? null
 , clabRendererInventoryJsonPath ? null
+, containerlabLinuxRendererInput ? {}
 , containerlabLinuxRendererSelf  ? null
 , ...
 }:
