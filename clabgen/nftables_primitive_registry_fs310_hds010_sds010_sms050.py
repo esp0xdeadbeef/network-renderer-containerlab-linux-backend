@@ -134,6 +134,32 @@ REGISTRY: Dict[str, Dict[str, Dict[str, Any]]] = {
             ),
             "used_by": ["nat.py", "firewall_wan.py"],
         },
+        "prerouting": {
+            "source": "platform-registry",
+            "description": (
+                "Standard nftables prerouting chain for NAT. Used for DNAT and "
+                "pre-routing address translation."
+            ),
+            "used_by": [],
+        },
+        "POSTROUTING": {
+            "source": "platform-registry",
+            "description": (
+                "Uppercase variant of postrouting chain name. nftables treats chain names "
+                "as case-sensitive user-defined labels; both lowercase and uppercase "
+                "conventions are standard across Linux distributions."
+            ),
+            "used_by": ["nat.py", "firewall_wan.py", "merge.py"],
+        },
+        "PREROUTING": {
+            "source": "platform-registry",
+            "description": (
+                "Uppercase variant of prerouting chain name. nftables treats chain names "
+                "as case-sensitive user-defined labels; both lowercase and uppercase "
+                "conventions are standard across Linux distributions."
+            ),
+            "used_by": [],
+        },
     },
     "hooks": {
         "filter": {
@@ -193,6 +219,30 @@ REGISTRY: Dict[str, Dict[str, Dict[str, Any]]] = {
                 "on the postrouting path."
             ),
             "used_by": ["nat.py", "firewall_wan.py"],
+        },
+        "prerouting": {
+            "source": "platform-registry",
+            "description": (
+                "Netfilter prerouting hook. Used with nat chains for DNAT/pre-routing "
+                "address translation."
+            ),
+            "used_by": [],
+        },
+        "POSTROUTING": {
+            "source": "platform-registry",
+            "description": (
+                "Uppercase variant of postrouting hook type. Standard Linux nftables "
+                "accepts both casing conventions for hook type strings."
+            ),
+            "used_by": ["nat.py", "firewall_wan.py", "merge.py"],
+        },
+        "PREROUTING": {
+            "source": "platform-registry",
+            "description": (
+                "Uppercase variant of prerouting hook type. Standard Linux nftables "
+                "accepts both casing conventions for hook type strings."
+            ),
+            "used_by": [],
         },
     },
     "families": {
