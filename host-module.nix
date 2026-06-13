@@ -293,9 +293,26 @@ in
     '';
   };
 
+  # ----- VLAN 2 management (persistent across reboots) -----
+  # VLAN 2 is the management network: eth0.2 → vlan2 bridge, DHCP on bridge
   # ----- VLAN 4 upstream internet (persistent across reboots) -----
   # VLAN 4 is the emulated internet uplink: eth0.4 → br-uplink0 → container WAN
   systemd.network.netdevs = {
+    "10-eth0.2" = {
+      netdevConfig = {
+        Kind = "vlan";
+        Name = "eth0.2";
+      };
+      vlanConfig = {
+        Id = 2;
+      };
+    };
+    "20-vlan2" = {
+      netdevConfig = {
+        Kind = "bridge";
+        Name = "vlan2";
+      };
+    };
     "10-eth0.4" = {
       netdevConfig = {
         Kind = "vlan";
@@ -314,6 +331,35 @@ in
   };
 
   systemd.network.networks = {
+    "10-eth0" = {
+      matchConfig.Name = "eth0";
+      linkConfig.ActivationPolicy = "always-up";
+      networkConfig = {
+        ConfigureWithoutCarrier = true;
+        DHCP = "no";
+        LinkLocalAddressing = "no";
+        VLAN = [ "eth0.2" "eth0.4" ];
+      };
+    };
+    "10-eth0.2" = {
+      matchConfig.Name = "eth0.2";
+      linkConfig.ActivationPolicy = "always-up";
+      networkConfig = {
+        ConfigureWithoutCarrier = true;
+        DHCP = "no";
+        LinkLocalAddressing = "no";
+        Bridge = "vlan2";
+      };
+    };
+    "20-vlan2" = {
+      matchConfig.Name = "vlan2";
+      linkConfig.ActivationPolicy = "always-up";
+      networkConfig = {
+        DHCP = "ipv4";
+        LinkLocalAddressing = "no";
+        IPv6AcceptRA = false;
+      };
+    };
     "10-eth0.4" = {
       matchConfig.Name = "eth0.4";
       linkConfig.ActivationPolicy = "always-up";
