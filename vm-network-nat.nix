@@ -32,15 +32,22 @@ in
     cfg:
     lib.optionalAttrs ((cfg.mode or "") == "nat") {
       Address = [ (addressFor cfg) ];
-      # CPM_GAP: DHCPServer and IPMasquerade are hardcoded for NAT bridge
-      # networks. The CPM does not yet emit explicitRole.dhcpServer or
-      # bridgeControlConfig.masquerade for vm-bridge NAT networks.
-      # Trace: FS-380-HDS-010-SDS-010-SMS-060
-      # CPM_GAP: address, dhcpPoolOffset, dhcpPoolSize — also hardcoded
-      # defaults before CMC fix. Now throw. Trace: FS-310.
-      DHCPServer = true;
+      # CMC: FS-310-HDS-010-SDS-010-SMS-200 — no unconditional DHCPServer/IPMasquerade.
+      # CPM_GAP: DHCPServer should trace to CPM wanPool.dhcpServer.
+      # CPM_GAP: IPMasquerade should trace to CPM natIntent.masqueradeInterfaces.
+      # CPM does not yet emit these for vm-bridge NAT networks.
+      # Reference: FS-380-HDS-010-SDS-010-SMS-060.
+      DHCPServer =
+        if cfg ? dhcpServer then
+          cfg.dhcpServer
+        else
+          throw "vm-network-nat: DHCPServer requires CPM wanPool.dhcpServer for NAT network ${cfg.bridge or cfg.inventoryName or "unknown"} — CPM_GAP: CPM does not yet emit dhcpServer for bridge networks";
       IPv4Forwarding = true;
-      IPMasquerade = "ipv4";
+      IPMasquerade =
+        if cfg ? masquerade then
+          cfg.masquerade
+        else
+          throw "vm-network-nat: IPMasquerade requires CPM natIntent.masqueradeInterfaces for NAT network ${cfg.bridge or cfg.inventoryName or "unknown"} — CPM_GAP: CPM does not yet emit masquerade authorization for bridge networks";
     };
 
   dhcpServerConfigFor =
