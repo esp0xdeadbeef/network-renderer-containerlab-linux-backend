@@ -47,6 +47,9 @@ tests=(
   test-fs540-hds010-sds010-sms035-dns-self-referential-guard.sh
   test-policy-no-main-defaults.sh
   test-fs960-hds010-sds016-sms050-clab-privileged-inspect.sh
+  test-fs960-hds010-sds016-sms030-clab-cache-absent-build-save.sh
+  test-fs960-hds010-sds016-sms060-clab-failure-diagnostics.sh
+  test-fs310-hds010-sds010-sms110-cmc-clab-fail-closed-domain.sh
 )
 
 if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" == "1" ]]; then

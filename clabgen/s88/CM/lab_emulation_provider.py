@@ -30,17 +30,19 @@ def _optional_vlan(
     request: Dict[str, Any],
     direct_key: str,
     object_key: str,
+    mode: str,
 ) -> int | None:
     raw_value = _vlan_from_request(request, direct_key, object_key)
     if raw_value is None:
         return None
-    mode = str(
-        request.get("providerEmulationMode")
-        or request.get("mode")
-        or request.get("kind")
-        or request.get("type")
-        or "provider-emulation"
-    )
+    # FS-310-HDS-010-SDS-010-SMS-110: fail-closed — must use
+    # providerEmulationMode from the resolved mode parameter,
+    # not a multi-key fallback chain
+    if not isinstance(mode, str) or not mode:
+        raise ValueError(
+            "lab-emulation request requires providerEmulationMode; "
+            "multi-key fallback defaults are not allowed"
+        )
     return _require_positive_vlan(raw_value, object_key, mode)
 
 
@@ -126,6 +128,7 @@ def _client_side_vlan(
         request,
         "clientSideVlan",
         "isolatedClientSide",
+        mode,
     )
     if client_side_vlan is None:
         return None
