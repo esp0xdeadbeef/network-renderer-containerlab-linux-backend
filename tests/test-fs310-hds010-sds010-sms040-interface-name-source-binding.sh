@@ -105,9 +105,11 @@ def make_solver_json():
 # These are convention names for CLAB management plane, not CPM-scoped.
 # ppp* names are Linux PPPoE session interfaces explicitly recognized in
 # interface_names.py:require_runtime_name (pass-through for "ppp" prefix).
+# ppp0 is the default runtimeInterface; ppp1+ are platform-dynamic.
 PLATFORM_ALLOWED = {
     "eth0",  # CLAB management/console interface (platform convention)
     "ppp0",  # Linux PPPoE session interface (platform convention, default runtimeInterface)
+    "ppp1",  # Linux PPPoE session interface (platform-dynamic, SMS-040 L27-29)
 }
 
 # Pattern for names generated deterministically from CPM/metadata:

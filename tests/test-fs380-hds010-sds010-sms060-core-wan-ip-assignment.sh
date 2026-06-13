@@ -110,6 +110,7 @@ nat_node = {
             "hostUplink": {
                 "mode": "nat",
                 "ipv4": {
+                    "method": "static",
                     "address": "192.168.1.1/24",
                     "clientAddress": "192.168.1.100",
                 }
