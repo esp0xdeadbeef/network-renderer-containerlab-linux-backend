@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
 
-# FS-310-HDS-010-SDS-010-SMS-090: Renderer Check Bypass Prevention
+# FS-310-HDS-030-SDS-010-SMS-090: Renderer Check Bypass Prevention
 # Seeded bypass examples that MUST be caught. If any seeded pattern passes
 # the checker, the checker is broken and the test must fail.
 

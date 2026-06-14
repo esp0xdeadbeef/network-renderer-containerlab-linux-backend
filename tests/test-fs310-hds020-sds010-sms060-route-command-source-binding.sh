@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-310-HDS-010-SDS-010-SMS-060
+# GAMP-ID: FS-310-HDS-020-SDS-010-SMS-060
 # Renderer Route-Command Source-Binding Construction Test
 #
 # Covers:
@@ -610,5 +610,5 @@ else:
     print(f"  FAIL: injected hardcoded route not found in emitted scan")
     sys.exit(1)
 
-print(f"\nPASS FS-310-HDS-010-SDS-010-SMS-060-route-command-source-binding")
+print(f"\nPASS FS-310-HDS-020-SDS-010-SMS-060-route-command-source-binding")
 PY

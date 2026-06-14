@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-310-HDS-010-SDS-010-SMS-070
+# GAMP-ID: FS-310-HDS-020-SDS-010-SMS-070
 # Renderer NAT/NAT66 Primitive Source-Binding Construction Test
 #
 # Classifies every NAT, NAT66, NAPT, SNAT, masquerade, postrouting,
@@ -679,5 +679,5 @@ finally:
         print(f"Restored {target_py}")
 print()
 
-print("PASS FS-310-HDS-010-SDS-010-SMS-070 nat-primitive-source-binding")
+print("PASS FS-310-HDS-020-SDS-010-SMS-070 nat-primitive-source-binding")
 PY

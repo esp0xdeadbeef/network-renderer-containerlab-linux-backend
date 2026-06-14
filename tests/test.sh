@@ -22,16 +22,16 @@ fi
 tests=(
   test-regression-md-resolved-states.sh
   test-fs100-renderer-output-provenance.sh
-  test-fs310-hds010-sds010-sms040-interface-name-source-binding.sh
-  test-fs310-hds010-sds010-sms050-nftables-primitive-source-binding.sh
-  test-fs310-hds010-sds010-sms060-route-command-source-binding.sh
-  test-fs310-hds010-sds010-sms070-nat-primitive-source-binding.sh
-  test-fs310-hds010-sds010-sms080-shell-fallback-error-propagation.sh
-  test-fs310-hds010-sds010-sms090-check-bypass-prevention.sh
-  test-fs310-hds010-sds010-sms190-pppoe-no-default.sh
-  test-fs310-hds010-sds010-sms200-bridge-no-default.sh
-  test-fs310-hds010-sds010-sms210-route-table-allocation.sh
-  test-fs380-hds010-sds010-sms060-core-wan-ip-assignment.sh
+  test-fs310-hds020-sds010-sms040-interface-name-source-binding.sh
+  test-fs310-hds020-sds010-sms050-nftables-primitive-source-binding.sh
+  test-fs310-hds020-sds010-sms060-route-command-source-binding.sh
+  test-fs310-hds020-sds010-sms070-nat-primitive-source-binding.sh
+  test-fs310-hds030-sds010-sms080-shell-fallback-error-propagation.sh
+  test-fs310-hds030-sds010-sms090-check-bypass-prevention.sh
+  test-fs310-hds020-sds010-sms190-pppoe-no-default.sh
+  test-fs310-hds020-sds010-sms200-bridge-no-default.sh
+  test-fs310-hds020-sds010-sms210-route-table-allocation.sh
+  test-fs380-hds020-sds010-sms060-core-wan-ip-assignment.sh
   test-runtime-interface-mapping-refusals.sh
   test-bridge-link-realization-contracts.sh
   test-lab-emulation-capability-gate.sh

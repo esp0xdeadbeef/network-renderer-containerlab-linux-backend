@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-310-HDS-010-SDS-010-SMS-200
+# GAMP-ID: FS-310-HDS-020-SDS-010-SMS-200
 # Renderer Bridge-Network No-Default Contract Construction Test
 #
 # Proves: CLAB renderer bridge-network and VM-network modules do not supply
@@ -137,7 +137,7 @@ except Exception as e:
         print(f"  NOTE: renderer failure for other reason: {type(e).__name__}: {e}")
 
 # ── Summary ──────────────────────────────────────────────────────────
-print(f"\n{'PASS' if failures == 0 else 'FAIL'} FS-310-HDS-010-SDS-010-SMS-200: "
+print(f"\n{'PASS' if failures == 0 else 'FAIL'} FS-310-HDS-020-SDS-010-SMS-200: "
       f"{failures} violation(s) in CLAB renderer source")
 sys.exit(0 if failures == 0 else 1)
 PY

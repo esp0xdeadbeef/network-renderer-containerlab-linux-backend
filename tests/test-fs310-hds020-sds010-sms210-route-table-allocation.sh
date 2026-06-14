@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-310-HDS-010-SDS-010-SMS-210
+# GAMP-ID: FS-310-HDS-020-SDS-010-SMS-210
 # Renderer Route-Table Allocation Contract Construction Test
 #
 # Proves: CLAB renderer routing modules do not supply hardcoded route table
@@ -92,7 +92,7 @@ assert onlink_count > 0, "onlink should be present as platform constant"
 print(f"  PASS: {onlink_count} onlink usages — deterministic platform constant")
 
 # ── Summary ──────────────────────────────────────────────────────────
-print(f"\n{'PASS' if failures == 0 else 'FAIL'} FS-310-HDS-010-SDS-010-SMS-210: "
+print(f"\n{'PASS' if failures == 0 else 'FAIL'} FS-310-HDS-020-SDS-010-SMS-210: "
       f"{failures} violation(s)")
 sys.exit(0 if failures == 0 else 1)
 PY
