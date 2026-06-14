@@ -83,6 +83,9 @@ for sh_file in sorted(repo.glob("tests/*.sh")):
     text = sh_file.read_text(encoding="utf-8")
 
     for lineno, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
         if broad_ignore_pattern.search(line):
             violations.append(
                 f"BROAD_EXCEPT {sh_file}:{lineno}: {line.strip()[:80]}"

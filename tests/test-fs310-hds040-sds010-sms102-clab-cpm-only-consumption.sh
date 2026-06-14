@@ -45,7 +45,7 @@ KNOWN_GAPS = {
     ("clabgen/s88/CM/linux_addressing.py", 90, "except Exception: return None — _addr_ip swallows IP parse errors silently"),
     ("clabgen/s88/CM/linux_route_via.py", 18, "except Exception: return False — _same_subnet swallows IP parse errors silently"),
     ("clabgen/s88/CM/linux_bgp_state.py", 163, "except Exception: return None — _peer_ip swallows IP parse errors silently"),
-    ("clabgen/s88/CM/linux_policy_routes.py", 219, "except Exception: return — swallows IP parse errors silently"),
+    ("clabgen/s88/CM/linux_policy_routes.py", 217, "except Exception: return — swallows IP parse errors silently"),
 }
 
 failures = 0
