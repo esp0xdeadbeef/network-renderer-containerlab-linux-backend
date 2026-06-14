@@ -53,7 +53,7 @@
                   (builtins.toJSON rendererInput.cpm)
               else "";
             deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
-            rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or "";
+            rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or null;
           in
           { lib, ... }:
           {
