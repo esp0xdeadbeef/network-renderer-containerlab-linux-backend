@@ -113,10 +113,11 @@ let
           echo "CPM JSON not found: $cpm_json" >&2
           exit 1
         }
-        [[ -f "$renderer_inventory_json" ]] || {
-          echo "Renderer inventory JSON not found: $renderer_inventory_json" >&2
-          exit 1
-        }
+        if [[ -f "$renderer_inventory_json" ]]; then
+          echo "Using renderer inventory: $renderer_inventory_json" >&2
+        else
+          echo "Renderer inventory JSON not found, will rely on CPM fallback (endpointInventory): $renderer_inventory_json" >&2
+        fi
 
         phase="render"
         CLABGEN_RENDERER_INVENTORY_JSON="$renderer_inventory_json" \
