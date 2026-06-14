@@ -52,6 +52,7 @@ tests=(
   test-fs310-hds010-sds010-sms110-cmc-clab-fail-closed-domain.sh
   test-fs310-hds040-sds010-sms102-clab-cpm-only-consumption.sh
   test-fs310-hds030-sds010-sms112-clab-fail-closed-contract.sh
+  test-fs370-hds010-sds010-rdr-sms010-clab-forwarding-materialization.sh
 )
 
 if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" == "1" ]]; then
