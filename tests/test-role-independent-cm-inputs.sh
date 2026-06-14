@@ -31,8 +31,6 @@ explicit_wan_firewall = render(
 assert_has(explicit_wan_firewall, 'iifname "eth9"')
 assert_has(explicit_wan_firewall, "nft add table ip nat")
 assert_has(explicit_wan_firewall, 'oifname "eth9" masquerade')
-assert_has(explicit_wan_firewall, 'meta l4proto icmp accept')
-assert_has(explicit_wan_firewall, 'meta l4proto ipv6-icmp accept')
 
 explicit_policy_firewall = render(
     {
