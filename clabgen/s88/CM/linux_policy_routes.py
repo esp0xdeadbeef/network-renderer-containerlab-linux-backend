@@ -189,9 +189,7 @@ def _render_policy_table(
 ) -> None:
     for dst in sorted(groups.keys()):
         route = _render_group(ip_cmd, table_id, dst, groups[dst])
-        cmds.append(
-            f"sh -c '{route} 2>/dev/null || true'"
-        )
+        cmds.append(route)
 
 
 def _add_connected_subnet_route(
@@ -269,7 +267,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     # Phase 2: render policy tables and generic iif rules (order-independent).
     # Skip generic iif rules for access-uplink interfaces — their return-path
     # routing is handled by Phase 4 cross-rules (SMS-101).
-    for _slot, table_id, priority, lane_eths, _shared_eths, routes4, routes6 in lanes:
+    for _slot, table_id, priority, lane_eths, shared_eths, routes4, routes6 in lanes:
         # Find whether this lane is an access-uplink (US-facing) interface
         is_uplink = False
         for src_eth in lane_eths:
@@ -286,7 +284,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         if routes4 != {}:
             _render_policy_table(cmds, "ip", table_id, routes4)
             if not is_uplink:
-                for source_eth in lane_eths:
+                for source_eth in lane_eths + shared_eths:
                     cmds.append(
                         f"sh -c 'ip rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                     )
@@ -303,7 +301,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
             if not is_uplink:
-                for source_eth in lane_eths:
+                for source_eth in lane_eths + shared_eths:
                     cmds.append(
                         f"sh -c 'ip -6 rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                     )
