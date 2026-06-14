@@ -49,6 +49,7 @@ let
         pkgs.gnumake
         pkgs.iproute2
         pkgs.jq
+        pkgs.nix
         pkgs.python3
         pkgs.systemd
         pkgs.util-linux
