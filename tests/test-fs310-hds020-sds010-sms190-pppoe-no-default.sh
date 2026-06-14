@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-310-HDS-010-SDS-010-SMS-190
+# GAMP-ID: FS-310-HDS-020-SDS-010-SMS-190
 # Renderer PPPoE No-Default Contract Construction Test
 #
 # Proves: PPPoE renderer fails closed on missing CPM fields (mtu, maxSessions,
@@ -161,5 +161,5 @@ elif result.returncode == 0:
     print(f"  FAIL: hardcoded fallbacks still present:\n{result.stdout}")
     sys.exit(1)
 
-print(f"\nPASS FS-310-HDS-010-SDS-010-SMS-190: {failures_caught}/{failures_expected} seeded negatives caught, no source fallbacks")
+print(f"\nPASS FS-310-HDS-020-SDS-010-SMS-190: {failures_caught}/{failures_expected} seeded negatives caught, no source fallbacks")
 PY

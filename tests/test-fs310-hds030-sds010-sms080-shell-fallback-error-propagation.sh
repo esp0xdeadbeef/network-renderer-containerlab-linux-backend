@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
 
-# FS-310-HDS-010-SDS-010-SMS-080: Renderer Shell Fallback Audit
+# FS-310-HDS-030-SDS-010-SMS-080: Renderer Shell Fallback Audit
 # Documents every || true / 2>/dev/null pattern, classifies it, and
 # proves no shell fallback hides critical network behavior that would
 # be accepted as validation evidence without HAT verification.

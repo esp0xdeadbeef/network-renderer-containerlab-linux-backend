@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-380-HDS-010-SDS-010-SMS-060
-# GAMP-ID: FS-380-HDS-010-SDS-010-SMS-060-CMC
+# GAMP-ID: FS-380-HDS-020-SDS-010-SMS-060
+# GAMP-ID: FS-380-HDS-020-SDS-010-SMS-060-CMC
 # GAMP-SCOPE: software-module-test
 # LAB-SMT-ID: LAB-SMT-021
 # LAB-SMT-SCOPE: renderer construction test; see GAMP/SMT/README.md
@@ -146,8 +146,8 @@ check("Orphan WAN (no eth_map) produces no commands", len(cmds_orphan) == 0)
 
 print()
 if failures:
-    print(f"FAIL FS-380-HDS-010-SDS-010-SMS-060-CMC: {failures} failure(s)")
+    print(f"FAIL FS-380-HDS-020-SDS-010-SMS-060-CMC: {failures} failure(s)")
     sys.exit(1)
 else:
-    print("PASS FS-380-HDS-010-SDS-010-SMS-060-CMC")
+    print("PASS FS-380-HDS-020-SDS-010-SMS-060-CMC")
 PY

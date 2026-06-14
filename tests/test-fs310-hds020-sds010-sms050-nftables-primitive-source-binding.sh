@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-310-HDS-010-SDS-010-SMS-050
+# GAMP-ID: FS-310-HDS-020-SDS-010-SMS-050
 # Renderer nftables Primitive Source-Binding Construction Test
 #
 # Classifies every nftables table, chain, hook, priority, family, policy,
