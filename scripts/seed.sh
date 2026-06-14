@@ -105,7 +105,6 @@ seed_one() {
   echo "  inventory: ${inventory}"
 
   # Run the full pipeline: compiler -> NFM -> CPM -> emit CPM JSON
-  # Pass emulationSubnets from inventory to CPM (FS-260-HDS-010-SDS-010-SMS-012)
   nix eval --impure --json --expr "
     let
       flake = builtins.getFlake \"path:${cpm_path}\";
@@ -115,7 +114,6 @@ seed_one() {
       result = lib.compileAndBuild {
         input = intent;
         inherit inventory;
-        emulationSubnets = inventory.hat.emulationSubnets or [];
       };
     in
       result

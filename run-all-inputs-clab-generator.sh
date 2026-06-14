@@ -63,7 +63,6 @@ run_cpm_build() {
 
   local cpm_path
   cpm_path="$(resolve_input_path network-control-plane-model)"
-  # Pass emulationSubnets from inventory to CPM (FS-260-HDS-010-SDS-010-SMS-012)
   nix eval --impure --json --expr "
     let
       flake = builtins.getFlake \"path:${cpm_path}\";
@@ -73,7 +72,6 @@ run_cpm_build() {
       result = lib.compileAndBuild {
         input = intent;
         inherit inventory;
-        emulationSubnets = inventory.hat.emulationSubnets or [];
       };
     in
       result
