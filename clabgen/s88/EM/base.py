@@ -181,6 +181,147 @@ def _wan_firewall_cm_input(
     }
 
 
+def _pppoe_session_interface_names(
+    node_data: Dict[str, Any],
+    name_map: Dict[str, str],
+) -> List[str]:
+    """Derive PPPoE session interface names from CPM services.pppoe data
+    and the node's interface records.  Returns runtime interface names
+    (e.g. "ppp0") that appear in the CPM-provided forwarding surface."""
+    services = _dict(node_data.get("services"))
+    pppoe = _dict(services.get("pppoe"))
+    if not pppoe:
+        return []
+
+    ppp_ifaces: List[str] = []
+
+    # Client: the client's runtimeInterface names the PPP session.
+    client = _dict(pppoe.get("client"))
+    client_rt = client.get("runtimeInterface")
+    if isinstance(client_rt, str) and client_rt:
+        resolved = require_runtime_name(
+            client_rt, name_map, "services.pppoe.client.runtimeInterface"
+        )
+        if resolved and resolved not in ppp_ifaces:
+            ppp_ifaces.append(resolved)
+
+    # Server: the server itself does not carry runtimeInterface, but the CPM
+    # may attach a synthetic PPPoE-session interface record to the node's
+    # effectiveRuntimeRealization.interfaces with sourceKind="pppoe-session".
+    interfaces = _dict(node_data.get("interfaces"))
+    for ifname, iface in interfaces.items():
+        if not isinstance(iface, dict):
+            continue
+        kind_candidate = iface.get("kind") or iface.get("sourceKind")
+        # KNOWN_GAP: CPM may attach PPPoE-session interfaces with either
+        # field name.  When both are absent we skip rather than falling
+        # through to an empty-string default that would hide the gap.
+        if not isinstance(kind_candidate, str) or not kind_candidate:
+            continue
+        if kind_candidate != "pppoe-session":
+            continue
+        # Resolve through name_map (which self-maps ppp names)
+        resolved = require_runtime_name(
+            ifname, name_map, f"interfaces.{ifname}.pppoe-session"
+        )
+        if resolved and resolved not in ppp_ifaces:
+            ppp_ifaces.append(resolved)
+
+    return ppp_ifaces
+
+
+def _augment_pppoe_forwarding_rules(
+    node_data: Dict[str, Any],
+    forwarding_intent: Dict[str, Any],
+    name_map: Dict[str, str],
+) -> List[Dict[str, Any]]:
+    """Derive additional forwarding rules for PPPoE session interfaces.
+
+    When a node carries PPPoE services and CPM has already supplied
+    forwardingIntent.rules for other interface pairs, the PPP session
+    interface (e.g. ppp0) needs explicit accept rules in the inet fw
+    forward chain to avoid being dropped by the chain's policy-drop
+    default.
+
+    Returns only rules whose fromInterface/toInterface are already
+    resolvable through name_map, so every rule stays data-driven from
+    CPM-provided interface records and services.pppoe fields."""
+    ppp_ifaces = _pppoe_session_interface_names(node_data, name_map)
+    if not ppp_ifaces:
+        return []
+
+    # Collect the set of forwarding-eligible peer interfaces from the
+    # existing CPM forwardingIntent rules.  These are the interfaces
+    # that CPM already considers part of the forwarding surface for
+    # this node.
+    existing_rules = forwarding_intent.get("rules")
+    peer_runtime_names: List[str] = []
+    seen: set[str] = set()
+    if isinstance(existing_rules, list):
+        for rule in existing_rules:
+            if not isinstance(rule, dict):
+                continue
+            for side in ("fromInterface", "toInterface"):
+                raw = rule.get(side)
+                if not isinstance(raw, str) or not raw:
+                    continue
+                try:
+                    resolved = require_runtime_name(raw, name_map, side)
+                except ValueError:
+                    continue
+                if resolved and resolved not in seen:
+                    seen.add(resolved)
+                    peer_runtime_names.append(resolved)
+
+    # Remove the PPPoE session interfaces themselves — we want the OTHER
+    # interfaces on the node.
+    ppp_set = set(ppp_ifaces)
+    peers = [n for n in peer_runtime_names if n not in ppp_set]
+    if not peers:
+        return []
+
+    # Build existing (from, to) pairs so we don't emit duplicates.
+    existing_pairs: set[tuple[str, str]] = set()
+    if isinstance(existing_rules, list):
+        for rule in existing_rules:
+            if not isinstance(rule, dict):
+                continue
+            fi_raw = rule.get("fromInterface")
+            ti_raw = rule.get("toInterface")
+            if not isinstance(fi_raw, str) or not isinstance(ti_raw, str):
+                continue
+            try:
+                fi = require_runtime_name(fi_raw, name_map, "fromInterface")
+                ti = require_runtime_name(ti_raw, name_map, "toInterface")
+            except ValueError:
+                continue
+            existing_pairs.add((fi, ti))
+
+    new_rules: List[Dict[str, Any]] = []
+    for ppp_iface in ppp_ifaces:
+        for peer_iface in peers:
+            # Forward: peer -> ppp
+            if (peer_iface, ppp_iface) not in existing_pairs:
+                new_rules.append({
+                    "action": "accept",
+                    "fromInterface": peer_iface,
+                    "toInterface": ppp_iface,
+                    "relationId": f"pppoe-fabric-{peer_iface}-to-{ppp_iface}",
+                    "comment": f"pppoe-fabric:{peer_iface}->{ppp_iface}",
+                })
+            # Reverse: ppp -> peer
+            if (ppp_iface, peer_iface) not in existing_pairs:
+                new_rules.append({
+                    "action": "accept",
+                    "fromInterface": ppp_iface,
+                    "toInterface": peer_iface,
+                    "relationId": f"pppoe-fabric-{ppp_iface}-to-{peer_iface}",
+                    "comment": f"pppoe-fabric:{ppp_iface}->{peer_iface}",
+                })
+
+    return new_rules
+
+
 def _firewall_cm_input(
     node_data: Dict[str, Any],
     eth_map: Dict[str, str],
@@ -202,7 +343,21 @@ def _firewall_cm_input(
             if isinstance(rule, dict):
                 _add_missing_key(rule.get("fromInterface"))
                 _add_missing_key(rule.get("toInterface"))
-    rules = _translated_forwarding_rules(forwarding_intent, name_map)
+
+    # Augment with PPPoE-derived forwarding rules from CPM services.pppoe data.
+    # FS-800 fabric egress: provider-handoff containers with PPPoE sessions need
+    # explicit forward accept rules between the PPP interface and the fabric/ISP
+    # interfaces, otherwise the inet fw forward policy-drop blocks the paths.
+    pppoe_rules = _augment_pppoe_forwarding_rules(node_data, forwarding_intent, name_map)
+    if pppoe_rules:
+        augmented_intent = dict(forwarding_intent)
+        augmented_rules = list(rules_list if isinstance(rules_list, list) else [])
+        augmented_rules.extend(pppoe_rules)
+        augmented_intent["rules"] = augmented_rules
+        rules = _translated_forwarding_rules(augmented_intent, name_map)
+    else:
+        rules = _translated_forwarding_rules(forwarding_intent, name_map)
+
     if not rules:
         return {}
 
