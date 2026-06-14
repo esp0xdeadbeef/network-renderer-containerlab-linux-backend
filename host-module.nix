@@ -284,6 +284,7 @@ in
     after = [
       "docker.service"
       "network-online.target"
+      "sops-nix.service"
     ];
     wants = [
       "docker.service"

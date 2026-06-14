@@ -57,6 +57,7 @@ tests=(
   test-fs310-hds030-sds010-sms112-clab-fail-closed-contract.sh
   test-fs370-hds010-sds010-rdr-sms010-clab-forwarding-materialization.sh
   test-no-policy-no-nftables-emission.sh
+  test-fs840-sops-service-ordering.sh
 )
 
 if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" == "1" ]]; then
