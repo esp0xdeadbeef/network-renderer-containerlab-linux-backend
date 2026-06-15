@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# GAMP-ID: FS-760-HDS-010-SDS-010-SMS-010
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

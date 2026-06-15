@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-840 (functional requirement: scoped runtime secret delivery)
+# GAMP-ID: FS-840-HDS-010-SDS-010-SMS-030
 # GAMP-SCOPE: software-module-test
 # Focused construction test: CLAB renderer sops service ordering.
 #
