@@ -20,8 +20,8 @@ if ! [[ "${test_timeout_seconds}" =~ ^[0-9]+$ ]] || [[ "${test_timeout_seconds}"
 fi
 
 tests=(
-  test-regression-md-resolved-states.sh
-  test-fs100-renderer-output-provenance.sh
+  test-fs960-hds010-sds010-sms080-regression-resolved-states.sh
+  test-fs100-hds010-sds010-sms010-renderer-output-provenance.sh
   test-fs310-hds020-sds010-sms040-interface-name-source-binding.sh
   test-fs310-hds020-sds010-sms050-nftables-primitive-source-binding.sh
   test-fs310-hds020-sds010-sms060-route-command-source-binding.sh
@@ -32,21 +32,21 @@ tests=(
   test-fs310-hds020-sds010-sms200-bridge-no-default.sh
   test-fs310-hds020-sds010-sms210-route-table-allocation.sh
   test-fs380-hds020-sds010-sms060-core-wan-ip-assignment.sh
-  test-runtime-interface-mapping-refusals.sh
-  test-bridge-link-realization-contracts.sh
-  test-lab-emulation-capability-gate.sh
-  test-provider-access-pppoe-artifacts.sh
-  test-deploy-clab-app-contract.sh
-  test-clab-tooling-cache-evidence.sh
-  test-topology-conformance-parity-guard.sh
-  test-bgp-cpm-contract-render.sh
-  test-fs760-policy-firewall-forwarding-intent.sh
-  test-role-independent-cm-inputs.sh
-  test-access-advertisements-runtime.sh
-  test-dns-namespace-fallback-cpm-contract.sh
+  test-fs320-hds010-sds010-sms030-runtime-interface-mapping.sh
+  test-fs320-hds010-sds010-sms020-bridge-link-realization.sh
+  test-fs960-hds010-sds010-sms020-lab-emulation-capability-gate.sh
+  test-fs800-hds030-sds010-sms010-pppoe-artifacts.sh
+  test-fs960-hds010-sds010-sms070-deploy-clab-app-contract.sh
+  test-fs960-hds010-sds016-sms020-clab-cache-evidence.sh
+  test-fs320-hds010-sds010-sms010-topology-conformance-parity.sh
+  test-fs480-hds010-sds010-sms010-bgp-cpm-contract-render.sh
+  test-fs760-hds010-sds010-sms010-policy-firewall-forwarding.sh
+  test-fs310-hds010-sds010-sms120-role-independent-cm-inputs.sh
+  test-fs970-hds010-sds010-sms010-access-advertisements-runtime.sh
+  test-fs570-hds010-sds010-sms010-namespace-fallback.sh
   test-fs540-hds010-sds010-sms035-dns-self-referential-guard.sh
   test-fs540-hds020-sds010-sms010-clab-recursive-dns-requester-fixture.sh
-  test-policy-no-main-defaults.sh
+  test-fs520-hds010-sds010-sms040-policy-no-main-defaults.sh
   test-fs960-hds010-sds016-sms010-clab-autostart.sh
   test-fs960-hds010-sds016-sms020-clab-docker-readiness.sh
   test-fs960-hds010-sds016-sms050-clab-privileged-inspect.sh
@@ -56,13 +56,13 @@ tests=(
   test-fs310-hds040-sds010-sms102-clab-cpm-only-consumption.sh
   test-fs310-hds030-sds010-sms112-clab-fail-closed-contract.sh
   test-fs370-hds010-sds010-rdr-sms010-clab-forwarding-materialization.sh
-  test-no-policy-no-nftables-emission.sh
-  test-fs840-sops-service-ordering.sh
+  test-fs310-hds010-sds010-sms130-no-policy-no-nftables.sh
+  test-fs840-hds010-sds010-sms030-sops-service-ordering.sh
 )
 
 if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" == "1" ]]; then
   tests+=(
-    test-fs800-hds010-sds020-sms010-pppoe-runtime.sh
+    test-fs800-hds030-sds010-sms010-pppoe-runtime.sh
   )
 fi
 
