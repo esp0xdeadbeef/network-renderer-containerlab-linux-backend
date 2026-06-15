@@ -49,7 +49,7 @@ if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" != "1" ]]; then
   filtered=()
   for t in "${tests[@]}"; do
     case "$(basename "${t}")" in
-      test-fs800-hds010-sds020-sms010-pppoe-runtime.sh) ;;  # requires Docker + /dev/ppp
+      test-fs800-hds030-sds010-sms010-pppoe-runtime.sh) ;;  # requires Docker + /dev/ppp
       *) filtered+=("${t}") ;;
     esac
   done
