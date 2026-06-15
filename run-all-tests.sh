@@ -14,6 +14,7 @@
 # No hardcoded test list.
 
 set -euo pipefail
+exec > >(tee "/tmp/network-renderer-containerlab-linux-backend-tests.out")
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -105,6 +106,7 @@ done
 echo ""
 echo "========================================"
 printf 'Results: %s passed, %s failed, %s total\n' "${passed}" "${failures}" "${#tests[@]}"
+printf 'PASS: %s, FAIL: %s, TOTAL: %s\n' "${passed}" "${failures}" "${#tests[@]}" >&2
 
 if (( failures > 0 )); then
   printf 'FAIL network-renderer-containerlab-linux-backend: %s test(s) failed\n' "${failures}" >&2
