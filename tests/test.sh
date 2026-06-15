@@ -62,7 +62,7 @@ tests=(
 
 if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" == "1" ]]; then
   tests+=(
-    test-provider-access-pppoe-runtime.sh
+    test-fs800-hds010-sds020-sms010-pppoe-runtime.sh
   )
 fi
 
