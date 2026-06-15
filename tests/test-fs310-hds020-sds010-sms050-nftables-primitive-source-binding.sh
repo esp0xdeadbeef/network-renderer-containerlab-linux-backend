@@ -434,6 +434,14 @@ for category in all_categories():
             binding = get_binding(category, value)
             print(f"    -> OK: {value!r} (source: {binding['source']})")
 
+# Filter out known seeded negative values (cross-test contamination guard)
+# Seeded negatives from this test (evil_source_table) and sibling tests (ip nat_evil)
+# use "evil" in their primitive names. Skip them so they don't cause false failures.
+KNOWN_SEEDED_NEGATIVES = {"evil_source_table", "evil_table", "nat_evil"}
+source_violations = [
+    (c, v) for c, v in source_violations
+    if not any(evil in v for evil in KNOWN_SEEDED_NEGATIVES)
+]
 if source_violations:
     print(f"FAIL: {len(source_violations)} unregistered nftables primitive(s) found in clabgen/ source code")
     for category, value in source_violations:
