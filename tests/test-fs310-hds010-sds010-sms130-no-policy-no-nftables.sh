@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-310-HDS-010-SDS-010-SMS-NOPOLICY
+# GAMP-ID: FS-310-HDS-010-SDS-010-SMS-130
 # GAMP-SCOPE: software-module-test (CMC focused test)
 # Renderer No-Policy No-Emission Construction Test
 #

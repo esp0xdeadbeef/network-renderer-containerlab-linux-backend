@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-800-HDS-010-SDS-020-SMS-010
+# GAMP-ID: FS-800-HDS-030-SDS-010-SMS-010
 # Construction test: CLAB PPPoE Forwarding Rule Augmentation
 # Proves: CLAB renderer augments forwardingIntent.rules with
 # PPPoE-derived forwarding rules when services.pppoe is present

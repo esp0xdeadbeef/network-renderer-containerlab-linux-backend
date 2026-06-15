@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-800-HDS-010-SDS-020-SMS-010
+# GAMP-ID: FS-800-HDS-030-SDS-010-SMS-010
 # GAMP-SCOPE: runtime-validation
 # Construction test: CLAB PPPoE runtime session establishment
 # Proves: CLAB FRR+tooling Docker image provides executable PPPoE
 # tooling (pppd, pppoe, pppoe-server, pppoe-sniff) and can establish
 # a PPPoE session between provider and client containers with a
 # working PPP interface and default route.
-# NOTE: This SMS slot (FS-800-HDS-010-SDS-020-SMS-010) is a retained
+# NOTE: Atomized from placeholder FS-800-HDS-010-SDS-020-SMS-010 to active FS-800-HDS-030-SDS-010-SMS-010
 # placeholder. Active PPPoE ownership is under FS-800-HDS-030.
 set -euo pipefail
 
