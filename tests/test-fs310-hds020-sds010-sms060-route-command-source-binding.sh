@@ -176,6 +176,12 @@ SCAN_EXCLUDE_FILES = {
     "nftables_primitive_registry_fs310_hds010_sds010_sms050.py",
 }
 
+# Filter out known seeded negative values (cross-test contamination guard).
+# Seeded negatives from sibling tests (evil_source_table from SMS-050,
+# ip nat_evil from SMS-070) use "evil" in their names. Exclude lines
+# containing these markers so they don't cause false matches.
+KNOWN_SEEDED_NEGATIVES = {"evil_source_table", "evil_table", "nat_evil"}
+
 
 def _is_in_cpm_traced_function(file_path: str, lineno: int) -> bool:
     """Heuristic: check if the route command line is inside a function
@@ -253,6 +259,9 @@ def scan_source_for_route_commands(source_dir, cpm_context):
         for lineno, line in enumerate(lines, 1):
             for pattern, label in HARDCODED_ROUTE_PATTERNS:
                 if pattern.search(line):
+                    # Skip known seeded negative markers from sibling tests
+                    if any(evil in line for evil in KNOWN_SEEDED_NEGATIVES):
+                        continue
                     # Get surrounding context (5 lines before/after)
                     ctx_start = max(0, lineno - 6)
                     ctx_end = min(len(lines), lineno + 5)
