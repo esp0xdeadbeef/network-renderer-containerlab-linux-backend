@@ -41,6 +41,21 @@ mapfile -d '' tests < <(
   find "${repo_root}/tests" -maxdepth 1 -type f -name 'test-*.sh' -print0 | sort -z
 )
 
+# Runtime tests require Docker and live container orchestration; they are
+# gated behind NETWORK_REPO_RUNTIME_TEST_OK=1 to avoid false failures in
+# environments without Docker (e.g., Nix-based test runners, CI without
+# Docker socket).  This matches the gating in tests/test.sh.
+if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" != "1" ]]; then
+  filtered=()
+  for t in "${tests[@]}"; do
+    case "$(basename "${t}")" in
+      test-fs800-hds010-sds020-sms010-pppoe-runtime.sh) ;;  # requires Docker + /dev/ppp
+      *) filtered+=("${t}") ;;
+    esac
+  done
+  tests=("${filtered[@]}")
+fi
+
 if [[ "${#tests[@]}" -eq 0 ]]; then
   echo "error: no test-*.sh files found in ${repo_root}/tests" >&2
   exit 2
