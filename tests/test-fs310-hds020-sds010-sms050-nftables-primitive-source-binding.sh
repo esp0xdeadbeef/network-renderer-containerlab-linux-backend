@@ -453,21 +453,21 @@ print()
 
 # ── Seeded negative for source code scan ──
 print("--- Seeded negative for source code scan ---")
-# Pick the first .py file in clabgen/ to inject an evil comment
-target_py = py_files[0]
-print(f"Seeding evil comment into {target_py}")
-original_content = target_py.read_text()
+# Use an isolated temp file to avoid race conditions with sibling tests
+# (SMS-060 also writes to clabgen/__init__.py under parallel HAT load).
+seeded_dir = Path(tempfile.mkdtemp(prefix="sms050-seeded-"))
+seeded_file = seeded_dir / "seeded_nftables.py"
 evil_comment = "# nft add table inet evil_source_table"
+seeded_file.write_text(evil_comment + "\n")
+print(f"Seeding evil comment into isolated temp file: {seeded_file}")
 try:
-    # Write file with evil comment prepended
-    target_py.write_text(evil_comment + "\n" + original_content)
-    # Re-extract commands from the seeded file
+    # Extract commands from the seeded file
     seeded_cmds = []
-    for m in NFT_STRING_RE.finditer(target_py.read_text()):
+    for m in NFT_STRING_RE.finditer(seeded_file.read_text()):
         cmd = m.group(1)
         cmd = cmd.replace("\\'", "'").replace('\\"', '"').replace("\\n", " ")
         seeded_cmds.append(cmd)
-    for line in target_py.read_text().splitlines():
+    for line in seeded_file.read_text().splitlines():
         stripped = line.strip()
         if stripped.startswith("# nft ") or stripped.startswith("#nft "):
             cmd = stripped.lstrip("#").strip()
@@ -499,9 +499,8 @@ try:
 
     print("SEEDED SOURCE NEGATIVE PASS: 'inet evil_source_table' correctly flagged in source scan")
 finally:
-    # Restore original file content
-    target_py.write_text(original_content)
-    print(f"Restored {target_py}")
+    import shutil
+    shutil.rmtree(seeded_dir, ignore_errors=True)
 print()
 
 print("PASS fs310-hds010-sds010-sms050-nftables-primitive-source-binding")
