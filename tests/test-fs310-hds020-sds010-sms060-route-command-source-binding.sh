@@ -541,19 +541,16 @@ if all_unbound > 0:
 
 print(f"\n--- Seeded negative: source code ---")
 
-# Use a file with NO CPM context so the seeded command is correctly
-# classified as unbound (not masked by surrounding CPM references).
-target_file = clabgen_dir / "__init__.py"
-original = target_file.read_text()
-
-# Inject a hardcoded sysctl command as a comment
-seeded_comment = '\n# sysctl -w net.ipv4.tcp_fastopen=3  # SEEDED NEGATIVE SMS-060\n'
-assert seeded_comment not in original, "test precondition: seeded comment should not already exist"
-target_file.write_text(original + seeded_comment)
+# Use an isolated temp file to avoid race conditions with sibling tests
+# (SMS-050 also writes to clabgen/__init__.py under parallel HAT load).
+seeded_dir = Path(tempfile.mkdtemp(prefix="sms060-seeded-"))
+seeded_file = seeded_dir / "seeded_sysctl.py"
+seeded_comment = "# sysctl -w net.ipv4.tcp_fastopen=3  # SEEDED NEGATIVE SMS-060\n"
+seeded_file.write_text(seeded_comment)
 
 try:
     seeded_source_found, seeded_binding = scan_source_for_route_commands(
-        clabgen_dir, cpm_context
+        seeded_dir, cpm_context
     )
 
     # The seeded command should be flagged as "sysctl net.ipv4.*"
@@ -561,7 +558,7 @@ try:
     # Find the seeded line
     seeded_matches = [
         (f, l) for f, l, _ in seeded_entries
-        if "__init__.py" in f
+        if "seeded_sysctl.py" in f
     ]
     if not seeded_matches:
         print(f"  FAIL: seeded sysctl command not detected by pattern scan at all")
@@ -569,17 +566,17 @@ try:
 
     # Check if the seeded command is in the unbound list
     unbound_sysctl = seeded_binding["unbound"].get("sysctl net.ipv4.*", [])
-    unbound_init = [(f, l) for f, l in unbound_sysctl if "__init__.py" in f]
-    if unbound_init:
+    unbound_seeded = [(f, l) for f, l in unbound_sysctl if "seeded_sysctl.py" in f]
+    if unbound_seeded:
         print(f"  SEEDED NEGATIVE (source) PASS: checker correctly flags seeded")
         print(f"  hardcoded sysctl command as UNBOUND.")
-        print(f"  Location: {unbound_init[0]}")
+        print(f"  Location: {unbound_seeded[0]}")
     else:
         # Check if it was classified elsewhere
         for cat, items in seeded_binding.items():
             sysctl_items = items.get("sysctl net.ipv4.*", [])
             for f, l in sysctl_items:
-                if "__init__.py" in f:
+                if "seeded_sysctl.py" in f:
                     print(f"  WARN: seeded sysctl classified as '{cat}' instead of 'unbound'")
                     print(f"  Location: {f}:{l}")
                     break
@@ -587,9 +584,8 @@ try:
         print(f"  but not classified as unbound. The classifier may need tuning.")
 
 finally:
-    target_file.write_text(original)
-
-assert target_file.read_text() == original, "test cleanup: source file not restored correctly"
+    import shutil
+    shutil.rmtree(seeded_dir, ignore_errors=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 8. SEEDED NEGATIVE: ARTIFACT (inject hardcoded route into rendered exec)
