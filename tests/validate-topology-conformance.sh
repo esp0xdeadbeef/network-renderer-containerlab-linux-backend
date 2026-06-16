@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 usage() {
   cat >&2 <<'EOF'
 usage:
@@ -24,7 +26,7 @@ fi
 }
 [[ -s "${topology_yaml}" ]] || { echo "conformance: missing or empty topology yaml: ${topology_yaml}" >&2; exit 1; }
 
-python3 - "${cpm_json}" "${renderer_inventory_json}" "${topology_yaml}" <<'PY'
+PYTHONPATH="${repo_root}" python3 - "${cpm_json}" "${renderer_inventory_json}" "${topology_yaml}" <<'PY'
 from __future__ import annotations
 
 import json
