@@ -55,7 +55,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-python3 - <<'PY'
+PYTHONPATH="${repo_root}" python3 - <<'PY'
 import json
 import tempfile
 from pathlib import Path
