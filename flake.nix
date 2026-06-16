@@ -101,6 +101,7 @@
           rendererSourceNarHash = self.narHash or "";
 
           rendererSourceEnv = ''
+            export PYTHONDONTWRITEBYTECODE=1
             export CLAB_RENDERER_SOURCE_NAME="${rendererSourceName}"
             export CLAB_RENDERER_SOURCE_REV="${rendererSourceRev}"
             export CLAB_RENDERER_SOURCE_SHORT_REV="${rendererSourceShortRev}"
@@ -130,6 +131,7 @@
               qemu
             ];
             text = ''
+              export PYTHONDONTWRITEBYTECODE=1
               exec ${./start-vm.sh} "$@"
             '';
           };
