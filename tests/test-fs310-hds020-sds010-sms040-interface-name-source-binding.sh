@@ -56,6 +56,7 @@ def make_solver_json():
                                         "kind": "tenant",
                                         "tenant": "admin",
                                         "addr4": "10.20.15.1/24",
+                                        "attachBridge": "br-admin",
                                     },
                                 },
                             },
@@ -77,6 +78,7 @@ def make_solver_json():
                                         "kind": "tenant",
                                         "tenant": "client",
                                         "addr4": "10.20.20.1/24",
+                                        "attachBridge": "br-client",
                                     },
                                 },
                             },
@@ -84,6 +86,7 @@ def make_solver_json():
                         "links": {
                             "p2p-link": {
                                 "kind": "p2p",
+                                "bridge": "br-p2p-link",
                                 "endpoints": {
                                     "left-router": {"interface": "to-right"},
                                     "right-router": {"interface": "to-left"},
@@ -155,6 +158,35 @@ def is_bound_to_source(name, cpm_runtime_names):
     if is_generated_name(name):
         return True
     return False
+
+
+def collect_cpm_bridge_names(solver_json):
+    """Extract all bridge/attachBridge values from CPM data."""
+    names = set()
+    for enterprise, sites_obj in solver_json.get("enterprise", {}).items():
+        if not isinstance(sites_obj, dict):
+            continue
+        for site_name, site in sites_obj.get("site", {}).items():
+            if not isinstance(site, dict):
+                continue
+            # Bridge names from links
+            for link_name, link in site.get("links", {}).items():
+                if not isinstance(link, dict):
+                    continue
+                bridge = link.get("bridge")
+                if isinstance(bridge, str) and bridge:
+                    names.add(bridge)
+            # attachBridge from interfaces
+            for node_name, node in site.get("nodes", {}).items():
+                if not isinstance(node, dict):
+                    continue
+                for ifname, iface in node.get("interfaces", {}).items():
+                    if not isinstance(iface, dict):
+                        continue
+                    ab = iface.get("attachBridge")
+                    if isinstance(ab, str) and ab:
+                        names.add(ab)
+    return names
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -306,7 +338,9 @@ def verify_trace_sources(cpm_runtime_names, concrete_names, source_found_names):
 
 solver_json = make_solver_json()
 cpm_runtime_names = collect_cpm_runtime_ifnames(solver_json)
-print(f"CPM runtimeIfName values: {sorted(cpm_runtime_names)}")
+cpm_bridge_names = collect_cpm_bridge_names(solver_json)
+cpm_runtime_names |= cpm_bridge_names
+print(f"CPM runtimeIfName values (incl bridge names): {sorted(cpm_runtime_names)}")
 
 # ── 7a. Render and scan emitted artifacts ─────────────────────────────────
 
