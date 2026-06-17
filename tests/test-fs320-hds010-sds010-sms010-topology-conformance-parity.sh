@@ -47,6 +47,7 @@ cpm = {
                                         "runtimeIfName": "left0",
                                         "addr4": "10.0.0.0/31",
                                         "backingRef": {"name": "p2p"},
+                                        "attach": {"bridge": "br-p2p"},
                                     }
                                 }
                             },
@@ -66,6 +67,7 @@ cpm = {
                                         "runtimeIfName": "right0",
                                         "addr4": "10.0.0.1/31",
                                         "backingRef": {"name": "p2p"},
+                                        "attach": {"bridge": "br-p2p"},
                                     }
                                 }
                             },
