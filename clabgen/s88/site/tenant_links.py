@@ -121,6 +121,10 @@ def render_tenant_links(
                     )
                 )
             continue
+        if len(endpoints) == 2 and host_uplink_interface(host_uplink):
+            for endpoint in endpoints:
+                links.append(_host_bridge_link(endpoint, bridge, tenant, host_uplink))
+            continue
         links.append(_bridge_link(endpoints, bridge))
 
     return links, bridges
