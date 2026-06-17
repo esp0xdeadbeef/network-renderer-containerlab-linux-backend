@@ -53,6 +53,7 @@ tests=(
   test-fs960-hds010-sds016-sms020-clab-docker-readiness.sh
   test-fs960-hds010-sds016-sms050-clab-privileged-inspect.sh
   test-fs960-hds010-sds016-sms030-clab-cache-absent-build-save.sh
+  test-fs960-hds010-sds016-sms040-clab-marker-ordering.sh
   test-fs960-hds010-sds016-sms060-clab-failure-diagnostics.sh
   test-fs310-hds010-sds010-sms110-cmc-clab-fail-closed-domain.sh
   test-fs310-hds040-sds010-sms102-clab-cpm-only-consumption.sh
