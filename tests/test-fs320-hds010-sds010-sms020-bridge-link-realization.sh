@@ -123,5 +123,40 @@ assert_refuses(
     "unknown node",
 )
 
+missing_bridge = base_site(
+    LinkModel(
+        name="actual-contract-link",
+        kind="p2p",
+        endpoints={
+            "left": {"interface": "uplink-left"},
+            "right": {"interface": "uplink-right"},
+        },
+    )
+)
+assert_refuses(
+    "missing-bridge-field",
+    missing_bridge,
+    "MISSING_CPM_BRIDGE_FIELD",
+)
+
+missing_bridge_recovered = base_site(
+    LinkModel(
+        name="actual-contract-link",
+        kind="p2p",
+        bridge="br-contract",
+        endpoints={
+            "left": {"interface": "uplink-left"},
+            "right": {"interface": "uplink-right"},
+        },
+    )
+)
+rendered_recovered = render_site_topology(missing_bridge_recovered)
+recovered_links = rendered_recovered["topology"]["links"]
+if len(recovered_links) != 1:
+    raise AssertionError(f"recovery: expected exactly one link, got {recovered_links!r}")
+recovered_link = recovered_links[0]
+if recovered_link.get("labels", {}).get("clab.link.bridge") != "br-contract":
+    raise AssertionError(f"recovery: link did not use explicit bridge contract: {recovered_link!r}")
+
 print("PASS bridge-link-realization-contracts")
 PY
