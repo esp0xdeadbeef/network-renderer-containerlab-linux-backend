@@ -97,9 +97,15 @@ def render_tenant_links(
     links: List[Dict[str, Any]] = []
     bridges: List[str] = []
     for tenant in sorted(tenant_groups.keys()):
-        bridge = tenant_bridges.get(tenant) or bridge_name(
-            f"{site.enterprise}-{site.site}-tenant-{tenant}"
-        )
+        bridge = tenant_bridges.get(tenant)
+        if bridge is None:
+            raise ValueError(
+                f"MISSING_CPM_BRIDGE_FIELD: no attach_bridge set for tenant "
+                f"{tenant!r} (enterprise={site.enterprise!r} site={site.site!r}); "
+                f"bridge name must be explicitly provided by "
+                f"CPM endpointAssignment.<key>.bridge "
+                f"(FS-720-HDS-030-SDS-010-SMS-041)"
+            )
         endpoints = list(tenant_groups[tenant])
         host_uplink = _bridge_host_uplink(site, bridge)
         if len(endpoints) == 1 and host_uplink_interface(host_uplink):

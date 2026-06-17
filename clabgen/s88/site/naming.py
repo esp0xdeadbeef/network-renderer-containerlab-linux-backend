@@ -27,7 +27,12 @@ def host_ifname(seed: str) -> str:
 def link_bridge(site: SiteModel, link: LinkModel, link_name: str) -> str:
     if link.bridge:
         return realized_bridge_name(link.bridge)
-    return bridge_name(f"{site.enterprise}-{site.site}-{link_name}")
+    raise ValueError(
+        f"MISSING_CPM_BRIDGE_FIELD: link {link_name!r} has no explicit bridge field "
+        f"(enterprise={site.enterprise!r} site={site.site!r}); "
+        f"bridge must be explicitly provided by CPM link contract "
+        f"(FS-720-HDS-030-SDS-010-SMS-041)"
+    )
 
 
 def host_uplink_interface(host_uplink: Dict[str, Any]) -> str | None:
