@@ -14,6 +14,7 @@
 # No hardcoded test list.
 
 set -euo pipefail
+export PYTHONDONTWRITEBYTECODE=1
 exec > >(tee "/tmp/network-renderer-containerlab-linux-backend-tests.out")
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
