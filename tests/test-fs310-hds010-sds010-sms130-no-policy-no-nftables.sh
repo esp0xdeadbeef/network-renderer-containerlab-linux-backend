@@ -59,6 +59,7 @@ def make_bare_solver_json():
                         "links": {
                             "bare-link": {
                                 "kind": "p2p",
+                                "bridge": "br-bare-link",
                                 "endpoints": {
                                     "bare-node": {
                                         "interface": "bare-link",
@@ -277,6 +278,7 @@ node["interfaces"]["bare-link-2"] = {
 # Add a link for the second interface
 site["links"]["bare-link-2"] = {
     "kind": "p2p",
+    "bridge": "br-bare-link-2",
     "endpoints": {
         "bare-node": {
             "interface": "bare-link-2",
