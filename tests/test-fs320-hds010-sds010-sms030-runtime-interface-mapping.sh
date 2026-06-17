@@ -26,7 +26,7 @@ def node(interfaces):
     )
 
 
-def site_for(interfaces, endpoints):
+def site_for(interfaces, endpoints, bridge="br-test-sms030"):
     return SiteModel(
         enterprise="test",
         site="clab",
@@ -36,6 +36,7 @@ def site_for(interfaces, endpoints):
                 name="l0",
                 kind="p2p",
                 endpoints=endpoints,
+                bridge=bridge,
             )
         },
         single_access="client",
@@ -211,11 +212,13 @@ duplicate_runtime = SiteModel(
             name="l0",
             kind="p2p",
             endpoints={"router": {"interface": "left"}},
+            bridge="br-dup-0",
         ),
         "l1": LinkModel(
             name="l1",
             kind="p2p",
             endpoints={"router": {"interface": "right"}},
+            bridge="br-dup-1",
         ),
     },
     single_access="client",
