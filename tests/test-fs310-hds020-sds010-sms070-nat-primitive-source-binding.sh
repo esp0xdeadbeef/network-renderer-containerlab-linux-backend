@@ -16,6 +16,7 @@ cd "${repo_root}"
 PYTHONPATH="${repo_root}" python3 - <<'PY'
 import json
 import re
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -652,13 +653,22 @@ print()
 
 # ── Seeded source negative ──
 print("--- Seeded source negative for source code scan ---")
-target_py = Path("clabgen") / "s88" / "CM" / "nat.py"
+# Use an isolated temp file inside clabgen/ to avoid race conditions with
+# sibling tests under parallel HAT execution.  Modifying a shared source
+# file (nat.py) could cause import errors in concurrently-running tests.
+seeded_dir = Path(tempfile.mkdtemp(prefix="sms070-seeded-"))
+seeded_file = seeded_dir / "seeded_nat_evil.py"
 evil_comment = "# nft add table ip nat_evil  # hardcoded NAT table without CPM authority"
-original_content = ""
+seeded_file.write_text(evil_comment + "\n")
+
+# Place the seeded file inside clabgen/s88/CM/ so scan_source_for_hardcoded_nat()
+# (which walks clabgen/**/*.py) will find it.
+target_py = Path("clabgen") / "s88" / "CM" / "_sms070_seeded_negative.py"
+temp_placed = False
 try:
-    original_content = target_py.read_text()
-    # Prepend evil comment
-    target_py.write_text(evil_comment + "\n" + original_content)
+    shutil.copy2(seeded_file, target_py)
+    temp_placed = True
+    print(f"Seeding evil comment into isolated temp file: {target_py}")
 
     # Re-scan source for hardcoded NAT
     seeded_source_findings = scan_source_for_hardcoded_nat()
@@ -674,9 +684,10 @@ try:
         print("FAIL: Seeded 'nat_evil' not detected in source code scan")
         sys.exit(1)
 finally:
-    if original_content:
-        target_py.write_text(original_content)
-        print(f"Restored {target_py}")
+    if temp_placed:
+        target_py.unlink(missing_ok=True)
+        print(f"Removed temp seeded file: {target_py}")
+    shutil.rmtree(seeded_dir, ignore_errors=True)
 print()
 
 print("PASS FS-310-HDS-020-SDS-010-SMS-070 nat-primitive-source-binding")
