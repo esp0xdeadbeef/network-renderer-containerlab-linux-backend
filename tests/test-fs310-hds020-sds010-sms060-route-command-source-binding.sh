@@ -60,6 +60,7 @@ def make_solver_json():
                                         "kind": "tenant",
                                         "tenant": "admin",
                                         "addr4": "10.20.15.1/24",
+                                        "attachBridge": "br-admin",
                                     },
                                 },
                             },
@@ -81,6 +82,7 @@ def make_solver_json():
                                         "kind": "tenant",
                                         "tenant": "client",
                                         "addr4": "10.20.20.1/24",
+                                        "attachBridge": "br-client",
                                     },
                                 },
                             },
@@ -88,6 +90,7 @@ def make_solver_json():
                         "links": {
                             "p2p-link": {
                                 "kind": "p2p",
+                                "bridge": "br-p2p-link",
                                 "endpoints": {
                                     "left-router": {"interface": "to-right"},
                                     "right-router": {"interface": "to-left"},
