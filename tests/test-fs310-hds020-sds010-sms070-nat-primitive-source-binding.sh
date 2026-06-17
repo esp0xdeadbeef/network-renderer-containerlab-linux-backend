@@ -96,12 +96,14 @@ def make_solver_json():
                         "links": {
                             "p2p-access": {
                                 "kind": "p2p",
+                                "bridge": "br-nat-access",
                                 "endpoints": {
                                     "core-router": {"interface": "to-access"},
                                 },
                             },
                             "p2p-wan": {
                                 "kind": "p2p",
+                                "bridge": "br-nat-wan",
                                 "endpoints": {
                                     "core-router": {"interface": "to-wan"},
                                 },
