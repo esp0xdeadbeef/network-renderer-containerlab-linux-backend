@@ -108,7 +108,7 @@ if total == 0:
     print("FAIL: no shell fallback lines found")
     sys.exit(1)
 
-print(f"PASS fs310-hds010-sds010-sms080-shell-fallback-error-propagation: {total} fallback lines, "
+print(f"PASS fs310-hds030-sds010-sms080-shell-fallback-error-propagation: {total} fallback lines, "
       f"{len(classified)} categories, {len(violations)} unclassified\n")
 
 for cat_name, desc, _patterns in RULES:
