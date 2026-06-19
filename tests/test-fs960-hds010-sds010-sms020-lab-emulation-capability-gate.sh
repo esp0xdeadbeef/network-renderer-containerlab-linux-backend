@@ -223,11 +223,11 @@ assert_topology_refuses_without_artifacts(
 
 assert_refuses(
     {"providerEmulation": {"mode": "fake-provider", "name": "fake-isp-a"}},
-    "structured refusal: fake-provider handoff input requires explicit lab-emulation capability",
+    "diagnostic.ambiguous-target-capability: fake-provider handoff input requires explicit lab-emulation capability (FS-310-HDS-010-SDS-010-SMS-020)",
 )
 assert_refuses(
     {"providerEmulation": {"mode": "pppoe-like", "name": "fake-pppoe"}},
-    "structured refusal: pppoe-like handoff input requires explicit lab-emulation capability",
+    "diagnostic.ambiguous-target-capability: pppoe-like handoff input requires explicit lab-emulation capability (FS-310-HDS-010-SDS-010-SMS-020)",
 )
 assert_refuses(
     {
