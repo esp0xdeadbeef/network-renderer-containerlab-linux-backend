@@ -24,6 +24,7 @@ fi
 tests=(
   test-fs960-hds010-sds010-sms080-regression-resolved-states.sh
   test-fs100-hds010-sds010-sms010-renderer-output-provenance.sh
+  test-fs310-hds010-sds010-sms020-target-capability-limitation.sh
   test-fs310-hds020-sds010-sms040-interface-name-source-binding.sh
   test-fs310-hds020-sds010-sms050-nftables-primitive-source-binding.sh
   test-fs310-hds020-sds010-sms060-route-command-source-binding.sh

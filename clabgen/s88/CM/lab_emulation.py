@@ -72,8 +72,36 @@ def render_lab_emulation_artifacts(site: SiteModel) -> List[Dict[str, Any]]:
         mode = provider_emulation_mode(request)
         if not has_capability:
             raise ValueError(
-                f"structured refusal: {mode} handoff input requires explicit lab-emulation capability"
+                f"diagnostic.ambiguous-target-capability: {mode} handoff input "
+                f"requires explicit lab-emulation capability "
+                f"(FS-310-HDS-010-SDS-010-SMS-020)"
             )
-        artifacts.append(provider_emulation_artifact(request, mode))
+        artifact = provider_emulation_artifact(request, mode)
+        _validate_limitation_record(artifact, mode)
+        artifacts.append(artifact)
 
     return artifacts
+
+
+UNAUTHORIZED_POLICY_FIELDS = frozenset({"defaultRoute", "defaultFirewall"})
+
+
+def _validate_limitation_record(
+    artifact: Dict[str, Any],
+    mode: str,
+) -> None:
+    """Reject limitation records that create policy authority.
+
+    FS-310-HDS-010-SDS-010-SMS-020 SN2: a limitation record must not
+    include defaultRoute, defaultFirewall, or any field not authorized
+    by an explicit CPM contract.
+    """
+    unauthorized = UNAUTHORIZED_POLICY_FIELDS & artifact.keys()
+    if unauthorized:
+        fields = ", ".join(sorted(unauthorized))
+        raise ValueError(
+            f"diagnostic.limitation-record-policy-authority: "
+            f"{mode} lab-emulation limitation record includes "
+            f"unauthorized policy field(s): {fields} "
+            f"(FS-310-HDS-010-SDS-010-SMS-020)"
+        )
