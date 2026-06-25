@@ -50,6 +50,15 @@ Construction tests: `network-renderer-containerlab-linux-backend/tests/`
 - Missing, partial, or inconsistent input must fail evaluation.
 - Renderer output must be deterministic for the same CPM input.
 
+## VLAN Boundary
+
+Do not use `vlan2` as testing infrastructure.
+
+`vlan2` is the runtime management/reachability network for the VM/host
+lifecycle. It must stay separate from Containerlab test semantics, generated
+test uplinks, fake-provider paths, or mini POC traffic. If a test needs DHCP
+uplinks, use `vlan4` or `vlan5` and make that CPM/renderer input explicit.
+
 ## Allowed
 
 - Render Containerlab topology files from explicit realized nodes, links,
