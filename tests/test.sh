@@ -60,7 +60,7 @@ tests=(
   test-fs310-hds010-sds010-sms110-cmc-clab-fail-closed-domain.sh
   test-fs310-hds040-sds010-sms102-clab-cpm-only-consumption.sh
   test-fs310-hds030-sds010-sms112-clab-fail-closed-contract.sh
-  test-fs370-hds010-sds010-rdr-sms010-clab-forwarding-materialization.sh
+  test-fs370-hds010-sds010-sms110-clab-forwarding-materialization.sh
   test-fs310-hds010-sds010-sms130-no-policy-no-nftables.sh
   test-fs840-hds010-sds010-sms030-sops-service-ordering.sh
   run-fs982-sms110.sh
