@@ -28,6 +28,7 @@ failures=0
 # This mirrors the ordering logic from the HAT readiness pipeline:
 #   - fabric.clab.yml must not be consumed before render-live complete-success
 #   - Docker containers must not be started before network-artifacts readiness
+#   - Containerlab/Docker inspection must not run before ordering is verified
 # ---------------------------------------------------------------------------
 
 # Simulated marker states
@@ -40,7 +41,7 @@ ARTIFACTS_NOT_READY_MARKER='{"network-artifacts":"pending","timestamp":"2026-06-
 check_marker_artifact_ordering() {
   local marker_json="$1"
   local artifacts_json="$2"
-  local action="$3"  # "consume-fabric" or "start-containers"
+  local action="$3"  # "consume-fabric", "start-containers", or "inspect-containerlab"
 
   local phase result service_name artifacts_state
 
@@ -72,6 +73,14 @@ check_marker_artifact_ordering() {
     if [[ "${artifacts_state}" != "ready" ]]; then
       echo "diagnostic.premature-container-start: cannot start Docker containers before network-artifacts readiness (state=${artifacts_state:-none})" >&2
       return 3
+    fi
+  fi
+
+  # Gate 4: containerlab state inspection must wait for marker and artifacts.
+  if [[ "${action}" == "inspect-containerlab" ]]; then
+    if [[ "${phase}" != "complete" || "${result}" != "success" || "${artifacts_state}" != "ready" ]]; then
+      echo "diagnostic.artifact-ordering-violation: cannot inspect Docker/containerlab state before render-live complete-success and network-artifacts readiness (phase=${phase:-none}, result=${result:-none}, artifacts=${artifacts_state:-none})" >&2
+      return 4
     fi
   fi
 
@@ -225,13 +234,13 @@ EMPTY_ARTIFACTS='{}'
 if check_marker_artifact_ordering \
     "${MARKER_COMPLETE_SUCCESS}" \
     "${EMPTY_ARTIFACTS}" \
-    "start-containers" \
+    "inspect-containerlab" \
     >/dev/null 2>"${tmp_dir}/test8.stderr"; then
-  echo "FAIL test8: missing artifacts state should reject container startup" >&2
+  echo "FAIL test8: missing artifacts state should reject containerlab inspection" >&2
   failures=$((failures + 1))
 else
-  if grep -q "diagnostic.premature-container-start" "${tmp_dir}/test8.stderr"; then
-    echo "PASS test8: missing artifacts state correctly rejects container startup"
+  if grep -q "diagnostic.artifact-ordering-violation" "${tmp_dir}/test8.stderr"; then
+    echo "PASS test8: missing artifacts state correctly rejects containerlab inspection"
   else
     echo "FAIL test8: wrong diagnostic for missing artifacts state" >&2
     cat "${tmp_dir}/test8.stderr" >&2
