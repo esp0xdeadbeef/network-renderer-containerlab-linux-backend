@@ -258,7 +258,85 @@ print()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 5. Seeded negative: inject forwarding rule → verify emission
+# 5. Seeded negative: silent default-accept firewall policy is rejected
+# ═══════════════════════════════════════════════════════════════════════════════
+
+print("=== Seeded negative: synthetic default-accept firewall policy ===")
+
+default_accept_cmd = (
+    "nft 'add chain inet filter forward "
+    "{ type filter hook forward priority 0 ; policy accept ; }'"
+)
+default_platform, default_inventions = classify_nft_commands([default_accept_cmd])
+if default_platform != 0 or len(default_inventions) != 1:
+    print("FAIL: default-accept forward policy was not classified as policy invention")
+    print(f"  platform={default_platform} inventions={len(default_inventions)}")
+    sys.exit(1)
+
+print("SEEDED NEGATIVE PASS: default-accept forward policy is reported as policy invention")
+print()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. Seeded negative: missing policy-route allocation fails closed
+# ═══════════════════════════════════════════════════════════════════════════════
+
+print("=== Seeded negative: missing policy routing allocation ===")
+
+routing_solver = json.loads(json.dumps(bare_solver))
+routing_site = routing_solver["enterprise"]["esp0xdeadbeef"]["site"]["site-a"]
+routing_node = routing_site["nodes"]["bare-node"]
+routing_node["interfaces"]["bare-link"]["lane"] = {
+    "access": "client",
+    "kind": "tenant",
+}
+routing_node["interfaces"]["bare-link"]["routes"] = {
+    "ipv4": [
+        {
+            "dst": "198.51.100.0/24",
+            "via4": "192.0.2.1",
+            "policyOnly": True,
+            "lane": {
+                "access": "client",
+                "kind": "tenant",
+            },
+        },
+    ],
+}
+
+try:
+    render_solver(routing_solver)
+except ValueError as exc:
+    message = str(exc)
+    if "policyRoutingAllocation" not in message:
+        print("FAIL: missing allocation failed with the wrong diagnostic")
+        print(f"  diagnostic={message}")
+        sys.exit(1)
+    print("SEEDED NEGATIVE PASS: missing policyRoutingAllocation rejected")
+else:
+    print("FAIL: renderer accepted policy route lane without policyRoutingAllocation")
+    sys.exit(1)
+
+routing_node["interfaces"]["bare-link"]["policyRoutingAllocation"] = {
+    "source": "control-plane-model",
+    "allocation": "sms-130-seeded-recovery",
+    "tableId": 2200,
+    "priority": 5000,
+}
+allocated_rendered = render_solver(routing_solver)
+allocated_cmds = extract_all_exec_cmds(allocated_rendered)
+allocated_joined = "\n".join(allocated_cmds)
+if "table 2200" not in allocated_joined or "priority 5000" not in allocated_joined:
+    print("FAIL: explicit policyRoutingAllocation was not realized in route commands")
+    print(allocated_joined)
+    sys.exit(1)
+
+print("RECOVERY PASS: explicit policyRoutingAllocation tableId=2200 priority=5000 realized")
+print()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. Seeded positive: inject forwarding rule → verify emission
 # ═══════════════════════════════════════════════════════════════════════════════
 
 print("=== Seeded negative: inject forwardingIntent rule ===")
@@ -361,11 +439,13 @@ print()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 6. Final summary
+# 8. Final summary
 # ═══════════════════════════════════════════════════════════════════════════════
 
 print("PASS test-no-policy-no-nftables-emission")
 print("  Bare CPM input: 0 invented nftables policy (platform constants only)")
-print("  Seeded negative: correctly detects policy emission when CPM provides it")
+print("  Seeded negative: default-accept firewall policy is classified as invention")
+print("  Seeded negative: missing policy route allocation fails closed")
+print("  Seeded positive: correctly detects policy emission when CPM provides it")
 print("  Renderer is policy-transparent: zero policy in → zero policy out")
 PY

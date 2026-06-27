@@ -172,6 +172,12 @@ selector_node = {
             "kind": "p2p",
             "runtimeIfName": "ens19",
             "lane": {"access": "client", "kind": "access"},
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "allocation": "fixture-explicit",
+                "tableId": 1001,
+                "priority": 10001,
+            },
             "addr4": "10.50.0.1/31",
             "routes": {
                 "ipv4": [],
@@ -182,6 +188,12 @@ selector_node = {
             "kind": "p2p",
             "runtimeIfName": "ens22",
             "lane": {"access": "client", "uplink": "us"},
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "allocation": "fixture-explicit",
+                "tableId": 1002,
+                "priority": 10002,
+            },
             "addr4": "10.200.0.0/31",  # peer of core's 10.200.0.1
             "routes": {
                 "ipv4": [
@@ -197,6 +209,12 @@ selector_node = {
             "kind": "p2p",
             "runtimeIfName": "ens23",
             "lane": {"access": "guest", "kind": "access"},
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "allocation": "fixture-explicit",
+                "tableId": 1003,
+                "priority": 10003,
+            },
             "addr4": "10.60.0.1/31",
             "routes": {
                 "ipv4": [

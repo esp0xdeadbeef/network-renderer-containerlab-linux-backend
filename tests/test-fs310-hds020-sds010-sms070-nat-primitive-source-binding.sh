@@ -458,7 +458,7 @@ def inject_unbound_nat_rule(rendered):
 # 8. Source code scan: detect hardcoded NAT primitives in clabgen/
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def scan_source_for_hardcoded_nat():
+def scan_source_for_hardcoded_nat(extra_roots=None):
     """Scan clabgen/ Python source files for hardcoded NAT primitives.
 
     Searches for nft nat table/chain/rule command strings embedded in
@@ -467,8 +467,15 @@ def scan_source_for_hardcoded_nat():
 
     Returns list of (file, line_content) tuples with hardcoded NAT patterns.
     """
-    clabgen_dir = Path("clabgen")
-    py_files = sorted(clabgen_dir.rglob("*.py"))
+    roots = [Path("clabgen")]
+    if extra_roots:
+        roots.extend(Path(root) for root in extra_roots)
+    py_files = []
+    for root in roots:
+        if root.is_file() and root.suffix == ".py":
+            py_files.append(root)
+        elif root.is_dir():
+            py_files.extend(sorted(root.rglob("*.py")))
 
     # Patterns that indicate hardcoded NAT primitives in source strings
     NAT_HARDCODED_RE = re.compile(
@@ -655,25 +662,18 @@ print()
 
 # ── Seeded source negative ──
 print("--- Seeded source negative for source code scan ---")
-# Use an isolated temp file inside clabgen/ to avoid race conditions with
-# sibling tests under parallel HAT execution.  Modifying a shared source
-# file (nat.py) could cause import errors in concurrently-running tests.
+# Use an isolated temp file outside the source tree. Copying generated files
+# into clabgen/ can race with parallel Nix source snapshots.
 seeded_dir = Path(tempfile.mkdtemp(prefix="sms070-seeded-"))
 seeded_file = seeded_dir / "seeded_nat_evil.py"
 evil_comment = "# nft add table ip nat_evil  # hardcoded NAT table without CPM authority"
 seeded_file.write_text(evil_comment + "\n")
 
-# Place the seeded file inside clabgen/s88/CM/ so scan_source_for_hardcoded_nat()
-# (which walks clabgen/**/*.py) will find it.
-target_py = Path("clabgen") / "s88" / "CM" / "_sms070_seeded_negative.py"
-temp_placed = False
 try:
-    shutil.copy2(seeded_file, target_py)
-    temp_placed = True
-    print(f"Seeding evil comment into isolated temp file: {target_py}")
+    print(f"Seeding evil comment into isolated temp file: {seeded_file}")
 
     # Re-scan source for hardcoded NAT
-    seeded_source_findings = scan_source_for_hardcoded_nat()
+    seeded_source_findings = scan_source_for_hardcoded_nat(extra_roots=[seeded_file])
 
     # Check if evil comment was detected
     evil_detected = any(
@@ -686,9 +686,6 @@ try:
         print("FAIL: Seeded 'nat_evil' not detected in source code scan")
         sys.exit(1)
 finally:
-    if temp_placed:
-        target_py.unlink(missing_ok=True)
-        print(f"Removed temp seeded file: {target_py}")
     shutil.rmtree(seeded_dir, ignore_errors=True)
 print()
 

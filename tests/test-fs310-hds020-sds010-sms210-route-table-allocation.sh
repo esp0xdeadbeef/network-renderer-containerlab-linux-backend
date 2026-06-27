@@ -7,7 +7,7 @@
 # names without CPM authority or documented platform constants.
 #
 # Covers:
-#   1. linux_policy_routes.py: table/priority bases documented as CPM_GAP
+#   1. linux_policy_routes.py: table/priority values come from explicit CPM/provider allocation
 #   2. linux_bgp_state.py: no more `return "1.1.1.1"`
 #   3. interface_tags.py: no more `or ["wan"]`
 #   4. onlink: documented as platform constant
@@ -24,23 +24,28 @@ from pathlib import Path
 repo = Path(".")
 failures = 0
 
-# ── 1. Policy route table/priority bases: CPM_GAP documented ────────
-print("=== Check 1: table/priority bases CPM_GAP ===")
+# ── 1. Policy route table/priority values: explicit allocation only ──
+print("=== Check 1: table/priority allocation contract ===")
 policy_file = repo / "clabgen/s88/CM/linux_policy_routes.py"
 content = policy_file.read_text()
 
-# Must have CPM_GAP comment near table_id = 1000 + slot
-gap_pattern = re.compile(r"CPM_GAP.*table base.*1000|CPM_GAP.*priority base.*10000", re.IGNORECASE)
-if gap_pattern.search(content):
-    print("  PASS: CPM_GAP comment present for table/priority bases")
-else:
-    print("  FAIL: missing CPM_GAP comment for table/priority bases")
+if "CPM_GAP" in content:
+    print("  FAIL: CPM_GAP fallback still present in linux_policy_routes.py")
     failures += 1
+else:
+    print("  PASS: no CPM_GAP table/priority fallback")
 
-# Must still use table_id = 1000 + slot (platform constant, not removed)
-assert "table_id = 1000 + slot" in content, "table_id expression missing"
-assert "priority = 10000 + slot" in content, "priority expression missing"
-print("  PASS: table_id/priority expressions preserved with CPM_GAP")
+if "table_id = 1000 + slot" in content or "priority = 10000 + slot" in content:
+    print("  FAIL: hardcoded table/priority expressions still present")
+    failures += 1
+else:
+    print("  PASS: hardcoded table/priority expressions removed")
+
+assert "policyRoutingAllocation" in content, \
+    "linux_policy_routes should require policyRoutingAllocation"
+assert "renderer must not invent route table IDs" in content, \
+    "missing allocation diagnostic should name renderer invention boundary"
+print("  PASS: policyRoutingAllocation fail-closed diagnostic present")
 
 # ── 2. BGP health check: no 1.1.1.1 fallback ────────────────────────
 print("\n=== Check 2: BGP health check ===")

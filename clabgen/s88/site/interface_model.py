@@ -113,6 +113,9 @@ def build_interfaces(
             tenant=_infer_interface_tenant(link_key, fb, tenant_prefix_owners),
             overlay=fb["overlay"] if isinstance(fb["overlay"], str) else None,
             lane=dict(iface.get("lane", {}) or {}),
+            policy_routing_allocation=dict(
+                iface.get("policyRoutingAllocation", {}) or {}
+            ),
             attach_bridge=iface.get("attachBridge")
             if isinstance(iface.get("attachBridge"), str)
             else None,

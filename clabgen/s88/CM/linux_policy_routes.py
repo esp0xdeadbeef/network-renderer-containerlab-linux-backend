@@ -181,6 +181,41 @@ def _table_slot(eth_map: Dict[str, str], target_ifname: str) -> int:
     return names.index(target_ifname) + 1
 
 
+def _int_field(value: Any, field: str, ifname: str) -> int:
+    if not isinstance(value, int) or value <= 0:
+        raise ValueError(
+            "FS-310-HDS-010-SDS-010-SMS-130: interface "
+            f"{ifname!r} policyRoutingAllocation.{field} must be a positive integer"
+        )
+    return value
+
+
+def _policy_routing_allocation(
+    iface: Dict[str, Any],
+    ifname: str,
+) -> Tuple[int, int]:
+    allocation = iface.get("policyRoutingAllocation")
+    if not isinstance(allocation, dict) or not allocation:
+        raise ValueError(
+            "FS-310-HDS-010-SDS-010-SMS-130: interface "
+            f"{ifname!r} has policy-routing lane data but lacks CPM "
+            "policyRoutingAllocation; renderer must not invent route table IDs "
+            "or rule priorities"
+        )
+
+    source = allocation.get("source")
+    if source not in {"control-plane-model", "provider-contract"}:
+        raise ValueError(
+            "FS-310-HDS-010-SDS-010-SMS-130: interface "
+            f"{ifname!r} policyRoutingAllocation.source must be "
+            "'control-plane-model' or 'provider-contract'"
+        )
+
+    table_id = _int_field(allocation.get("tableId"), "tableId", ifname)
+    priority = _int_field(allocation.get("priority"), "priority", ifname)
+    return table_id, priority
+
+
 def _render_policy_table(
     cmds: List[str],
     ip_cmd: str,
@@ -214,7 +249,7 @@ def _add_connected_subnet_route(
         return
     try:
         subnet = str(ipaddress.ip_interface(cidr).network)
-    except Exception:
+    except ValueError:
         return
     if _is_default(subnet):
         return
@@ -247,13 +282,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         # policy drop can act.  (FS-170 silent-drop / D9)
 
         slot = _table_slot(eth_map, eth)
-        # CPM_GAP: table base (1000) and priority base (10000) are
-        # deterministic platform constants. CPM does not currently provide
-        # routingTableBase or routePriorityBase fields. When CPM adds these,
-        # replace the hardcoded bases with CPM-derived values.
-        # Trace: FS-310-HDS-010-SDS-010-SMS-190 (renderer no-default contract).
-        table_id = 1000 + slot
-        priority = 10000 + slot
+        table_id, priority = _policy_routing_allocation(iface, ifname)
         source_eths: List[str] = []
         for source in _source_interfaces_for_lane(node, ifname, iface):
             source_eth = eth_map.get(source)
