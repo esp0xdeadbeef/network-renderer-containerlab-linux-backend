@@ -219,6 +219,20 @@ let
             echo "container $container has no non-loopback interfaces after deploy" >&2
             exit 1
           fi
+          health="$(
+            timeout 10 docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container"
+          )" || {
+            echo "container $container health status could not be inspected" >&2
+            exit 1
+          }
+          case "$health" in
+            healthy|none)
+              ;;
+            *)
+              echo "container $container health check is $health" >&2
+              exit 1
+              ;;
+          esac
         done <<EOF
         $containers
         EOF

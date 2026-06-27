@@ -98,6 +98,21 @@ verify_containers() {
       echo "container ${container} has no non-loopback interfaces after deploy" >&2
       return 1
     fi
+    local health
+    health="$(
+      timeout 10 docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${container}"
+    )" || {
+      echo "container ${container} health status could not be inspected" >&2
+      return 1
+    }
+    case "${health}" in
+      healthy|none)
+        ;;
+      *)
+        echo "container ${container} health check is ${health}" >&2
+        return 1
+        ;;
+    esac
   done <<EOF
 ${containers}
 EOF
@@ -197,6 +212,10 @@ case "$1" in
     exit 0
     ;;
   inspect)
+    if [[ "${2:-}" == "--format" ]]; then
+      echo "healthy"
+      exit 0
+    fi
     exit 0
     ;;
   *)
@@ -226,7 +245,63 @@ else
 fi
 
 # ===========================================================================
-# Test 4 (seeded negative): No containers running → verification fails
+# Test 4 (seeded negative): Container running but health check is unhealthy
+# Mock docker ps: returns 1 container
+# Mock docker exec: returns non-loopback interfaces
+# Mock docker inspect: returns unhealthy health status
+# ===========================================================================
+test4_health_dir="${tmp_dir}/test4-health"
+mkdir -p "${test4_health_dir}"
+
+cat >"${fake_bin}/docker" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "$1" in
+  ps)
+    if [[ "${2:-}" == "--format" ]]; then
+      echo "clab-fabric-unhealthy-1"
+    fi
+    ;;
+  exec)
+    if [[ "$*" == *"find /sys/class/net"* ]]; then
+      echo "2"
+      exit 0
+    fi
+    exit 0
+    ;;
+  inspect)
+    if [[ "${2:-}" == "--format" ]]; then
+      echo "unhealthy"
+      exit 0
+    fi
+    exit 0
+    ;;
+  *)
+    exit 2
+    ;;
+esac
+SH
+chmod +x "${fake_bin}/docker"
+
+if (
+  export PATH="${fake_bin}:${PATH}"
+  verify_containers
+) 2>"${test4_health_dir}/stderr"; then
+  echo "FAIL test4: expected failure for unhealthy container, but verification passed" >&2
+  failures=$((failures + 1))
+else
+  if grep -q "health check is unhealthy" "${test4_health_dir}/stderr"; then
+    echo "PASS test4: seeded negative — running but unhealthy container correctly rejected"
+  else
+    echo "FAIL test4: wrong error message for unhealthy container" >&2
+    cat "${test4_health_dir}/stderr" >&2
+    failures=$((failures + 1))
+  fi
+fi
+
+# ===========================================================================
+# Test 5 (seeded negative): No containers running → verification fails
 # Mock docker ps: returns empty (no clab-fabric containers)
 # ===========================================================================
 test4_dir="${tmp_dir}/test4"
@@ -297,6 +372,10 @@ case "$1" in
     exit 0
     ;;
   inspect)
+    if [[ "${2:-}" == "--format" ]]; then
+      echo "healthy"
+      exit 0
+    fi
     exit 0
     ;;
   *)
@@ -348,6 +427,10 @@ case "$1" in
     exit 0
     ;;
   inspect)
+    if [[ "${2:-}" == "--format" ]]; then
+      echo "healthy"
+      exit 0
+    fi
     exit 0
     ;;
   *)
@@ -570,6 +653,10 @@ case "$1" in
     exit 0
     ;;
   inspect)
+    if [[ "${2:-}" == "--format" ]]; then
+      echo "healthy"
+      exit 0
+    fi
     exit 0
     ;;
   *)
@@ -602,4 +689,4 @@ if (( failures > 0 )); then
   exit 1
 fi
 
-echo "PASS FS-960-HDS-010-SDS-016-SMS-010: all 10 acceptance predicates covered (locked-source, readiness marker, container state, 5 seeded negatives)"
+echo "PASS FS-960-HDS-010-SDS-016-SMS-010: all 11 acceptance predicates covered (locked-source, readiness marker, container state, 6 seeded negatives)"

@@ -312,6 +312,16 @@ verify_fabric_containers() {
     docker exec "${container}" sh -ec '
       ip -o link show up | awk -F": " "$2 != \"lo\" && $2 !~ /^lo@/ { found = 1 } END { exit found ? 0 : 1 }"
     ' || fail "container ${container} has no non-loopback interface up"
+    health="$(
+      docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${container}"
+    )" || fail "container ${container} health status could not be inspected"
+    case "${health}" in
+      healthy|none)
+        ;;
+      *)
+        fail "container ${container} health check is ${health}"
+        ;;
+    esac
   done
   log "verified ${#containers[@]} fabric containers"
 }
