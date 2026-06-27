@@ -9,7 +9,9 @@
 #  1. Cache-absent path builds the Docker image (imageBuilt=true)
 #  2. Cache-absent path saves the cache artifact (cacheSaved=true)
 #  3. Cache-absent path reports cachePresentAtStart=false
-#  4. Seeded negative: cache-present path reports cachePresentAtStart=true
+#  4. Seeded negative: cache absent but build skipped is rejected
+#  5. Seeded negative: build succeeds but cache is not saved is rejected
+#  6. Cache-present path reports cachePresentAtStart=true
 #     (proves the test discriminates absent from present)
 set -euo pipefail
 
@@ -141,6 +143,51 @@ run_build() {
   printf '%s\n' "${evidence}"
 }
 
+run_build_expect_failure() {
+  local case_name="$1"
+  local failure_mode="$2" # "build-skipped" or "save-missing"
+  local case_dir="${tmp_dir}/${case_name}"
+  local cache_dir="${case_dir}/cache"
+  local state_dir="${case_dir}/state"
+  local evidence="${case_dir}/evidence.json"
+  local stderr="${case_dir}/stderr"
+  local cache_tar="${cache_dir}/clab-frr-plus-tooling-contract-key-${case_name}.tar"
+  local cache_id="${cache_tar}.image-id"
+  local allow_existing=0
+  local save_cache=1
+
+  mkdir -p "${cache_dir}" "${state_dir}"
+
+  if [[ "${failure_mode}" == "build-skipped" ]]; then
+    allow_existing=1
+    printf 'sha256:existing-%s\n' "${case_name}" >"${state_dir}/image-id"
+    printf '%s\n' "contract-key-${case_name}" >"${state_dir}/label"
+  elif [[ "${failure_mode}" == "save-missing" ]]; then
+    save_cache=0
+  else
+    echo "unknown failure mode: ${failure_mode}" >&2
+    return 2
+  fi
+
+  if PATH="${fake_bin}:${PATH}" \
+    FAKE_DOCKER_STATE_DIR="${state_dir}" \
+    FAKE_DOCKER_CACHE_ID_FILE="${cache_id}" \
+    CLAB_FRR_TOOLING_IMAGE="fake-clab-tooling:${case_name}" \
+    CLAB_FRR_TOOLING_CACHE_KEY="contract-key-${case_name}" \
+    CLAB_FRR_TOOLING_CACHE_DIR="${cache_dir}" \
+    CLAB_FRR_TOOLING_CACHE_TAR="${cache_tar}" \
+    CLAB_FRR_TOOLING_CACHE_IMAGE_ID_FILE="${cache_id}" \
+    CLAB_FRR_TOOLING_CACHE_EVIDENCE_JSON="${evidence}" \
+    CLAB_FRR_TOOLING_SAVE_CACHE="${save_cache}" \
+    CLAB_FRR_TOOLING_ALLOW_EXISTING_IMAGE="${allow_existing}" \
+    "${build_script}" >/dev/null 2>"${stderr}"; then
+    echo "expected ${failure_mode} to fail, but build.sh passed" >&2
+    return 1
+  fi
+
+  printf '%s\n' "${stderr}"
+}
+
 failures=0
 
 # ---------------------------------------------------------------------------
@@ -175,7 +222,34 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Test 2 (seeded negative): Cache-present path — inject a cache tar at start.
+# Test 2 (seeded negative): Cache absent but build skipped.
+#   Existing image use is not enough for cache-miss readiness; the locked-source
+#   build must run before parent readiness can pass.
+# ---------------------------------------------------------------------------
+stderr_file="$(run_build_expect_failure cache-absent-build-skipped build-skipped)"
+if grep -q 'diagnostic.clab-cache-absent-build-skipped' "${stderr_file}"; then
+  echo "PASS test2: seeded negative — cache absent but build skipped rejected"
+else
+  echo "FAIL test2: missing build-skipped diagnostic" >&2
+  cat "${stderr_file}" >&2
+  failures=$((failures + 1))
+fi
+
+# ---------------------------------------------------------------------------
+# Test 3 (seeded negative): Build succeeds but cache is not saved.
+#   Parent readiness must not pass until the /persist cache artifact is saved.
+# ---------------------------------------------------------------------------
+stderr_file="$(run_build_expect_failure cache-absent-save-missing save-missing)"
+if grep -q 'diagnostic.clab-cache-save-missing-before-ready' "${stderr_file}"; then
+  echo "PASS test3: seeded negative — build without cache save rejected before readiness"
+else
+  echo "FAIL test3: missing cache-save diagnostic" >&2
+  cat "${stderr_file}" >&2
+  failures=$((failures + 1))
+fi
+
+# ---------------------------------------------------------------------------
+# Test 4: Cache-present path — inject a cache tar at start.
 #   build.sh should: detect cache → load it → use existing image (no build).
 #   Expected evidence: cachePresentAtStart=true, imageBuilt=false, cacheLoaded=true.
 #   This proves the test discriminates absent from present.
@@ -197,9 +271,9 @@ assert payload["existingImageUsed"] is True, f"expected existingImageUsed=true, 
 PY
 
 if (( $? == 0 )); then
-  echo "PASS test2: seeded negative — cache-present path correctly distinguished"
+  echo "PASS test4: cache-present path correctly distinguished"
 else
-  echo "FAIL test2: seeded negative cache-present evidence check failed" >&2
+  echo "FAIL test4: cache-present evidence check failed" >&2
   failures=$((failures + 1))
 fi
 
@@ -211,4 +285,4 @@ if (( failures > 0 )); then
   exit 1
 fi
 
-echo "PASS FS-960-HDS-010-SDS-016-SMS-030: cache-absent build/save acceptance predicates covered"
+echo "PASS FS-960-HDS-010-SDS-016-SMS-030: cache-absent build/save acceptance predicates covered with active seeded negatives"
