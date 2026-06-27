@@ -15,7 +15,12 @@ EOF
 }
 
 log() { printf '[deploy-clab] %s\n' "$*"; }
-fail() { printf '[deploy-clab] error: %s\n' "$*" >&2; exit 1; }
+fail() {
+  local context="${CLAB_FAILURE_CONTEXT:-direct-host-clab}"
+  local locked_source="${CLAB_LOCKED_SOURCE_IDENTITY:-${repo_root:-unknown}}"
+  printf '[deploy-clab] error: %s [directHostContext=%s lockedSource=%s]\n' "$*" "${context}" "${locked_source}" >&2
+  exit 1
+}
 
 repo_root="${CLAB_RENDERER_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 python_bin="${CLABGEN_PYTHON:-python3}"

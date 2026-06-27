@@ -33,6 +33,43 @@ eval "$(
 
 failures=0
 
+classify_failure_record() {
+  local signal="$1"
+  local reported_category="$2"
+  local direct_host_context="$3"
+  local locked_source_identity="$4"
+
+  if [[ -z "${direct_host_context}" || -z "${locked_source_identity}" ]]; then
+    echo "diagnostic.clab-failure-context-missing: direct-host context or locked source identity omitted" >&2
+    return 1
+  fi
+
+  case "${signal}" in
+    docker-permission-denied)
+      if [[ "${reported_category}" != "privilege_failure" ]]; then
+        echo "diagnostic.clab-privilege-failure-misclassified: permission denial reported as ${reported_category}" >&2
+        return 1
+      fi
+      ;;
+    cache-build-in-progress)
+      if [[ "${reported_category}" != "cache_build_save_progress" ]]; then
+        echo "diagnostic.clab-cache-progress-misclassified: cache build/save progress reported as ${reported_category}" >&2
+        return 1
+      fi
+      ;;
+    pre-marker-artifact-inspection)
+      if [[ "${reported_category}" != "pre_marker_race" ]]; then
+        echo "diagnostic.clab-pre-marker-race-misclassified: pre-marker inspection reported as ${reported_category}" >&2
+        return 1
+      fi
+      ;;
+    *)
+      echo "diagnostic.clab-unknown-failure-category: ${signal}" >&2
+      return 1
+      ;;
+  esac
+}
+
 # ===========================================================================
 # PRIVILEGE FAILURE TESTS (wait_for_docker diagnostics)
 # ===========================================================================
@@ -334,6 +371,87 @@ else
   else
     echo "PASS test9: seeded negative — privilege_failure correctly NOT misclassified as deployment or artifact failure"
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# Test 10 (seeded negative): Classifier rejects privilege failure reported as
+# runtime absence/deployment failure and accepts the corrected category.
+# ---------------------------------------------------------------------------
+if classify_failure_record \
+    docker-permission-denied \
+    deployment_failure \
+    direct-host-clab \
+    locked-hat-source \
+    2>"${tmp_dir}/test10.stderr"; then
+  echo "FAIL test10: seeded negative — privilege misclassification unexpectedly accepted" >&2
+  failures=$((failures + 1))
+else
+  if grep -q 'diagnostic.clab-privilege-failure-misclassified' "${tmp_dir}/test10.stderr"; then
+    echo "PASS test10: seeded negative — privilege failure misclassification rejected"
+  else
+    echo "FAIL test10: wrong diagnostic for privilege misclassification" >&2
+    cat "${tmp_dir}/test10.stderr" >&2
+    failures=$((failures + 1))
+  fi
+fi
+
+if classify_failure_record \
+    docker-permission-denied \
+    privilege_failure \
+    direct-host-clab \
+    locked-hat-source \
+    2>"${tmp_dir}/test10-corrected.stderr"; then
+  echo "PASS test10 recovery: corrected privilege failure category accepted"
+else
+  echo "FAIL test10 recovery: corrected privilege failure category rejected" >&2
+  cat "${tmp_dir}/test10-corrected.stderr" >&2
+  failures=$((failures + 1))
+fi
+
+# ---------------------------------------------------------------------------
+# Test 11 (seeded negative): Classifier rejects cache build/save progress
+# reported as missing runtime and accepts the corrected category.
+# ---------------------------------------------------------------------------
+if classify_failure_record \
+    cache-build-in-progress \
+    runtime_absence \
+    direct-host-clab \
+    locked-hat-source \
+    2>"${tmp_dir}/test11.stderr"; then
+  echo "FAIL test11: seeded negative — cache progress misclassification unexpectedly accepted" >&2
+  failures=$((failures + 1))
+else
+  if grep -q 'diagnostic.clab-cache-progress-misclassified' "${tmp_dir}/test11.stderr"; then
+    echo "PASS test11: seeded negative — cache progress misclassification rejected"
+  else
+    echo "FAIL test11: wrong diagnostic for cache progress misclassification" >&2
+    cat "${tmp_dir}/test11.stderr" >&2
+    failures=$((failures + 1))
+  fi
+fi
+
+if classify_failure_record \
+    cache-build-in-progress \
+    cache_build_save_progress \
+    direct-host-clab \
+    locked-hat-source \
+    2>"${tmp_dir}/test11-corrected.stderr"; then
+  echo "PASS test11 recovery: corrected cache progress category accepted"
+else
+  echo "FAIL test11 recovery: corrected cache progress category rejected" >&2
+  cat "${tmp_dir}/test11-corrected.stderr" >&2
+  failures=$((failures + 1))
+fi
+
+# ---------------------------------------------------------------------------
+# Test 12: Real deploy-clab failures carry direct-host context and locked-source identity.
+# ---------------------------------------------------------------------------
+if grep -q 'directHostContext=' "${deploy_script}" &&
+   grep -q 'lockedSource=' "${deploy_script}"; then
+  echo "PASS test12: deploy-clab fail diagnostics preserve direct-host context and locked source identity"
+else
+  echo "FAIL test12: deploy-clab fail diagnostics omit context or locked source identity" >&2
+  failures=$((failures + 1))
 fi
 
 # ===========================================================================
