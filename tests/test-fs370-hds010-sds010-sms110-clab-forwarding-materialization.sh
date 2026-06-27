@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GAMP-ID: FS-370-HDS-010-SDS-010-RDR-SMS-010
+# GAMP-ID: FS-370-HDS-010-SDS-010-SMS-110
 # Construction test: CLAB Forwarding Materialization
 # Proves: CLAB renderer materializes FS-370 forwarding predicates
 # (nftables rules, ip routes, ip rules) from CPM data, with active
@@ -479,8 +479,8 @@ check("No unexpected hardcoded ethX interface names in commands",
 # ═══════════════════════════════════════════════════════════════════════
 print()
 if failures:
-    print(f"FAIL FS-370-HDS-010-SDS-010-RDR-SMS-010: {failures} failure(s)")
+    print(f"FAIL FS-370-HDS-010-SDS-010-SMS-110: {failures} failure(s)")
     sys.exit(1)
 else:
-    print("PASS FS-370-HDS-010-SDS-010-RDR-SMS-010")
+    print("PASS FS-370-HDS-010-SDS-010-SMS-110")
 PY
