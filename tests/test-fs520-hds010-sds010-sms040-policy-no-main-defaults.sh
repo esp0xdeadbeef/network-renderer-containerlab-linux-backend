@@ -14,6 +14,12 @@ node = {
     "interfaces": {
         "tenant": {
             "lane": {"access": "client"},
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "allocation": "fixture-explicit",
+                "tableId": 1001,
+                "priority": 10001,
+            },
         },
         "wan": {
             "addr4": "10.0.0.0/31",
@@ -71,6 +77,12 @@ upstream = {
         "policy-client": {
             "addr4": "10.50.0.33/31",
             "lane": {"access": "client", "uplink": "wan"},
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "allocation": "fixture-explicit",
+                "tableId": 1002,
+                "priority": 10002,
+            },
             "routes": {
                 "ipv4": [
                     {

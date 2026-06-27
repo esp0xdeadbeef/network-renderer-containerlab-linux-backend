@@ -107,6 +107,7 @@ def _interface_output(
         "tenant": iface.get("tenant"),
         "overlay": _interface_overlay(kind, backing_ref, iface),
         "lane": _dict_value(backing_ref.get("lane") or iface.get("lane")),
+        "policyRoutingAllocation": _dict_value(iface.get("policyRoutingAllocation")),
         "attachBridge": attach_bridge,
         "hostUplink": host_uplink,
     }
@@ -178,9 +179,11 @@ def add_runtime_target(
     iface_out = _interface_outputs(
         runtime_target, link_bridges, link_host_uplinks, link_metadata
     )
+    role = _string_value(runtime_target.get("role"))
+    routing_domain = _string_value(runtime_target.get("routingDomain"))
     nodes[node_name] = {
-        "role": runtime_target.get("role") or "",
-        "routingDomain": runtime_target.get("routingDomain") or "",
+        "role": role if role is not None else "",
+        "routingDomain": routing_domain if routing_domain is not None else "",
         "routing_mode": _routing_mode(rt_name, runtime_target),
         "bgp": runtime_target.get("bgp") or {},
         "interfaces": iface_out,
