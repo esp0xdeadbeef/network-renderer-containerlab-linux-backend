@@ -208,4 +208,14 @@ else
     fi
 fi
 
+if [[ "${CACHE_PRESENT_AT_START}" == "0" && "${CACHE_BUILT}" != "1" ]]; then
+    echo "diagnostic.clab-cache-absent-build-skipped: cache was absent but locked-source image build did not run" >&2
+    exit 1
+fi
+
+if [[ "${CACHE_PRESENT_AT_START}" == "0" && "${CACHE_SAVED}" != "1" ]]; then
+    echo "diagnostic.clab-cache-save-missing-before-ready: cache was absent and no cache artifact was saved before readiness" >&2
+    exit 1
+fi
+
 write_cache_evidence
