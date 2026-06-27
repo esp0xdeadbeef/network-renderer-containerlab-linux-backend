@@ -63,6 +63,7 @@ tests=(
   test-fs370-hds010-sds010-rdr-sms010-clab-forwarding-materialization.sh
   test-fs310-hds010-sds010-sms130-no-policy-no-nftables.sh
   test-fs840-hds010-sds010-sms030-sops-service-ordering.sh
+  run-fs982-sms110.sh
 )
 
 if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" == "1" ]]; then
