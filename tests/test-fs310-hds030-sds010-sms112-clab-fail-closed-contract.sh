@@ -44,8 +44,6 @@ KNOWN_GAPS = {
     ("clabgen/s88/enterprise/site_loader.py", 140, "or \"\" — policy_node_name defaults to empty string"),
     ("clabgen/s88/enterprise/site_loader.py", 142, "or \"\" — upstreamSelectorNodeName defaults to empty string"),
     ("clabgen/s88/CM/linux_runtime.py", 31, "or \"\" — routing_mode defaults to empty string"),
-    ("clabgen/cpm_runtime.py", 182, "or \"\" — runtime target role defaults to empty string"),
-    ("clabgen/cpm_runtime.py", 183, "or \"\" — runtime target routingDomain defaults to empty string"),
 }
 
 # Pre-existing silent error hiders (also tracked in SMS-102 KNOWN_GAPS)
@@ -64,7 +62,6 @@ NIX_ACCEPTABLE_OR_EMPTY = {
     ("vm-network-nat.nix", 29, "or \"\" — guard: (cfg.mode or \"\") == \"nat\", fail-closed comparison"),
     ("vm-network-nat.nix", 33, "or \"\" — guard: (cfg.mode or \"\") == \"nat\", fail-closed comparison"),
     ("vm-network-nat.nix", 55, "or \"\" — guard: (cfg.mode or \"\") == \"nat\", fail-closed comparison"),
-    ("vm-network.nix", 53, "or \"\" — guard: (uplink.mode or \"\") == \"vlan\", fail-closed comparison"),
 }
 
 NIX_ACCEPTABLE_FILES = {e[0] for e in NIX_ACCEPTABLE_OR_EMPTY}
