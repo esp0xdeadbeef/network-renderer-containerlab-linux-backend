@@ -52,8 +52,9 @@ let
       name:
       let
         uplink = physicalUplinks.${name};
+        mode = uplink.mode or null;
       in
-      (uplink.mode or "") == "vlan" && builtins.isInt (uplink.vlan or null)
+      mode == "vlan" && builtins.isInt (uplink.vlan or null)
     )
     physicalUplinkNames;
 
