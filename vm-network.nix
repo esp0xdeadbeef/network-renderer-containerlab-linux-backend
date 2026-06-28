@@ -1,3 +1,6 @@
+# FS-310-HDS-020-SDS-010-SMS-040 and FS-320-HDS-010-SDS-010-SMS-030:
+# VM host eth0 is an explicit platform parent interface for test substrate
+# bridge/VLAN materialization, not a renderer fallback.
 { lib
 , generated
 ,

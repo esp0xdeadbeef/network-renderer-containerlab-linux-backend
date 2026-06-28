@@ -367,6 +367,8 @@ def _firewall_cm_input(
     }
 
 
+# FS-320-HDS-010-SDS-010-SMS-030: management eth0 below is the platform
+# primary interface passed into CM input after runtime interface mapping.
 def _cm_inputs_from_contracts(
     node_data: Dict[str, Any],
     eth_map: Dict[str, str],

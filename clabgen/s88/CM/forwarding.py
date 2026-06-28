@@ -1,4 +1,6 @@
 # ./clabgen/s88/CM/forwarding.py
+# FS-320-HDS-010-SDS-010-SMS-030: eth0 handling is a platform runtime
+# interface mapping primitive, not a renderer-invented logical interface.
 from __future__ import annotations
 
 from typing import List, Dict, Any
