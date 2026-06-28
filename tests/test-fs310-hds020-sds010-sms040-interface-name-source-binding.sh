@@ -16,6 +16,7 @@ REPO_ROOT="${repo_root}" PYTHONPATH="${repo_root}" python3 - <<'PY'
 import json
 import os
 import re
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -280,6 +281,8 @@ def scan_source_for_ifnames(source_dir, cpm_runtime_names):
         except Exception:
             continue
         for lineno, line in enumerate(lines, 1):
+            if line.lstrip().startswith("#"):
+                continue
             for match in HARDCODED_IFNAME_PATTERN.finditer(line):
                 name = match.group(0)
                 found.setdefault(name, []).append((str(py_file), lineno))
@@ -488,19 +491,28 @@ print(f"  Flagged names: {sorted(seeded_unreferenced)}")
 
 print("\n--- Seeded negative: source code ---")
 
-# Find a suitable target file (one that already has eth0 refs, a real clabgen file)
-target_file = clabgen_dir / "s88" / "EM" / "base.py"
-original = target_file.read_text()
+with tempfile.TemporaryDirectory(prefix="sms040-source-negative-", dir="/tmp") as seeded_root:
+    seeded_clabgen_dir = Path(seeded_root) / "clabgen"
+    shutil.copytree(
+        clabgen_dir,
+        seeded_clabgen_dir,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
 
-# Inject a hardcoded interface name as a comment
-seeded_comment = '\n# interface = "eth999_src"\n'
-assert seeded_comment not in original, "test precondition: seeded comment should not already exist"
-target_file.write_text(original + seeded_comment)
+    # Find a suitable target file in the isolated copy. The seeded negative must
+    # not mutate the importable source tree while the parallel HAT gate is running.
+    target_file = seeded_clabgen_dir / "s88" / "EM" / "base.py"
+    original = target_file.read_text()
 
-try:
-    # Re-scan with the seeded negative present
+    # Inject a hardcoded interface name as a source literal. Full-line comments
+    # are documentation and are intentionally excluded from the SMS-040 scan.
+    seeded_source = '\nSEEDED_TEST_INTERFACE_NAME = "eth999_src"\n'
+    assert seeded_source not in original, "test precondition: seeded source should not already exist"
+    target_file.write_text(original + seeded_source)
+
+    # Re-scan the isolated copy with the seeded negative present.
     seeded_source_found, seeded_source_unref = scan_source_for_ifnames(
-        clabgen_dir, cpm_runtime_names
+        seeded_clabgen_dir, cpm_runtime_names
     )
 
     if "eth999" not in seeded_source_unref:
@@ -510,16 +522,9 @@ try:
         sys.exit(1)
 
     print(f"SEEDED NEGATIVE (source) PASS: checker correctly flags eth999 as unreferenced")
-    print(f"  (extracted from seeded comment '# interface = \"eth999_src\"')")
+    print(f"  (extracted from seeded source literal 'eth999_src')")
     print(f"  Source unreferenced names: {sorted(seeded_source_unref)}")
     print(f"  Location: {seeded_source_found['eth999']}")
-
-finally:
-    # Restore original file
-    target_file.write_text(original)
-
-# Verify restoration
-assert target_file.read_text() == original, "test cleanup: source file not restored correctly"
 
 
 print("\nPASS fs310-hds010-sds010-sms040-interface-name-source-binding")
