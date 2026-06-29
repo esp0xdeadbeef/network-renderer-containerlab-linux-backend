@@ -174,6 +174,13 @@ grep -F "renderer deploy provenance=${tmp_dir}/run/clab-renderer-deploy-provenan
   "${tmp_dir}/renderer-inventory-lab-emulation.json" >"${tmp_dir}/lab-emulation-dry-run.log"
 
 grep -F 'labEmulationArtifacts = builtins.fromJSON' "${tmp_dir}/lab-emulation/vm-bridges-generated.nix" >/dev/null
+grep -F 'lab-emulation-fs540-dns-resolver-testnet:' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
+grep -F 'clab.lab-emulation: fake-provider' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
+grep -F 'ip addr replace 10.20.0.1/24 dev eth1' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
+grep -F 'udhcpd /run/udhcpd/fake-provider.conf' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
+grep -F 'ip saddr 10.20.0.0/24 masquerade' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
+grep -F 'clab.link.type: lab-emulation' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
+grep -F 'clab.link.bridge: testnet-vlan4' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
 python3 - "${tmp_dir}/lab-emulation/vm-bridges-generated.nix" <<'PY'
 import json
 import re
