@@ -115,9 +115,13 @@ let
         }
         if [[ -f "$renderer_inventory_json" ]]; then
           echo "Using renderer inventory: $renderer_inventory_json" >&2
+          cp "$renderer_inventory_json" "$work_dir/renderer-inventory.json"
+          cp "$renderer_inventory_json" "$artifact_dir/inventory.json"
         else
           echo "Renderer inventory JSON not found, will rely on CPM fallback (endpointInventory): $renderer_inventory_json" >&2
         fi
+        cp "$cpm_json" "$work_dir/cpm.json"
+        cp "$cpm_json" "$artifact_dir/control-plane.json"
 
         phase="render"
         CLABGEN_RENDERER_INVENTORY_JSON="$renderer_inventory_json" \

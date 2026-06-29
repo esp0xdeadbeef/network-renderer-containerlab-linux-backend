@@ -152,12 +152,13 @@ PYTHONPATH="${repo_root}" python3 -m clabgen.s88.CM.route_materialization_artifa
   s-router-clab \
   "${output}"
 
-python3 - "${output}" <<'PY'
+python3 - "${output}" "${repo_root}" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 payload = json.loads(Path(sys.argv[1]).read_text())
+repo = Path(sys.argv[2])
 assert payload["artifactKind"] == "containerlab-route-materialization", payload
 assert payload["renderer"] == "network-renderer-containerlab-linux-backend", payload
 assert payload["deploymentHost"] == "s-router-clab", payload
@@ -209,6 +210,16 @@ assert "fd11:112::/64" not in all_text, payload
 assert "lan0" not in all_text, payload
 assert "10.250.0.0/24" not in all_text, payload
 assert all(route["source"] == "control-plane-model" for route in routes), routes
+
+host_module = (repo / "host-module.nix").read_text()
+control_plane_copy = 'cp "$cpm_json" "$artifact_dir/control-plane.json"'
+cpm_copy = 'cp "$cpm_json" "$work_dir/cpm.json"'
+inventory_copy = 'cp "$renderer_inventory_json" "$artifact_dir/inventory.json"'
+route_artifact = "clabgen.s88.CM.route_materialization_artifact"
+assert control_plane_copy in host_module, "host module must publish current CPM as control-plane artifact"
+assert cpm_copy in host_module, "host module must publish current CPM as cpm.json"
+assert inventory_copy in host_module, "host module must publish current renderer inventory artifact"
+assert host_module.index(control_plane_copy) < host_module.index(route_artifact), host_module
 PY
 
 echo "PASS FS-500-HDS-010-SDS-010-SMS-040 clab-route-materialization-artifact"
