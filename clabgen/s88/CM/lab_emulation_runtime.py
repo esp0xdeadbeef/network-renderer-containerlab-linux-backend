@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 import ipaddress
 import re
+import shlex
 
 from clabgen.s88.site.naming import host_ifname
 
@@ -66,28 +67,38 @@ def _dhcp_config_commands(name: str, dhcp4: Dict[str, Any]) -> List[str]:
         )
 
     try:
-        lease_seconds = int(lease_time[:-1]) * 60 if lease_time.endswith("m") else int(lease_time)
+        lease_seconds = (
+            int(lease_time[:-1]) * 60
+            if lease_time.endswith("m")
+            else int(lease_time)
+        )
     except ValueError as exc:
         raise ValueError(
             f"fake-provider lab-emulation runtime leaseTime must be minutes or seconds for {name}"
         ) from exc
 
     netmask = str(prefix.netmask)
+    config_lines = [
+        f"start {range_start}",
+        f"end {range_end}",
+        "interface eth1",
+        f"option subnet {netmask}",
+        f"option router {router}",
+        f"option lease {lease_seconds}",
+        "lease_file /run/udhcpd/fake-provider.leases",
+        "pidfile /run/udhcpd/fake-provider.pid",
+    ]
+    write_config = (
+        "sh -c 'printf \"%s\\n\" "
+        + " ".join(shlex.quote(line) for line in config_lines)
+        + " > /run/udhcpd/fake-provider.conf'"
+    )
     return [
         "sysctl -w net.ipv4.ip_forward=1",
         f"ip addr replace {address} dev eth1",
         "ip link set eth1 up",
         "mkdir -p /run/udhcpd",
-        "cat > /run/udhcpd/fake-provider.conf <<'EOF'\n"
-        f"start {range_start}\n"
-        f"end {range_end}\n"
-        "interface eth1\n"
-        f"option subnet {netmask}\n"
-        f"option router {router}\n"
-        f"option lease {lease_seconds}\n"
-        "lease_file /run/udhcpd/fake-provider.leases\n"
-        "pidfile /run/udhcpd/fake-provider.pid\n"
-        "EOF",
+        write_config,
         "pkill -x udhcpd || true",
         "udhcpd /run/udhcpd/fake-provider.conf",
     ]
