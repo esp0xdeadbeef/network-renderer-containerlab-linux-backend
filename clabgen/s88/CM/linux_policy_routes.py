@@ -10,11 +10,30 @@ from clabgen.s88.CM.linux_route_via import _effective_via4, _effective_via6
 
 def _lane(iface_or_route: Dict[str, Any]) -> Dict[str, Any]:
     value = iface_or_route.get("lane")
+    backing = iface_or_route.get("backingRef")
     if not isinstance(value, dict) or not value:
-        backing = iface_or_route.get("backingRef")
         if isinstance(backing, dict):
             value = backing.get("lane")
-    return value if isinstance(value, dict) else {}
+    lane = value if isinstance(value, dict) else {}
+    if isinstance(backing, dict):
+        backing_uplinks = backing.get("uplinks")
+        if isinstance(backing_uplinks, list) and backing_uplinks:
+            merged = dict(lane)
+            merged["uplinks"] = _dedupe_strings(
+                list(merged.get("uplinks") or []) + backing_uplinks
+            )
+            return merged
+    return lane
+
+
+def _dedupe_strings(values: List[Any]) -> List[str]:
+    seen: Set[str] = set()
+    result: List[str] = []
+    for value in values:
+        if isinstance(value, str) and value and value not in seen:
+            seen.add(value)
+            result.append(value)
+    return result
 
 
 def _lane_access(value: Dict[str, Any]) -> str | None:
@@ -27,6 +46,19 @@ def _lane_uplink(value: Dict[str, Any]) -> str | None:
     return uplink if isinstance(uplink, str) and uplink else None
 
 
+def _lane_uplinks(value: Dict[str, Any]) -> Set[str]:
+    uplinks: Set[str] = set()
+    singular = _lane_uplink(value)
+    if singular is not None:
+        uplinks.add(singular)
+    listed = value.get("uplinks")
+    if isinstance(listed, list):
+        for uplink in listed:
+            if isinstance(uplink, str) and uplink:
+                uplinks.add(uplink)
+    return uplinks
+
+
 def _is_default(dst: str | None) -> bool:
     return dst in {"0.0.0.0/0", "::/0"}
 
@@ -37,7 +69,11 @@ def _route_matches_ingress(
     ingress_access = _lane_access(ingress_lane)
     route_access = _lane_access(route_lane)
     if ingress_access is None:
-        return False
+        if not _lane_uplinks(ingress_lane):
+            return False
+        if route_access is None:
+            return _is_default(dst) and _same_uplink(ingress_lane, route_lane)
+        return _same_uplink(ingress_lane, route_lane)
 
     if route_access is None:
         return _is_default(dst) and _same_uplink(ingress_lane, route_lane)
@@ -51,9 +87,23 @@ def _route_matches_ingress(
 
 
 def _same_uplink(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
-    left_uplink = _lane_uplink(left)
-    right_uplink = _lane_uplink(right)
-    return left_uplink is not None and left_uplink == right_uplink
+    return bool(_lane_uplinks(left) & _lane_uplinks(right))
+
+
+def _has_policy_only_routes(iface: Dict[str, Any]) -> bool:
+    routes = _route_lists(iface)
+    return any(route.get("policyOnly") is True for route in routes["ipv4"] + routes["ipv6"])
+
+
+def _is_policy_routing_surface(iface: Dict[str, Any]) -> bool:
+    lane = _lane(iface)
+    if _lane_access(lane) is not None:
+        return True
+    return (
+        bool(_lane_uplinks(lane))
+        and _has_policy_only_routes(iface)
+        and isinstance(iface.get("policyRoutingAllocation"), dict)
+    )
 
 
 def _source_interfaces_for_lane(
@@ -73,6 +123,31 @@ def _source_interfaces_for_lane(
             sources.append(ifname)
 
     return sources
+
+
+def _route_surface_for_lane(
+    node: Dict[str, Any],
+    eth_map: Dict[str, str],
+    fallback_ifname: str,
+    route_lane: Dict[str, Any],
+) -> Tuple[Dict[str, Any], str] | None:
+    route_access = _lane_access(route_lane)
+    route_uplink = _lane_uplink(route_lane)
+    if route_access is not None and route_uplink is not None:
+        for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
+            iface = node["interfaces"][ifname]
+            iface_lane = _lane(iface)
+            if (
+                _lane_access(iface_lane) == route_access
+                and _lane_uplink(iface_lane) == route_uplink
+            ):
+                eth = eth_map.get(ifname)
+                return (iface, eth) if eth is not None else None
+    fallback_iface = (node.get("interfaces", {}) or {}).get(fallback_ifname)
+    fallback_eth = eth_map.get(fallback_ifname)
+    if isinstance(fallback_iface, dict) and fallback_eth is not None:
+        return fallback_iface, fallback_eth
+    return None
 
 
 def _append_policy_route(
@@ -135,12 +210,17 @@ def _policy_groups_for_lane(
             # Skip routes whose dst is the addr4/addr6 of another lane's interface
             if dst and (dst in other_addrs4 or dst in other_addrs6):
                 continue
+            route_surface = _route_surface_for_lane(node, eth_map, ifname, route_lane)
+            if route_surface is None:
+                continue
+            route_iface, route_eth = route_surface
             if ifname != target_ifname and dst in preferred4:
                 continue
-            if ifname == target_ifname and not _is_default(dst):
-                preferred4.add(_normalize_prefix(dst))
-                routes4.pop(_normalize_prefix(dst), None)
-            _append_policy_route(routes4, dst, _effective_via4(node, iface, route), eth)
+            normalized_dst = _normalize_prefix(dst)
+            if ifname == target_ifname and not _is_default(dst) and normalized_dst not in preferred4:
+                preferred4.add(normalized_dst)
+                routes4.pop(normalized_dst, None)
+            _append_policy_route(routes4, dst, _effective_via4(node, route_iface, route), route_eth)
 
         for route in routes["ipv6"]:
             if route.get("policyOnly") is not True:
@@ -152,12 +232,17 @@ def _policy_groups_for_lane(
             # Skip routes whose dst is the addr4/addr6 of another lane's interface
             if dst and (dst in other_addrs4 or dst in other_addrs6):
                 continue
+            route_surface = _route_surface_for_lane(node, eth_map, ifname, route_lane)
+            if route_surface is None:
+                continue
+            route_iface, route_eth = route_surface
             if ifname != target_ifname and dst in preferred6:
                 continue
-            if ifname == target_ifname and not _is_default(dst):
-                preferred6.add(_normalize_prefix(dst))
-                routes6.pop(_normalize_prefix(dst), None)
-            _append_policy_route(routes6, dst, _effective_via6(node, iface, route), eth)
+            normalized_dst = _normalize_prefix(dst)
+            if ifname == target_ifname and not _is_default(dst) and normalized_dst not in preferred6:
+                preferred6.add(normalized_dst)
+                routes6.pop(normalized_dst, None)
+            _append_policy_route(routes6, dst, _effective_via6(node, route_iface, route), route_eth)
 
     return routes4, routes6
 
@@ -282,7 +367,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
         iface = node["interfaces"][ifname]
         eth = eth_map.get(ifname)
-        if eth is None or _lane_access(_lane(iface)) is None:
+        if eth is None or not _is_policy_routing_surface(iface):
             continue
 
         routes4, routes6 = _policy_groups_for_lane(node, eth_map, ifname, iface)

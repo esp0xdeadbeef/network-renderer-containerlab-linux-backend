@@ -24,6 +24,7 @@ RULES = [
     ("IDEMPOTENT_TABLE", "Table/chain creation — idempotent, HAT checks nft counters", [
         r"nft add table",
         r"nft add chain",
+        r'nft "add chain',
         r"nft flush chain",
     ]),
     ("IDEMPOTENT_RULE_BASE", "Base firewall rules — idempotent, HAT checks nft counters", [
