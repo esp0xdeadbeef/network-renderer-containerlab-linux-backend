@@ -40,6 +40,7 @@ tests=(
   test-fs320-hds010-sds010-sms020-bridge-link-realization.sh
   test-fs960-hds010-sds010-sms020-lab-emulation-capability-gate.sh
   test-fs800-hds030-sds010-sms010-pppoe-artifacts.sh
+  test-fs800-hds030-sds010-sms010-target-host-bridge-scope.sh
   test-fs960-hds010-sds010-sms070-deploy-clab-app-contract.sh
   test-fs960-hds010-sds016-sms020-clab-cache-evidence.sh
   test-fs320-hds010-sds010-sms010-topology-conformance-parity.sh

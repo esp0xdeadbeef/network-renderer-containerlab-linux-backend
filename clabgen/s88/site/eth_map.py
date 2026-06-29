@@ -51,6 +51,24 @@ def _add_mapping(
     used_names[node_name][target_ifname] = logical_ifname
 
 
+def _pppoe_service_interfaces(site: SiteModel, node_name: str) -> list[str]:
+    node = site.nodes[node_name]
+    services = node.services or {}
+    pppoe = services.get("pppoe")
+    if not isinstance(pppoe, dict):
+        return []
+
+    interfaces: list[str] = []
+    for side in ("client", "server"):
+        service = pppoe.get(side)
+        if not isinstance(service, dict):
+            continue
+        logical_ifname = service.get("interface")
+        if isinstance(logical_ifname, str) and logical_ifname:
+            interfaces.append(logical_ifname)
+    return interfaces
+
+
 def build_eth_maps(site: SiteModel) -> Dict[str, Dict[str, str]]:
     eth_maps: Dict[str, Dict[str, str]] = {}
     used_names: Dict[str, Dict[str, str]] = {}
@@ -79,6 +97,10 @@ def build_eth_maps(site: SiteModel) -> Dict[str, Dict[str, str]]:
                 iface.kind in {"tenant", "overlay"}
                 and ifname not in eth_maps[node_name]
             ):
+                _add_mapping(eth_maps, used_names, site, node_name, ifname)
+
+        for ifname in _pppoe_service_interfaces(site, node_name):
+            if ifname not in eth_maps[node_name]:
                 _add_mapping(eth_maps, used_names, site, node_name, ifname)
 
     return eth_maps

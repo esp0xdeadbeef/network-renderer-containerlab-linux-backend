@@ -92,6 +92,20 @@ def _infer_interface_tenant(
     raise ValueError(f"tenant interface {iface_name!r} has no tenant mapping")
 
 
+def _attach_bridge(iface: Dict[str, Any]) -> str | None:
+    attach_bridge = iface.get("attachBridge")
+    if isinstance(attach_bridge, str) and attach_bridge:
+        return attach_bridge
+
+    attach = iface.get("attach")
+    if isinstance(attach, dict):
+        bridge = attach.get("bridge")
+        if isinstance(bridge, str) and bridge:
+            return bridge
+
+    return None
+
+
 def build_interfaces(
     site: Dict[str, Any],
     node_name: str,
@@ -116,9 +130,7 @@ def build_interfaces(
             policy_routing_allocation=dict(
                 iface.get("policyRoutingAllocation", {}) or {}
             ),
-            attach_bridge=iface.get("attachBridge")
-            if isinstance(iface.get("attachBridge"), str)
-            else None,
+            attach_bridge=_attach_bridge(iface),
             host_uplink=dict(iface.get("hostUplink", {}) or {}),
             runtime_if_name=iface.get("runtimeIfName")
             if isinstance(iface.get("runtimeIfName"), str)
