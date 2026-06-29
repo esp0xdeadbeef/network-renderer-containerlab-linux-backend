@@ -39,6 +39,14 @@ def assert_no_host_public_resolver(text):
         assert value not in text, f"renderer emitted forbidden fallback {value}"
 
 
+def assert_before(text, first, second):
+    first_index = text.find(first)
+    second_index = text.find(second)
+    assert first_index != -1, f"missing expected text: {first}"
+    assert second_index != -1, f"missing expected text: {second}"
+    assert first_index < second_index, f"expected {first} before {second}"
+
+
 # Positive: explicit local-recursive resolver addresses are consumed.
 local_text = rendered_text(render_dns_resolver_config(node_with_resolver("local-recursive", "127.0.0.1", "::1")))
 assert "FS-540-HDS-010-SDS-010-SMS-020" in local_text
@@ -68,12 +76,30 @@ print("PASS none resolver authority suppresses Docker host fallback")
 # DNS-service nodes are owned by render_dns_service, which writes loopback
 # resolvers and starts the local proxy.
 service_node = node_with_resolver("local-recursive", "127.0.0.1", "::1")
-service_node["services"] = {"dns": {"listen": ["10.50.20.1"], "forwarders": ["10.50.10.1"]}}
+service_node["services"] = {
+    "dns": {
+        "listen": ["10.50.10.1", "fd42:dead:feed:10::1"],
+        "forwarders": ["1.1.1.1", "2606:4700:4700::1111"],
+        "outgoingInterfaces": ["10.50.10.1", "fd42:dead:feed:10::1"],
+        "killSwitch": {"blockPublicResolvers": True},
+        "deniedResolverCidrs": ["1.1.1.1", "2606:4700:4700::1111"],
+    }
+}
 assert render_dns_resolver_config(service_node) == []
 service_text = rendered_text(render_dns_service(service_node))
 assert "nameserver 127.0.0.1" in service_text
 assert "clabgen-dns-proxy.py" in service_text
 assert_no_host_public_resolver(service_text)
+assert_before(
+    service_text,
+    "output ip saddr 10.50.10.1 ip daddr 1.1.1.1 udp dport 53 accept comment allow-dns-service-egress",
+    "output ip daddr 1.1.1.1 udp dport 53 drop comment deny-public-dns-output-leak",
+)
+assert_before(
+    service_text,
+    "output ip6 saddr fd42:dead:feed:10::1 ip6 daddr 2606:4700:4700::1111 udp dport 53 accept comment allow-dns-service-egress",
+    "output ip6 daddr 2606:4700:4700::1111 udp dport 53 drop comment deny-public-dns-output-leak",
+)
 print("PASS DNS service keeps local proxy resolv.conf ownership")
 
 
