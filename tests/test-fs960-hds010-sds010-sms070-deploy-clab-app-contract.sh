@@ -174,6 +174,21 @@ grep -F "renderer deploy provenance=${tmp_dir}/run/clab-renderer-deploy-provenan
   "${tmp_dir}/renderer-inventory-lab-emulation.json" >"${tmp_dir}/lab-emulation-dry-run.log"
 
 grep -F 'labEmulationArtifacts = builtins.fromJSON' "${tmp_dir}/lab-emulation/vm-bridges-generated.nix" >/dev/null
+python3 - "${tmp_dir}/lab-emulation/vm-bridges-generated.nix" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+bridges = Path(sys.argv[1]).read_text()
+quote = chr(39) * 2
+pattern = r"bridgeNetworks = builtins\.fromJSON " + quote + r"\n(.*)\n  " + quote + ";"
+match = re.search(pattern, bridges, re.S)
+if not match:
+    raise SystemExit("missing bridgeNetworks JSON")
+bridge_networks = json.loads(match.group(1))
+assert bridge_networks["testnet-vlan4"]["vlan"] == 4
+PY
 jq -e '
   (.bridgeNames | index("testnet-vlan4") != null)
   and .bridgeNetworks["testnet-vlan4"].mode == "vlan"
