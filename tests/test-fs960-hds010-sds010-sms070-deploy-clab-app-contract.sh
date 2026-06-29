@@ -179,6 +179,7 @@ grep -F 'clab.lab-emulation: fake-provider' "${tmp_dir}/lab-emulation/fabric.cla
 grep -F 'ip addr replace 10.20.0.1/24 dev eth1' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
 grep -F 'udhcpd /run/udhcpd/fake-provider.conf' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
 grep -F 'ip saddr 10.20.0.0/24 masquerade' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
+grep -F 'nft list chain ip nat postrouting' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
 grep -F 'clab.link.type: lab-emulation' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
 grep -F 'clab.link.bridge: testnet-vlan4' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
 python3 - "${tmp_dir}/lab-emulation/vm-bridges-generated.nix" <<'PY'
