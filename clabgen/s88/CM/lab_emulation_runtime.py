@@ -88,11 +88,12 @@ def _dhcp_config_commands(name: str, dhcp4: Dict[str, Any]) -> List[str]:
         "lease_file /run/udhcpd/fake-provider.leases",
         "pidfile /run/udhcpd/fake-provider.pid",
     ]
-    write_config = (
-        "sh -c 'printf \"%s\\n\" "
+    write_config_script = (
+        "printf '%s\\n' "
         + " ".join(shlex.quote(line) for line in config_lines)
-        + " > /run/udhcpd/fake-provider.conf'"
+        + " > /run/udhcpd/fake-provider.conf"
     )
+    write_config = "sh -c " + shlex.quote(write_config_script)
     return [
         "sysctl -w net.ipv4.ip_forward=1",
         f"ip addr replace {address} dev eth1",
