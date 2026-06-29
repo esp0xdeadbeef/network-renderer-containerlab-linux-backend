@@ -5,6 +5,7 @@ from typing import Any, Dict
 
 from clabgen.models import SiteModel
 from clabgen.s88.CM.lab_emulation import render_lab_emulation_artifacts
+from clabgen.s88.CM.lab_emulation_runtime import render_lab_emulation_runtime
 from clabgen.s88.CM._wan_index import reset_wan_index
 from clabgen.s88.site.bridge_networks import renderer_bridge_networks
 from clabgen.s88.site.eth_map import build_eth_maps
@@ -114,6 +115,13 @@ def render_site_topology(site: SiteModel) -> Dict[str, Any]:
     nodes = render_nodes(site, eth_maps)
     links, bridges = render_links(site, eth_maps)
     lab_emulation_artifacts = render_lab_emulation_artifacts(site)
+    lab_emulation_runtime = render_lab_emulation_runtime(
+        lab_emulation_artifacts,
+        bridge_networks,
+    )
+    nodes.update(lab_emulation_runtime["nodes"])
+    links.extend(lab_emulation_runtime["links"])
+    bridges.extend(lab_emulation_runtime["bridges"])
 
     for link in site.links.values():
         if link.bridge and link.host_uplink:
