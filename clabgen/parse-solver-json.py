@@ -145,12 +145,12 @@ def write_outputs(
         "{\n"
         "  bridges = [\n" + "\n".join(f'    "{b}"' for b in bridges) + "\n"
         "  ];\n"
-        "  bridgeNetworks = builtins.fromJSON ''\n"
-        + json.dumps(bridge_networks, sort_keys=True)
-        + "\n"
-        "  '';\n"
         "  labEmulationArtifacts = builtins.fromJSON ''\n"
         + json.dumps(lab_emulation_artifacts, sort_keys=True)
+        + "\n"
+        "  '';\n"
+        "  bridgeNetworks = builtins.fromJSON ''\n"
+        + json.dumps(bridge_networks, sort_keys=True)
         + "\n"
         "  '';\n"
         "}\n"
