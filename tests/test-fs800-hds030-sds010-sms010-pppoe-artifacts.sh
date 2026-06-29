@@ -214,6 +214,20 @@ def render_cpm(cpm):
         return Enterprise.from_solver_json(path, renderer_inventory={}).render()
 
 
+def has_bridge_link(rendered, endpoint_a, endpoint_b, bridge):
+    wanted = {endpoint_a, endpoint_b}
+    for link in rendered["topology"]["links"]:
+        endpoints = set(link.get("endpoints", []))
+        labels = link.get("labels", {})
+        if (
+            endpoints == wanted
+            and labels.get("clab.link.type") == "bridge"
+            and labels.get("clab.link.bridge") == bridge
+        ):
+            return True
+    return False
+
+
 positive_cpm = {
     "control_plane_model": {
         "version": 1,
@@ -331,6 +345,128 @@ assert "accept_ra=2" not in provider_exec
 assert "mkdir -p /etc/ppp /run/ppp" in provider_exec
 assert "pkill -x pppoe-server" in provider_exec
 assert "pkill -f 'pppoe-server -I eth1'" not in provider_exec
+
+host_handoff_cpm = {
+    "control_plane_model": {
+        "version": 1,
+        "data": {
+            "esp0xdeadbeef": {
+                "site-b-clab-pppoe": {
+                    "runtimeTargets": {
+                        "provider-runtime": {
+                            "role": "access",
+                            "routingMode": "static",
+                            "logicalNode": {
+                                "enterprise": "esp0xdeadbeef",
+                                "site": "site-b-clab-pppoe",
+                                "name": "pppoe-provider",
+                            },
+                            "effectiveRuntimeRealization": {
+                                "interfaces": {
+                                    "provider-handoff": {
+                                        "kind": "wan",
+                                        "runtimeIfName": "eth1",
+                                        "attach": {"bridge": "br-clab-pppoe"},
+                                        "backingRef": {"name": "provider-handoff"},
+                                    }
+                                }
+                            },
+                            "services": {
+                                "pppoe": {
+                                    "server": {
+                                        "interface": "provider-handoff",
+                                        "providerAddress": "203.0.113.5",
+                                        "customerAddress": "203.0.113.4",
+                                        "maxSessions": 8,
+                                        "mtu": 1492,
+                                        "credentials": {
+                                            "username": "hat-pppoe",
+                                            "password": "hat-pppoe",
+                                        },
+                                    }
+                                }
+                            },
+                        },
+                        "customer-runtime": {
+                            "role": "core",
+                            "routingMode": "static",
+                            "logicalNode": {
+                                "enterprise": "esp0xdeadbeef",
+                                "site": "site-b-clab-pppoe",
+                                "name": "pppoe-customer",
+                            },
+                            "effectiveRuntimeRealization": {
+                                "interfaces": {
+                                    "provider-handoff": {
+                                        "kind": "wan",
+                                        "runtimeIfName": "eth1",
+                                        "attach": {"bridge": "br-clab-pppoe"},
+                                        "backingRef": {"name": "provider-handoff"},
+                                    }
+                                }
+                            },
+                            "services": {
+                                "pppoe": {
+                                    "client": {
+                                        "interface": "provider-handoff",
+                                        "runtimeInterface": "ppp0",
+                                        "defaultRoute": True,
+                                        "usePeerDns": True,
+                                        "mtu": 1492,
+                                        "credentials": {
+                                            "username": "hat-pppoe",
+                                            "password": "hat-pppoe",
+                                        },
+                                    }
+                                }
+                            },
+                        },
+                    }
+                }
+            }
+        },
+    }
+}
+
+host_handoff_render = render_cpm(host_handoff_cpm)
+host_handoff_nodes = host_handoff_render["topology"]["nodes"]
+host_handoff_customer = next(
+    name for name in host_handoff_nodes if name.endswith("-pppoe-customer")
+)
+host_handoff_provider = next(
+    name for name in host_handoff_nodes if name.endswith("-pppoe-provider")
+)
+host_handoff_customer_exec = "\n".join(
+    host_handoff_nodes[host_handoff_customer]["exec"]
+)
+host_handoff_provider_exec = "\n".join(
+    host_handoff_nodes[host_handoff_provider]["exec"]
+)
+assert "pppd pty" in host_handoff_customer_exec
+assert "pppoe -I eth1" in host_handoff_customer_exec
+assert "pppoe-server -I eth1" in host_handoff_provider_exec
+assert "udhcpc -b -i eth1" not in host_handoff_customer_exec
+assert "udhcpc -b -i eth1" not in host_handoff_provider_exec
+assert has_bridge_link(
+    host_handoff_render,
+    f"{host_handoff_customer}:eth1",
+    f"{host_handoff_provider}:eth1",
+    "br-clab-pppoe",
+)
+
+missing_runtime_interface = copy.deepcopy(host_handoff_cpm)
+del missing_runtime_interface["control_plane_model"]["data"]["esp0xdeadbeef"][
+    "site-b-clab-pppoe"
+]["runtimeTargets"]["provider-runtime"]["effectiveRuntimeRealization"]["interfaces"][
+    "provider-handoff"
+]
+try:
+    render_cpm(missing_runtime_interface)
+except ValueError as exc:
+    assert "has no explicit CPM runtime interface" in str(exc)
+    assert "provider-handoff" in str(exc)
+else:
+    raise AssertionError("PPPoE service without CPM runtime interface was accepted")
 
 missing_client = copy.deepcopy(positive_cpm)
 del missing_client["control_plane_model"]["data"]["esp0xdeadbeef"][

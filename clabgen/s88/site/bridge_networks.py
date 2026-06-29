@@ -6,6 +6,17 @@ from clabgen.models import SiteModel
 from clabgen.s88.site.naming import realized_bridge_name
 
 
+def _target_host(site: SiteModel) -> str | None:
+    containerlab = site.renderer_inventory.get("containerlab")
+    if not isinstance(containerlab, dict):
+        return None
+    for key in ("targetHost", "deploymentHost", "host"):
+        value = containerlab.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
 def _add_bridge_network(
     bridge_networks: Dict[str, Any], bridge_name: str, bridge_data: Dict[str, Any]
 ) -> None:
@@ -54,8 +65,15 @@ def renderer_bridge_networks(site: SiteModel) -> Dict[str, Any]:
     if not isinstance(hosts, dict):
         return {}
 
+    target_host = _target_host(site)
+    if target_host is None:
+        host_values = hosts.values()
+    else:
+        host_data = hosts.get(target_host)
+        host_values = [host_data] if isinstance(host_data, dict) else []
+
     bridge_networks: Dict[str, Any] = {}
-    for host_data in hosts.values():
+    for host_data in host_values:
         if not isinstance(host_data, dict):
             continue
         bridge_networks.update(_host_bridge_networks(host_data))

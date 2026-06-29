@@ -30,16 +30,26 @@ def _validate_pppoe_pairs(site: SiteModel) -> None:
             logical = config.get("interface")
             if isinstance(logical, str) and logical:
                 iface = node.interfaces.get(logical)
-                bridge = iface.attach_bridge if iface is not None else None
-                scope = (
-                    f"bridge {bridge!r}"
-                    if isinstance(bridge, str) and bridge
-                    else f"interface {logical!r}"
-                )
+                if iface is None:
+                    raise ValueError(
+                        "CLAB PPPoE "
+                        f"{side} interface {logical!r} on node {node_name!r} "
+                        "has no explicit CPM runtime interface"
+                    )
+                bridge = iface.attach_bridge
+                if not isinstance(bridge, str) or not bridge:
+                    raise ValueError(
+                        "CLAB PPPoE "
+                        f"{side} interface {logical!r} on node {node_name!r} "
+                        "requires explicit CPM attach.bridge"
+                    )
+                scope = f"bridge {bridge!r}"
                 location = f"{node_name}:{logical}"
             else:
-                scope = f"node {node_name!r}"
-                location = f"{node_name}:<invalid-interface>"
+                raise ValueError(
+                    "CLAB PPPoE "
+                    f"{side} service on node {node_name!r} is missing explicit interface"
+                )
 
             bucket = pairs.setdefault(scope, {"client": [], "server": []})
             bucket[side].append(location)

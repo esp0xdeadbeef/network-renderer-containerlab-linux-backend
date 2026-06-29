@@ -132,6 +132,60 @@ def _overlay_links(
     return links
 
 
+def _pppoe_service_endpoints(
+    site: SiteModel, eth_maps: Dict[str, Dict[str, str]]
+) -> Dict[str, Dict[str, List[str]]]:
+    pairs: Dict[str, Dict[str, List[str]]] = {}
+
+    for node_name, node in sorted(site.nodes.items()):
+        pppoe = (node.services or {}).get("pppoe")
+        if not isinstance(pppoe, dict):
+            continue
+        for side in ("client", "server"):
+            service = pppoe.get(side)
+            if not isinstance(service, dict):
+                continue
+            logical = service.get("interface")
+            if not isinstance(logical, str) or not logical:
+                continue
+            iface = node.interfaces.get(logical)
+            if iface is None or not iface.attach_bridge:
+                continue
+            runtime_if = eth_maps.get(node_name, {}).get(logical)
+            if runtime_if is None:
+                continue
+            bridge = iface.attach_bridge
+            bucket = pairs.setdefault(bridge, {"client": [], "server": []})
+            bucket[side].append(f"{node_name}:{runtime_if}")
+
+    return pairs
+
+
+def _pppoe_handoff_links(
+    site: SiteModel,
+    eth_maps: Dict[str, Dict[str, str]],
+    existing_links: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    existing_endpoint_sets = {
+        frozenset(link.get("endpoints", []))
+        for link in existing_links
+        if isinstance(link.get("endpoints"), list)
+    }
+    links: List[Dict[str, Any]] = []
+
+    for bridge, sides in sorted(_pppoe_service_endpoints(site, eth_maps).items()):
+        clients = sides["client"]
+        servers = sides["server"]
+        if len(clients) != 1 or len(servers) != 1:
+            continue
+        endpoints = [clients[0], servers[0]]
+        if frozenset(endpoints) in existing_endpoint_sets:
+            continue
+        links.append(_bridge_link(endpoints, bridge, f"pppoe-handoff-{bridge}"))
+
+    return links
+
+
 def render_links(
     site: SiteModel, eth_maps: Dict[str, Dict[str, str]]
 ) -> tuple[List[Dict[str, Any]], List[str]]:
@@ -140,6 +194,14 @@ def render_links(
 
     links.extend(tenant_links)
     links.extend(_overlay_links(site, eth_maps))
+    pppoe_links = _pppoe_handoff_links(site, eth_maps, links)
+    links.extend(pppoe_links)
     bridges.extend(tenant_bridges)
+    bridges.extend(
+        link["labels"]["clab.link.bridge"]
+        for link in pppoe_links
+        if isinstance(link.get("labels"), dict)
+        and isinstance(link["labels"].get("clab.link.bridge"), str)
+    )
 
     return links, sorted(set(bridges))
