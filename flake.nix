@@ -142,6 +142,7 @@
               bash
               containerlab
               coreutils
+              dnsmasq
               docker
               findutils
               gawk
@@ -149,6 +150,7 @@
               gnused
               iproute2
               jq
+              nftables
               pythonEnv
             ];
             text = ''

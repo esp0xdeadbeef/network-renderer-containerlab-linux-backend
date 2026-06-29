@@ -105,6 +105,16 @@ bridge_networks = json.loads(networks_match.group(1)) if networks_match else {}
 if not isinstance(bridge_networks, dict):
     raise SystemExit("rendered bridgeNetworks must be an object")
 
+lab_emulation_match = re.search(
+    r"(?ms)^\s*labEmulationArtifacts\s*=\s*builtins\.fromJSON\s*''\n(.*?)^\s*'';",
+    raw,
+)
+lab_emulation_artifacts = (
+    json.loads(lab_emulation_match.group(1)) if lab_emulation_match else []
+)
+if not isinstance(lab_emulation_artifacts, list):
+    raise SystemExit("rendered labEmulationArtifacts must be a list")
+
 bridge_names = set(bridges)
 nat_bridge_names = []
 for key, value in bridge_networks.items():
@@ -120,6 +130,7 @@ plan_path.write_text(
         {
             "bridgeNames": sorted(bridge_names),
             "bridgeNetworks": bridge_networks,
+            "labEmulationArtifacts": lab_emulation_artifacts,
             "natBridgeNames": sorted(set(nat_bridge_names)),
         },
         indent=2,
@@ -240,6 +251,140 @@ materialize_bridges() {
   done < <(jq -c '.bridgeNetworks | to_entries[]' "${bridge_plan_file}")
 }
 
+sanitize_label() {
+  printf '%s' "$1" | sed -E 's/[^A-Za-z0-9_.-]+/-/g; s/^-+//; s/-+$//'
+}
+
+bridge_for_live_vlan() {
+  local vlan="$1"
+  jq -r --argjson vlan "${vlan}" '
+    .bridgeNetworks
+    | to_entries[]
+    | select((.value.mode // "") == "vlan" and (.value.vlan | tonumber?) == $vlan)
+    | (.value.bridge // .key)
+  ' "${bridge_plan_file}" | head -n 1
+}
+
+start_fake_provider_dhcp4() {
+  local name="$1"
+  local bridge="$2"
+  local address="$3"
+  local router="$4"
+  local range_start="$5"
+  local range_end="$6"
+  local lease_time="$7"
+  local dns_servers="$8"
+  local label pid_file lease_file log_file
+
+  validate_ifname "${bridge}"
+  label="$(sanitize_label "${name}-${bridge}")"
+  [[ -n "${label}" ]] || fail "fake-provider lab emulation has empty sanitized label"
+  pid_file="${work_dir}/lab-emulation-${label}.dnsmasq.pid"
+  lease_file="${work_dir}/lab-emulation-${label}.leases"
+  log_file="${work_dir}/lab-emulation-${label}.dnsmasq.log"
+
+  log "configuring fake-provider DHCPv4 ${name} on ${bridge} (${address})"
+  ip addr replace "${address}" dev "${bridge}"
+  ip link set "${bridge}" up
+
+  if [[ -s "${pid_file}" ]]; then
+    kill "$(cat "${pid_file}")" >/dev/null 2>&1 || true
+    rm -f "${pid_file}"
+  fi
+
+  local dns_args=()
+  if [[ -n "${dns_servers}" ]]; then
+    dns_args=(--dhcp-option=option:dns-server,"${dns_servers}")
+  fi
+
+  dnsmasq \
+    --conf-file=/dev/null \
+    --no-hosts \
+    --no-resolv \
+    --port=0 \
+    --bind-interfaces \
+    --interface="${bridge}" \
+    --dhcp-authoritative \
+    --dhcp-range="${range_start},${range_end},${lease_time}" \
+    --dhcp-option=option:router,"${router}" \
+    "${dns_args[@]}" \
+    --pid-file="${pid_file}" \
+    --dhcp-leasefile="${lease_file}" \
+    --log-facility="${log_file}"
+}
+
+enable_fake_provider_nat44() {
+  local name="$1"
+  local source_prefix="$2"
+  local default_oif chain
+
+  default_oif="$(ip -o -4 route show default | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')"
+  [[ -n "${default_oif}" ]] || fail "fake-provider ${name} requested NAT44 but host has no IPv4 default route"
+  validate_ifname "${default_oif}"
+  chain="postrouting_$(sanitize_label "${name}")"
+  [[ -n "${chain}" ]] || fail "fake-provider ${name} produced empty NAT chain name"
+
+  log "configuring fake-provider NAT44 ${name} source=${source_prefix} oif=${default_oif}"
+  sysctl -w net.ipv4.ip_forward=1 >/dev/null
+  nft add table ip clab_lab_emulation >/dev/null 2>&1 || true
+  nft "add chain ip clab_lab_emulation ${chain} { type nat hook postrouting priority 102; policy accept; }" >/dev/null 2>&1 || true
+  nft flush chain ip clab_lab_emulation "${chain}" >/dev/null 2>&1 || true
+  nft add rule ip clab_lab_emulation "${chain}" oifname "${default_oif}" ip saddr "${source_prefix}" masquerade
+}
+
+materialize_lab_emulation() {
+  local count artifact mode scope name live_vlan bridge dhcp4_type address router range_start range_end lease_time dns_servers nat_enabled source_prefix
+
+  count="$(jq -r '.labEmulationArtifacts | length' "${bridge_plan_file}")"
+  ((count > 0)) || return 0
+
+  while read -r artifact; do
+    mode="$(jq -r '.providerEmulationMode // ""' <<<"${artifact}")"
+    scope="$(jq -r '.scope // ""' <<<"${artifact}")"
+    name="$(jq -r '.name // .providerEmulationMode // "unnamed"' <<<"${artifact}")"
+
+    case "${mode}" in
+      fake-provider)
+        ;;
+      pppoe-like)
+        log "lab-emulation ${name}: pppoe-like has no host-side DHCP materialization"
+        continue
+        ;;
+      *)
+        fail "unsupported lab-emulation artifact mode for deploy: ${mode:-<missing>}"
+        ;;
+    esac
+
+    [[ "${scope}" == "harness" ]] || fail "fake-provider ${name} must be harness scoped"
+    live_vlan="$(jq -r '.liveUpstreamReachability.vlan // empty' <<<"${artifact}")"
+    [[ "${live_vlan}" =~ ^[0-9]+$ ]] || fail "fake-provider ${name} requires liveUpstreamReachability.vlan for host materialization"
+
+    bridge="$(bridge_for_live_vlan "${live_vlan}")"
+    [[ -n "${bridge}" ]] || fail "fake-provider ${name} live upstream VLAN ${live_vlan} has no matching rendered vlan bridge"
+
+    dhcp4_type="$(jq -r '(.dhcp4 // null) | type' <<<"${artifact}")"
+    [[ "${dhcp4_type}" == "object" ]] || fail "fake-provider ${name} live upstream VLAN ${live_vlan} requires explicit dhcp4 object"
+
+    address="$(jq -r '.dhcp4.address // empty' <<<"${artifact}")"
+    router="$(jq -r '.dhcp4.router // empty' <<<"${artifact}")"
+    range_start="$(jq -r '.dhcp4.rangeStart // empty' <<<"${artifact}")"
+    range_end="$(jq -r '.dhcp4.rangeEnd // empty' <<<"${artifact}")"
+    lease_time="$(jq -r '.dhcp4.leaseTime // empty' <<<"${artifact}")"
+    dns_servers="$(jq -r '(.dhcp4.dnsServers // []) | join(",")' <<<"${artifact}")"
+    [[ -n "${address}" && -n "${router}" && -n "${range_start}" && -n "${range_end}" && -n "${lease_time}" ]] \
+      || fail "fake-provider ${name} dhcp4 requires address, router, rangeStart, rangeEnd, and leaseTime"
+
+    start_fake_provider_dhcp4 "${name}" "${bridge}" "${address}" "${router}" "${range_start}" "${range_end}" "${lease_time}" "${dns_servers}"
+
+    nat_enabled="$(jq -r '(.nat44.enabled // false) | tostring' <<<"${artifact}")"
+    if [[ "${nat_enabled}" == "true" ]]; then
+      source_prefix="$(jq -r '.nat44.sourcePrefix // .dhcp4.sourcePrefix // empty' <<<"${artifact}")"
+      [[ -n "${source_prefix}" ]] || fail "fake-provider ${name} NAT44 requires nat44.sourcePrefix or dhcp4.sourcePrefix"
+      enable_fake_provider_nat44 "${name}" "${source_prefix}"
+    fi
+  done < <(jq -c '.labEmulationArtifacts[]' "${bridge_plan_file}")
+}
+
 wait_for_docker() {
   # FS-960-HDS-010-SDS-016-SMS-050: privileged Docker inspection with distinguishable
   # failure diagnostics (permission denial, daemon absence, sudo misconfiguration).
@@ -344,7 +489,7 @@ if ((dry_run)); then
   log "dry-run: bridge plan=${bridge_plan_file}"
   log "dry-run: renderer deploy provenance=${deploy_provenance_file}"
   log "dry-run: Docker tooling image cache evidence=${tooling_cache_evidence_file}"
-  log "dry-run: would ensure Docker tooling image cache, cleanup ${name}, materialize bridges, deploy, and verify containers"
+  log "dry-run: would ensure Docker tooling image cache, cleanup ${name}, materialize bridges, materialize lab emulation, deploy, and verify containers"
   exit 0
 fi
 
@@ -352,5 +497,6 @@ wait_for_docker
 ensure_tooling_image_cache
 cleanup_stale_lab "${name}"
 materialize_bridges
+materialize_lab_emulation
 deploy_lab
 verify_fabric_containers "${name}"
