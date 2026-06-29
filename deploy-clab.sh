@@ -253,7 +253,7 @@ wait_for_docker() {
   local docker_cmd=(docker)
   local euid="${CLAB_TEST_EUID:-${EUID:-$(id -u 2>/dev/null || echo 0)}}"
   if [[ "${euid}" -ne 0 ]]; then
-    if command -v sudo >/dev/null 2>&1; then
+    if [[ "${CLAB_TEST_DISABLE_SUDO:-0}" != "1" ]] && command -v sudo >/dev/null 2>&1; then
       docker_cmd=(sudo -n docker)
     fi
   fi

@@ -96,6 +96,7 @@ if (
   export PATH="${fake_bin}:${PATH}"
   export CLAB_DOCKER_WAIT_SECONDS=2
   export CLAB_TEST_EUID=1000
+  export CLAB_TEST_DISABLE_SUDO=1
   wait_for_docker
 ) 2>"${tmp_dir}/test1.stderr"; then
   echo "FAIL test1: expected daemon-absence failure but got success" >&2
@@ -126,6 +127,7 @@ if (
   export PATH="${fake_bin}:${PATH}"
   export CLAB_DOCKER_WAIT_SECONDS=2
   export CLAB_TEST_EUID=1000
+  export CLAB_TEST_DISABLE_SUDO=1
   wait_for_docker
 ) 2>"${tmp_dir}/test2.stderr"; then
   echo "FAIL test2: expected permission-denied failure but got success" >&2
@@ -346,6 +348,7 @@ if (
   export PATH="${fake_bin}:${PATH}"
   export CLAB_DOCKER_WAIT_SECONDS=2
   export CLAB_TEST_EUID=1000
+  export CLAB_TEST_DISABLE_SUDO=1
   wait_for_docker
 ) 2>"${tmp_dir}/test9.stderr"; then
   echo "FAIL test9: expected failure but got success" >&2
