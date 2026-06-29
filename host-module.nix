@@ -145,6 +145,11 @@ let
         target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
         PY
 
+        PYTHONPATH="$renderer_repo" python3 -m clabgen.s88.CM.route_materialization_artifact \
+          "$cpm_json" \
+          "$deployment_host" \
+          "$artifact_dir/clab-route-materialization.json"
+
         python3 - "$work_dir/vm-bridges-generated.nix" "$work_dir/setup-bridge-links.sh" <<'PY'
         import json
         import re
