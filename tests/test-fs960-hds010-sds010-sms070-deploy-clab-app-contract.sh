@@ -176,7 +176,7 @@ grep -F "renderer deploy provenance=${tmp_dir}/run/clab-renderer-deploy-provenan
 grep -F 'labEmulationArtifacts = builtins.fromJSON' "${tmp_dir}/lab-emulation/vm-bridges-generated.nix" >/dev/null
 grep -F 'lab-emulation-fs540-dns-resolver-testnet:' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
 grep -F 'clab.lab-emulation: fake-provider' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
-grep -F 'ip addr replace 10.20.0.1/24 dev eth1' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
+grep -E 'ip addr replace 10\.20\.0\.1/24 dev veth-[0-9a-f]{10}' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
 grep -F 'udhcpd /run/udhcpd/fake-provider.conf' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
 grep -F 'ip saddr 10.20.0.0/24 masquerade' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null
 grep -F 'nft list chain ip nat postrouting' "${tmp_dir}/lab-emulation/fabric.clab.yml" >/dev/null

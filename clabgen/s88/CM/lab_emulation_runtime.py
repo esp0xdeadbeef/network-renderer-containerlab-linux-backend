@@ -50,7 +50,7 @@ def _required_string(mapping: Dict[str, Any], key: str, label: str) -> str:
     return value
 
 
-def _dhcp_config_commands(name: str, dhcp4: Dict[str, Any]) -> List[str]:
+def _dhcp_config_commands(name: str, dhcp4: Dict[str, Any], iface_name: str) -> List[str]:
     address = _required_string(dhcp4, "address", "dhcp4")
     router = _required_string(dhcp4, "router", "dhcp4")
     range_start = _required_string(dhcp4, "rangeStart", "dhcp4")
@@ -85,7 +85,7 @@ def _dhcp_config_commands(name: str, dhcp4: Dict[str, Any]) -> List[str]:
     config_lines = [
         f"start {range_start}",
         f"end {range_end}",
-        "interface eth1",
+        f"interface {iface_name}",
         f"option subnet {netmask}",
         f"option router {router}",
         f"option lease {lease_seconds}",
@@ -100,8 +100,8 @@ def _dhcp_config_commands(name: str, dhcp4: Dict[str, Any]) -> List[str]:
     write_config = "sh -c " + shlex.quote(write_config_script)
     return [
         "sysctl -w net.ipv4.ip_forward=1",
-        f"ip addr replace {address} dev eth1",
-        "ip link set eth1 up",
+        f"ip addr replace {address} dev {iface_name}",
+        f"ip link set {iface_name} up",
         "mkdir -p /run/udhcpd",
         write_config,
         "pkill -x udhcpd || true",
@@ -175,8 +175,9 @@ def render_lab_emulation_runtime(
         node_name = f"lab-emulation-{name}"
         if node_name in nodes:
             raise ValueError(f"duplicate lab-emulation node {node_name!r}")
+        provider_ifname = host_ifname(f"{node_name}-provider")
 
-        exec_cmds = _dhcp_config_commands(name, dhcp4) + _nat_commands(
+        exec_cmds = _dhcp_config_commands(name, dhcp4, provider_ifname) + _nat_commands(
             name, artifact, dhcp4
         )
         nodes[node_name] = {
@@ -191,8 +192,8 @@ def render_lab_emulation_runtime(
         links.append(
             {
                 "endpoints": [
-                    f"{node_name}:eth1",
-                    f"{bridge}:{host_ifname(f'{bridge}-{node_name}-eth1')}",
+                    f"{node_name}:{provider_ifname}",
+                    f"{bridge}:{host_ifname(f'{bridge}-{node_name}-{provider_ifname}')}",
                 ],
                 "labels": {
                     "clab.link.type": "lab-emulation",

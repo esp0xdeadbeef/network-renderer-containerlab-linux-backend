@@ -34,6 +34,7 @@ tests=(
   test-fs310-hds020-sds010-sms190-pppoe-no-default.sh
   test-fs310-hds020-sds010-sms200-bridge-no-default.sh
   test-fs310-hds020-sds010-sms210-route-table-allocation.sh
+  test-fs380-hds020-sds010-sms050-upstream-selector-policy-routes.sh
   test-fs380-hds020-sds010-sms060-core-wan-ip-assignment.sh
   test-fs720-hds030-sds010-sms041-wan-host-uplink-bridge.sh
   test-fs320-hds010-sds010-sms030-runtime-interface-mapping.sh
