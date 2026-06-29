@@ -8,6 +8,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHONPATH="${repo_root}" python3 - <<'PY'
 from clabgen.s88.CM.dns_service import render_dns_resolver_config, render_dns_service
 from clabgen.s88.CM.linux_runtime import render
+from clabgen.cpm_solver import cpm_site_to_solver_site
+from clabgen.s88.site.model_builder import build_nodes, tenant_prefix_owners
+from clabgen.s88.site.node_runtime import build_node_data
 
 
 def node_with_resolver(source, resolver4=None, resolver6=None):
@@ -80,6 +83,50 @@ assert "FS-540-HDS-010-SDS-010-SMS-020" in runtime_text
 assert "No nameserver emitted by CPM dnsResolver authority" in runtime_text
 assert_no_host_public_resolver(runtime_text)
 print("PASS linux_runtime emits controlled resolv.conf for non-DNS node")
+
+
+# Live-shape integration: CPM runtimeTargets effectiveRuntimeRealization must
+# preserve dnsResolver through the CPM -> solver -> S88 node model path.
+cpm_site = {
+    "runtimeTargets": {
+        "esp-clab-clab-router-core-nebula": {
+            "logicalNode": {"name": "clab-router-core-nebula"},
+            "role": "core",
+            "routingMode": "static",
+            "effectiveRuntimeRealization": {
+                "interfaces": {
+                    "tenant-client": {
+                        "runtimeIfName": "client",
+                        "sourceKind": "tenant",
+                        "tenant": "client",
+                        "dnsResolver": {
+                            "resolver4": None,
+                            "resolver6": None,
+                            "resolverSource": "upstream-forwarder",
+                        },
+                    }
+                }
+            },
+        }
+    }
+}
+solver_site = cpm_site_to_solver_site(cpm_site)
+nodes = build_nodes(solver_site, tenant_prefix_owners(solver_site))
+core_node = nodes["clab-router-core-nebula"]
+core_map = {"tenant-client": "client"}
+core_data = build_node_data("clab-router-core-nebula", core_node, core_map)
+core_text = rendered_text(
+    render(
+        "core",
+        "clab-router-core-nebula",
+        core_data,
+        core_map,
+    )
+)
+assert "FS-540-HDS-010-SDS-010-SMS-020" in core_text
+assert "No nameserver emitted by CPM dnsResolver authority" in core_text
+assert_no_host_public_resolver(core_text)
+print("PASS CPM runtimeTargets dnsResolver survives into CLAB linux_runtime")
 
 
 print("PASS FS-540-HDS-010-SDS-010-SMS-020 CLAB DNS resolver materialization")
