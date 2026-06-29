@@ -13,6 +13,10 @@ def _slug(value: str) -> str:
     return slug or "unnamed"
 
 
+def _sh(command: str) -> str:
+    return "sh -c " + shlex.quote(command)
+
+
 def _live_vlan(artifact: Dict[str, Any]) -> int | None:
     live = artifact.get("liveUpstreamReachability")
     if isinstance(live, dict):
@@ -125,10 +129,18 @@ def _nat_commands(name: str, artifact: Dict[str, Any], dhcp4: Dict[str, Any]) ->
             f"fake-provider lab-emulation runtime NAT44 requires IPv4 sourcePrefix for {name}"
         )
     return [
-        "nft add table ip nat 2>/dev/null || true",
-        "nft 'add chain ip nat postrouting { type nat hook postrouting priority 100; policy accept; }' 2>/dev/null || true",
-        "nft flush chain ip nat postrouting",
-        f"nft add rule ip nat postrouting oifname \"eth0\" ip saddr {source_prefix} masquerade",
+        _sh(
+            "\n".join(
+                [
+                    "set -e",
+                    "nft add table ip nat 2>/dev/null || true",
+                    'nft "add chain ip nat postrouting { type nat hook postrouting priority 100; policy accept; }" 2>/dev/null || true',
+                    "nft flush chain ip nat postrouting",
+                    f'nft add rule ip nat postrouting oifname "eth0" ip saddr {source_prefix} masquerade',
+                    "nft list chain ip nat postrouting >/dev/null",
+                ]
+            )
+        )
     ]
 
 

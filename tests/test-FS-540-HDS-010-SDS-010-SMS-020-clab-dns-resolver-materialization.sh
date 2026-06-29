@@ -8,6 +8,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHONPATH="${repo_root}" python3 - <<'PY'
 from clabgen.s88.CM.dns_service import render_dns_resolver_config, render_dns_service
 from clabgen.s88.CM.linux_runtime import render
+from clabgen.s88.CM.linux_policy_routes import render as render_policy_routes
+from clabgen.s88.CM.linux_routes import _render_default_routes
 from clabgen.cpm_solver import cpm_site_to_solver_site
 from clabgen.s88.site.model_builder import build_nodes, tenant_prefix_owners
 from clabgen.s88.site.node_runtime import build_node_data
@@ -153,6 +155,97 @@ assert "FS-540-HDS-010-SDS-010-SMS-020" in core_text
 assert "No nameserver emitted by CPM dnsResolver authority" in core_text
 assert_no_host_public_resolver(core_text)
 print("PASS CPM runtimeTargets dnsResolver survives into CLAB linux_runtime")
+
+
+# Live-shape integration: runtime-origin DNS egress from an access-uplink lane
+# must use the CPM policyOnly default on the same uplink's pure-uplink
+# interface. This mirrors the active-lab
+# FS-540-HDS-010-SDS-010 mini-smt-dns-resolver-config upstream-selector.
+upstream_selector = {
+    "interfaces": {
+        "p2p-policy-upstream-selector--access-access-dns--uplink-testnet-vlan4": {
+            "addr4": "10.54.255.5/31",
+            "addr6": "fd42:540:fe::5/127",
+            "backingRef": {
+                "lane": {
+                    "access": "access-dns",
+                    "kind": "access-uplink",
+                    "uplink": "testnet-vlan4",
+                    "uplinks": ["testnet-vlan4"],
+                }
+            },
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "tableId": 1001,
+                "priority": 10001,
+            },
+        },
+        "p2p-resolver-node-upstream-selector": {
+            "addr4": "10.54.255.7/31",
+            "addr6": "fd42:540:fe::7/127",
+            "backingRef": {
+                "lane": {
+                    "access": None,
+                    "kind": "uplink",
+                    "uplink": "testnet-vlan4",
+                    "uplinks": ["testnet-vlan4"],
+                }
+            },
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "tableId": 1002,
+                "priority": 10002,
+            },
+            "routes": {
+                "ipv4": [
+                    {
+                        "dst": "0.0.0.0/0",
+                        "via4": "10.54.255.6",
+                        "policyOnly": True,
+                        "proto": "default",
+                        "reason": "policy-derived-default",
+                        "intent": {"kind": "default-reachability"},
+                    }
+                ],
+                "ipv6": [
+                    {
+                        "dst": "::/0",
+                        "via6": "fd42:540:fe::6",
+                        "policyOnly": True,
+                        "proto": "default",
+                        "reason": "policy-derived-default",
+                        "intent": {"kind": "default-reachability"},
+                    }
+                ],
+            },
+        },
+    }
+}
+upstream_eth_map = {
+    "p2p-policy-upstream-selector--access-access-dns--uplink-testnet-vlan4": "p0",
+    "p2p-resolver-node-upstream-selector": "p1",
+}
+main_default_text = rendered_text(
+    _render_default_routes(upstream_selector, upstream_eth_map)
+)
+policy_default_text = rendered_text(
+    render_policy_routes(upstream_selector, upstream_eth_map)
+)
+assert "ip route replace default" not in main_default_text, main_default_text
+assert "ip -6 route replace default" not in main_default_text, main_default_text
+assert (
+    "ip route replace table 1001 0.0.0.0/0 via 10.54.255.6 dev p1 onlink"
+    in policy_default_text
+), policy_default_text
+assert (
+    "ip -6 route replace table 1001 ::/0 via fd42:540:fe::6 dev p1 onlink"
+    in policy_default_text
+), policy_default_text
+assert "ip rule add iif p0 priority 10001 table 1001" in policy_default_text
+assert "ip -6 rule add iif p0 priority 10001 table 1001" in policy_default_text
+assert "ip rule add iif p1 priority 10001 table 1001" not in policy_default_text
+assert "ip -6 rule add iif p1 priority 10001 table 1001" not in policy_default_text
+print("PASS runtime-origin DNS policyOnly default materialized for access-uplink ingress")
 
 
 print("PASS FS-540-HDS-010-SDS-010-SMS-020 CLAB DNS resolver materialization")

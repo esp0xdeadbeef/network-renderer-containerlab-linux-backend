@@ -32,11 +32,17 @@ def _is_default(dst: str | None) -> bool:
 
 
 def _route_matches_ingress(
-    ingress_lane: Dict[str, Any], route_lane: Dict[str, Any]
+    ingress_lane: Dict[str, Any], route_lane: Dict[str, Any], dst: str | None
 ) -> bool:
     ingress_access = _lane_access(ingress_lane)
     route_access = _lane_access(route_lane)
-    if ingress_access is None or route_access != ingress_access:
+    if ingress_access is None:
+        return False
+
+    if route_access is None:
+        return _is_default(dst) and _same_uplink(ingress_lane, route_lane)
+
+    if route_access != ingress_access:
         return False
 
     ingress_uplink = _lane_uplink(ingress_lane)
@@ -123,9 +129,9 @@ def _policy_groups_for_lane(
             if route.get("policyOnly") is not True:
                 continue
             route_lane = _lane(route) or _lane(iface)
-            if not _route_matches_ingress(target_lane, route_lane):
-                continue
             dst = _dst(route)
+            if not _route_matches_ingress(target_lane, route_lane, dst):
+                continue
             # Skip routes whose dst is the addr4/addr6 of another lane's interface
             if dst and (dst in other_addrs4 or dst in other_addrs6):
                 continue
@@ -140,9 +146,9 @@ def _policy_groups_for_lane(
             if route.get("policyOnly") is not True:
                 continue
             route_lane = _lane(route) or _lane(iface)
-            if not _route_matches_ingress(target_lane, route_lane):
-                continue
             dst = _dst(route)
+            if not _route_matches_ingress(target_lane, route_lane, dst):
+                continue
             # Skip routes whose dst is the addr4/addr6 of another lane's interface
             if dst and (dst in other_addrs4 or dst in other_addrs6):
                 continue
@@ -225,6 +231,10 @@ def _render_policy_table(
     for dst in sorted(groups.keys()):
         route = _render_group(ip_cmd, table_id, dst, groups[dst])
         cmds.append(route)
+
+
+def _has_default(groups: Dict[str, List[Tuple[str, str]]]) -> bool:
+    return "0.0.0.0/0" in groups or "::/0" in groups
 
 
 def _add_connected_subnet_route(
@@ -312,8 +322,9 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
 
         if routes4 != {}:
             _render_policy_table(cmds, "ip", table_id, routes4)
-            if not is_uplink:
-                for source_eth in lane_eths + shared_eths:
+            if not is_uplink or _has_default(routes4):
+                rule_eths = lane_eths if is_uplink else lane_eths + shared_eths
+                for source_eth in rule_eths:
                     cmds.append(
                         f"sh -c 'ip rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                     )
@@ -329,8 +340,9 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                 )
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
-            if not is_uplink:
-                for source_eth in lane_eths + shared_eths:
+            if not is_uplink or _has_default(routes6):
+                rule_eths = lane_eths if is_uplink else lane_eths + shared_eths
+                for source_eth in rule_eths:
                     cmds.append(
                         f"sh -c 'ip -6 rule add iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
                     )
