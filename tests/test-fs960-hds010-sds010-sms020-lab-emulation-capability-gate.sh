@@ -62,6 +62,7 @@ from pathlib import Path
 
 from clabgen.models import SiteModel
 from clabgen.s88.CM.lab_emulation import render_lab_emulation_artifacts
+from clabgen.s88.enterprise.enterprise import Enterprise
 from clabgen.s88.enterprise.site_loader import load_sites
 from clabgen.s88.site.topology import render_site_topology
 
@@ -321,6 +322,13 @@ with tempfile.TemporaryDirectory() as tmp:
     loaded = load_sites(solver_path, renderer_inventory={"containerlab": fake_provider})
     loaded_render = render_site_topology(loaded["test-site-a"])
     assert loaded_render["lab_emulation_artifacts"] == fake_artifacts
+
+    enterprise_render = Enterprise.from_solver_json(
+        solver_path, renderer_inventory={"containerlab": fake_provider}
+    ).render()
+    assert enterprise_render["lab_emulation_artifacts"] == fake_artifacts
+    assert "labEmulation" not in enterprise_render["topology"]
+    assert "providerEmulation" not in enterprise_render["topology"]
 PY
 
 echo "PASS lab-emulation-capability-gate"

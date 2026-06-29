@@ -73,6 +73,53 @@ cat >"${tmp_dir}/renderer-inventory.json" <<'JSON'
 }
 JSON
 
+cat >"${tmp_dir}/renderer-inventory-lab-emulation.json" <<'JSON'
+{
+  "containerlab": {
+    "capabilities": {
+      "labEmulation": true
+    },
+    "labEmulation": {
+      "scope": "harness",
+      "requests": [
+        {
+          "providerEmulationMode": "fake-provider",
+          "name": "fs540-dns-resolver-testnet",
+          "handoffVlan": 11,
+          "liveUpstreamVlan": 4,
+          "dhcp4": {
+            "address": "10.20.0.1/24",
+            "router": "10.20.0.1",
+            "rangeStart": "10.20.0.20",
+            "rangeEnd": "10.20.0.99",
+            "leaseTime": "5m",
+            "sourcePrefix": "10.20.0.0/24"
+          },
+          "nat44": {
+            "enabled": true,
+            "sourcePrefix": "10.20.0.0/24"
+          }
+        }
+      ]
+    }
+  },
+  "deployment": {
+    "hosts": {
+      "s-router-clab": {
+        "bridgeNetworks": {
+          "testnet-vlan4": {
+            "bridge": "testnet-vlan4",
+            "mode": "vlan",
+            "parent": "eth0",
+            "vlan": 4
+          }
+        }
+      }
+    }
+  }
+}
+JSON
+
 deploy_app="$(nix build --show-trace --print-out-paths --no-link "path:${repo_root}#deploy-clab")"
 
 "${deploy_app}/bin/deploy-clab" --help >/dev/null
@@ -115,9 +162,34 @@ jq -e '
   and .artifacts.topology == "'"${tmp_dir}"'/run/fabric.clab.yml"
   and .artifacts.bridgePlan == "'"${tmp_dir}"'/run/clab-bridge-plan.json"
 ' "${tmp_dir}/run/clab-renderer-deploy-provenance.json" >/dev/null
-grep -F 'would ensure Docker tooling image cache, cleanup fabric, materialize bridges, deploy, and verify containers' \
+grep -F 'would ensure Docker tooling image cache, cleanup fabric, materialize bridges, materialize lab emulation, deploy, and verify containers' \
   "${tmp_dir}/dry-run.log" >/dev/null
 grep -F "renderer deploy provenance=${tmp_dir}/run/clab-renderer-deploy-provenance.json" \
   "${tmp_dir}/dry-run.log" >/dev/null
+
+"${deploy_app}/bin/deploy-clab" \
+  --dry-run \
+  --work-dir "${tmp_dir}/lab-emulation" \
+  "${tmp_dir}/cpm.json" \
+  "${tmp_dir}/renderer-inventory-lab-emulation.json" >"${tmp_dir}/lab-emulation-dry-run.log"
+
+grep -F 'labEmulationArtifacts = builtins.fromJSON' "${tmp_dir}/lab-emulation/vm-bridges-generated.nix" >/dev/null
+jq -e '
+  (.bridgeNames | index("testnet-vlan4") != null)
+  and .bridgeNetworks["testnet-vlan4"].mode == "vlan"
+  and .bridgeNetworks["testnet-vlan4"].vlan == 4
+  and (.labEmulationArtifacts | length == 1)
+  and .labEmulationArtifacts[0].providerEmulationMode == "fake-provider"
+  and .labEmulationArtifacts[0].scope == "harness"
+  and .labEmulationArtifacts[0].handoffVlan == 11
+  and .labEmulationArtifacts[0].liveUpstreamVlan == 4
+  and .labEmulationArtifacts[0].liveUpstreamReachability.vlan == 4
+  and .labEmulationArtifacts[0].dhcp4.address == "10.20.0.1/24"
+  and .labEmulationArtifacts[0].dhcp4.rangeStart == "10.20.0.20"
+  and .labEmulationArtifacts[0].dhcp4.rangeEnd == "10.20.0.99"
+  and .labEmulationArtifacts[0].nat44.enabled == true
+' "${tmp_dir}/lab-emulation/clab-bridge-plan.json" >/dev/null
+grep -F 'would ensure Docker tooling image cache, cleanup fabric, materialize bridges, materialize lab emulation, deploy, and verify containers' \
+  "${tmp_dir}/lab-emulation-dry-run.log" >/dev/null
 
 echo "PASS deploy-clab-app-contract"

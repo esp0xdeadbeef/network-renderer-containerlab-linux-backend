@@ -138,6 +138,7 @@ def write_outputs(
 
     bridges = list(merged.get("bridges", []))
     bridge_networks = dict(merged.get("bridge_networks", {}) or {})
+    lab_emulation_artifacts = list(merged.get("lab_emulation_artifacts", []) or [])
 
     bridges_body = (
         "{ lib, ... }:\n"
@@ -146,6 +147,10 @@ def write_outputs(
         "  ];\n"
         "  bridgeNetworks = builtins.fromJSON ''\n"
         + json.dumps(bridge_networks, sort_keys=True)
+        + "\n"
+        "  '';\n"
+        "  labEmulationArtifacts = builtins.fromJSON ''\n"
+        + json.dumps(lab_emulation_artifacts, sort_keys=True)
         + "\n"
         "  '';\n"
         "}\n"

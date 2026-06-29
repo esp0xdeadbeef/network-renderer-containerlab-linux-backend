@@ -96,6 +96,7 @@ def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
     defaults: Dict[str, Any] | None = None
     solver_meta: Dict[str, Any] | None = None
     merged_host_nat_cmds: List[str] = []
+    merged_lab_emulation_artifacts: List[Dict[str, Any]] = []
 
     for site_key in sorted(sites.keys()):
         site = sites[site_key]
@@ -139,6 +140,9 @@ def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
 
         merged_bridges.extend(list(topo.get("bridges", [])))
         merged_bridge_networks.update(dict(topo.get("bridge_networks", {}) or {}))
+        for artifact in list(topo.get("lab_emulation_artifacts", []) or []):
+            if isinstance(artifact, dict):
+                merged_lab_emulation_artifacts.append(copy.deepcopy(artifact))
 
     for _site_key in sorted(sites.keys()):
         merged_host_nat_cmds.extend(_host_nat_commands(sites[_site_key]))
@@ -179,5 +183,6 @@ def merge_sites(sites: Dict[str, SiteModel]) -> Dict[str, Any]:
         "bridges": sorted(set(merged_bridges)),
         "bridge_networks": merged_bridge_networks,
         "bridge_control_modules": {"hostNat": {"cmds": merged_host_nat_cmds}},
+        "lab_emulation_artifacts": merged_lab_emulation_artifacts,
         "solver_meta": solver_meta or {},
     }
