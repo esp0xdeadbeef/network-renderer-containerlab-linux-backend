@@ -39,6 +39,26 @@ def _public_resolver_drop_commands(dns: Dict[str, Any]) -> List[str]:
         "nft flush chain inet clab_dns_guard forward",
         "nft flush chain inet clab_dns_guard output",
     ]
+
+    forwarders = _string_list(dns.get("forwarders") or dns.get("upstreams") or [])
+    outgoing_interfaces = _string_list(dns.get("outgoingInterfaces", []))
+    for source in outgoing_interfaces:
+        source_family = "ip6" if ":" in source else "ip"
+        for forwarder in forwarders:
+            forwarder_family = "ip6" if ":" in forwarder else "ip"
+            if source_family != forwarder_family:
+                continue
+            commands.append(
+                f"nft add rule inet clab_dns_guard output {source_family} saddr {_nft_literal(source)} "
+                f"{forwarder_family} daddr {_nft_literal(forwarder)} udp dport 53 "
+                f"accept comment {shlex.quote('allow-dns-service-egress')}"
+            )
+            commands.append(
+                f"nft add rule inet clab_dns_guard output {source_family} saddr {_nft_literal(source)} "
+                f"{forwarder_family} daddr {_nft_literal(forwarder)} tcp dport 53 "
+                f"accept comment {shlex.quote('allow-dns-service-egress')}"
+            )
+
     for cidr in denied_cidrs:
         family = "ip6" if ":" in cidr else "ip"
         literal = _nft_literal(cidr)
