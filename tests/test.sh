@@ -49,6 +49,7 @@ tests=(
   test-fs310-hds010-sds010-sms120-role-independent-cm-inputs.sh
   test-fs970-hds010-sds010-sms010-access-advertisements-runtime.sh
   test-fs570-hds010-sds010-sms010-namespace-fallback.sh
+  test-FS-540-HDS-010-SDS-010-SMS-020-clab-dns-resolver-materialization.sh
   test-fs540-hds010-sds010-sms035-dns-self-referential-guard.sh
   test-fs540-hds020-sds010-sms010-clab-recursive-dns-requester-fixture.sh
   test-fs520-hds010-sds010-sms040-policy-no-main-defaults.sh

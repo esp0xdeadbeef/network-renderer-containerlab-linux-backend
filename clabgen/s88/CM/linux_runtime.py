@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from clabgen.s88.CM.base import render as render_cm
-from clabgen.s88.CM.dns_service import render_dns_service
+from clabgen.s88.CM.dns_service import render_dns_resolver_config, render_dns_service
 from clabgen.s88.CM.linux_bgp import _is_bgp_router, _render_bgp
 from clabgen.s88.CM.linux_interfaces import _render_addressing, _render_interfaces
 from clabgen.s88.CM.linux_routes import (
@@ -50,6 +50,7 @@ def render(
         cmds.extend(render_policy_routes(node_data, eth_map))
 
     cmds.extend(render_cm(node_data.get("_cm_inputs", {})))
+    cmds.extend(render_dns_resolver_config(node_data, node_name))
     cmds.extend(render_dns_service(node_data, node_name))
     cmds.extend(render_access_advertisements(node_data, eth_map))
     cmds.extend(render_pppoe_runtime(node_name, node_data, eth_map))
