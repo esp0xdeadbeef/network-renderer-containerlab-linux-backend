@@ -61,6 +61,7 @@ def build_node_data(
             "policyRoutingAllocation": copy.deepcopy(
                 iface.policy_routing_allocation
             ),
+            "dnsResolver": copy.deepcopy(iface.dns_resolver),
             "routes": iface.routes,
         }
     node_data["interfaces"] = interfaces

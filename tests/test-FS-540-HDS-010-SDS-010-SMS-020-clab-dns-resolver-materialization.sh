@@ -13,14 +13,13 @@ from clabgen.s88.CM.linux_runtime import render
 def node_with_resolver(source, resolver4=None, resolver6=None):
     return {
         "routing_mode": "static",
-        "effectiveRuntimeRealization": {
-            "interfaces": {
-                "eth0": {
-                    "dnsResolver": {
-                        "resolver4": resolver4,
-                        "resolver6": resolver6,
-                        "resolverSource": source,
-                    }
+        "interfaces": {
+            "eth0": {
+                "runtimeIfName": "eth0",
+                "dnsResolver": {
+                    "resolver4": resolver4,
+                    "resolver6": resolver6,
+                    "resolverSource": source,
                 }
             }
         },
