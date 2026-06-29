@@ -180,15 +180,26 @@ def render_dns_resolver_config(
 
 
 def _dns_resolvers(node: Dict[str, Any]) -> List[Dict[str, Any]]:
+    result: List[Dict[str, Any]] = []
+
+    interfaces = node.get("interfaces")
+    if isinstance(interfaces, dict):
+        for iface in interfaces.values():
+            if not isinstance(iface, dict):
+                continue
+            resolver = iface.get("dnsResolver")
+            if isinstance(resolver, dict):
+                result.append(resolver)
+
     runtime = node.get("effectiveRuntimeRealization")
     if not isinstance(runtime, dict):
-        return []
-    interfaces = runtime.get("interfaces")
-    if not isinstance(interfaces, dict):
-        return []
+        return result
 
-    result: List[Dict[str, Any]] = []
-    for iface in interfaces.values():
+    runtime_interfaces = runtime.get("interfaces")
+    if not isinstance(runtime_interfaces, dict):
+        return result
+
+    for iface in runtime_interfaces.values():
         if not isinstance(iface, dict):
             continue
         resolver = iface.get("dnsResolver")

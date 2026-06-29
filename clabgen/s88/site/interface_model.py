@@ -130,6 +130,7 @@ def build_interfaces(
             policy_routing_allocation=dict(
                 iface.get("policyRoutingAllocation", {}) or {}
             ),
+            dns_resolver=dict(iface.get("dnsResolver", {}) or {}),
             attach_bridge=_attach_bridge(iface),
             host_uplink=dict(iface.get("hostUplink", {}) or {}),
             runtime_if_name=iface.get("runtimeIfName")
