@@ -25,14 +25,32 @@ if [[ -z "${cpm_path}" || ! -f "${cpm_path}/flake.nix" ]]; then
   exit 1
 fi
 
-selection_trace="$(
+selection_ok="$(
   LABS_PATH="${labs_path}" nix eval --impure --raw --expr '
     let current = import ((builtins.getEnv "LABS_PATH") + "/current-lab");
-    in current.selection.traceId or ""
+        selection = current.selection or { };
+        selected =
+          (
+            (selection.layer or "") == "SIT"
+            && (selection.selector or "") == "FS-380-HDS-020-SDS-010"
+          )
+          || (
+            (selection.layer or "") == "SMT"
+            && (selection.selector or "") == "internet-mode-verification"
+          )
+          || ((selection.traceId or "") == "FS-380-HDS-020-SDS-010-SMS-050");
+    in if selected then "true" else "false"
   '
 )"
-if [[ "${selection_trace}" != "FS-380-HDS-020-SDS-010" ]]; then
-  echo "FAIL FS-380 active-lab CLAB render: current-lab must be selected to SIT FS-380-HDS-020-SDS-010, got ${selection_trace}" >&2
+selection_label="$(
+  LABS_PATH="${labs_path}" nix eval --impure --raw --expr '
+    let current = import ((builtins.getEnv "LABS_PATH") + "/current-lab");
+        selection = current.selection or { };
+    in "${selection.layer or ""}:${selection.selector or ""}:${selection.traceId or ""}"
+  '
+)"
+if [[ "${selection_ok}" != "true" ]]; then
+  echo "FAIL FS-380 active-lab CLAB render: current-lab must be selected to SIT FS-380-HDS-020-SDS-010 or SMT internet-mode-verification, got ${selection_label}" >&2
   exit 1
 fi
 
