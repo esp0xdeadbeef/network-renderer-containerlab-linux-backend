@@ -79,4 +79,56 @@ require_line "sh -c 'ip rule add iif p0 priority 10001 table 1001 2>/dev/null ||
 require_line "sh -c 'ip rule add iif p1 priority 10002 table 1002 2>/dev/null || true'"
 require_line "sh -c 'ip rule add iif p2 priority 10003 table 1003 2>/dev/null || true'"
 
+grep -F 'lab-emulation-fs380-internet-mode-provider:' "${tmp_dir}/fabric.clab.yml" >/dev/null
+grep -F 'clab.lab-emulation: fake-provider' "${tmp_dir}/fabric.clab.yml" >/dev/null
+grep -F 'clab.link.type: lab-emulation' "${tmp_dir}/fabric.clab.yml" >/dev/null
+grep -F 'clab.link.bridge: internet-vlan4' "${tmp_dir}/fabric.clab.yml" >/dev/null
+grep -E 'ip addr replace 10\.20\.0\.1/24 dev veth-[0-9a-f]{10}' "${tmp_dir}/fabric.clab.yml" >/dev/null
+grep -F 'udhcpd /run/udhcpd/fake-provider.conf' "${tmp_dir}/fabric.clab.yml" >/dev/null
+grep -F 'ip saddr 10.20.0.0/24 masquerade' "${tmp_dir}/fabric.clab.yml" >/dev/null
+
+python3 - "${tmp_dir}/vm-bridges-generated.nix" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+bridges = Path(sys.argv[1]).read_text()
+quote = chr(39) * 2
+artifact_match = re.search(
+    r"labEmulationArtifacts = builtins\.fromJSON " + quote + r"\n(.*?)\n  " + quote + ";",
+    bridges,
+    re.S,
+)
+if not artifact_match:
+    raise SystemExit("missing labEmulationArtifacts JSON")
+artifacts = json.loads(artifact_match.group(1))
+assert len(artifacts) == 1, artifacts
+artifact = artifacts[0]
+assert artifact["providerEmulationMode"] == "fake-provider", artifact
+assert artifact["name"] == "fs380-internet-mode-provider", artifact
+assert artifact["scope"] == "harness", artifact
+assert artifact["harnessScoped"] is True, artifact
+assert artifact["handoffVlan"] == 11, artifact
+assert artifact["liveUpstreamVlan"] == 4, artifact
+assert artifact["liveUpstreamReachability"] == {"vlan": 4}, artifact
+assert artifact["dhcp4"]["address"] == "10.20.0.1/24", artifact
+assert artifact["dhcp4"]["router"] == "10.20.0.1", artifact
+assert artifact["dhcp4"]["rangeStart"] == "10.20.0.20", artifact
+assert artifact["dhcp4"]["rangeEnd"] == "10.20.0.99", artifact
+assert artifact["dhcp4"]["sourcePrefix"] == "10.20.0.0/24", artifact
+assert artifact["nat44"] == {"enabled": True, "sourcePrefix": "10.20.0.0/24"}, artifact
+
+bridge_match = re.search(
+    r"bridgeNetworks = builtins\.fromJSON " + quote + r"\n(.*?)\n  " + quote + ";",
+    bridges,
+    re.S,
+)
+if not bridge_match:
+    raise SystemExit("missing bridgeNetworks JSON")
+bridge_networks = json.loads(bridge_match.group(1))
+assert bridge_networks["internet-vlan4"]["mode"] == "vlan", bridge_networks
+assert bridge_networks["internet-vlan4"]["vlan"] == 4, bridge_networks
+PY
+
 echo "PASS FS-380 active-lab CLAB upstream-selector render"
