@@ -96,8 +96,81 @@ def _nat4_commands(interface_name: str, host_uplink: Dict[str, Any]) -> List[str
     ]
 
 
+def _artifact_live_vlan(artifact: Dict[str, Any]) -> int | None:
+    live = artifact.get("liveUpstreamReachability")
+    if isinstance(live, dict):
+        vlan = live.get("vlan")
+        if isinstance(vlan, int) and not isinstance(vlan, bool):
+            return vlan
+    vlan = artifact.get("liveUpstreamVlan")
+    if isinstance(vlan, int) and not isinstance(vlan, bool):
+        return vlan
+    return None
+
+
+def _fake_provider_commands(
+    interface_name: str,
+    host_uplink: Dict[str, Any],
+    artifacts: Any,
+) -> List[str]:
+    vlan = host_uplink.get("vlan")
+    if isinstance(vlan, bool) or not isinstance(vlan, int):
+        return []
+    if not isinstance(artifacts, list):
+        return []
+
+    for artifact in artifacts:
+        if not isinstance(artifact, dict):
+            continue
+        if artifact.get("providerEmulationMode") != "fake-provider":
+            continue
+        if _artifact_live_vlan(artifact) != vlan:
+            continue
+
+        dhcp4 = artifact.get("dhcp4")
+        if not isinstance(dhcp4, dict):
+            raise ValueError(
+                "fake-provider WAN binding requires dhcp4 data for "
+                f"VLAN {vlan}"
+            )
+        address = dhcp4.get("address")
+        router = dhcp4.get("router")
+        client_address = dhcp4.get("clientAddress")
+        if not all(isinstance(value, str) and value for value in (address, router, client_address)):
+            raise ValueError(
+                "fake-provider WAN binding requires dhcp4.address, "
+                f"dhcp4.router, and dhcp4.clientAddress for VLAN {vlan}"
+            )
+
+        try:
+            provider = ipaddress.ip_interface(address)
+            client = ipaddress.ip_address(client_address)
+            router_ip = ipaddress.ip_address(router)
+        except ValueError as exc:
+            raise ValueError(
+                f"fake-provider WAN binding has invalid IPv4 data for VLAN {vlan}"
+            ) from exc
+        if provider.version != 4 or client.version != 4 or router_ip.version != 4:
+            raise ValueError(
+                f"fake-provider WAN binding requires IPv4 data for VLAN {vlan}"
+            )
+        if client not in provider.network or router_ip not in provider.network:
+            raise ValueError(
+                f"fake-provider WAN binding client/router not in provider subnet for VLAN {vlan}"
+            )
+
+        return [
+            f"ip addr flush dev {interface_name}",
+            f"ip addr replace {client_address}/{provider.network.prefixlen} dev {interface_name}",
+            f"ip route replace default via {router} dev {interface_name} onlink",
+        ]
+
+    return []
+
+
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
+    lab_emulation_artifacts = node.get("labEmulationArtifacts")
 
     wan_ifaces = _wan_interfaces(node, eth_map)
     for interface_data in wan_ifaces:
@@ -111,7 +184,17 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             ipv4_method = (host_uplink.get("ipv4") or {}).get("method")
             ipv6_method = (host_uplink.get("ipv6") or {}).get("method")
             host_mode = ipv4_method or ipv6_method
-            if host_mode == "static":
+            fake_provider_commands = (
+                _fake_provider_commands(
+                    interface_name, host_uplink, lab_emulation_artifacts
+                )
+                if host_mode == "dhcp"
+                else []
+            )
+            if fake_provider_commands:
+                for command in fake_provider_commands:
+                    cmds.append(_sh(command))
+            elif host_mode == "static":
                 for command in _nat4_commands(interface_name, host_uplink):
                     cmds.append(_sh(command))
             elif host_mode in ("dhcp", None):

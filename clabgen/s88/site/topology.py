@@ -112,9 +112,9 @@ def render_site_topology(site: SiteModel) -> Dict[str, Any]:
                 iface.host_uplink = merged
 
     eth_maps = build_eth_maps(site)
-    nodes = render_nodes(site, eth_maps)
-    links, bridges = render_links(site, eth_maps)
     lab_emulation_artifacts = render_lab_emulation_artifacts(site)
+    nodes = render_nodes(site, eth_maps, lab_emulation_artifacts)
+    links, bridges = render_links(site, eth_maps)
     lab_emulation_runtime = render_lab_emulation_runtime(
         lab_emulation_artifacts,
         bridge_networks,
