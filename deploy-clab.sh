@@ -456,7 +456,13 @@ verify_fabric_containers() {
   local container
 
   mapfile -t containers < <(docker ps --format '{{.Names}}' | grep -E "^clab-${name}-" | sort || true)
-  ((${#containers[@]} > 0)) || fail "no running fabric containers found for lab ${name}"
+  if ((${#containers[@]} == 0)); then
+    if grep -Eq '^[[:space:]]+nodes:[[:space:]]*\{\}[[:space:]]*$' "${topology_file}"; then
+      log "empty Containerlab topology for ${name}; no containers expected"
+      return 0
+    fi
+    fail "no running fabric containers found for lab ${name}"
+  fi
 
   for container in "${containers[@]}"; do
     docker exec "${container}" sh -ec '

@@ -28,6 +28,25 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 fake_bin="${tmp_dir}/bin"
 mkdir -p "${fake_bin}"
 
+non_empty_topology="${tmp_dir}/non-empty-fabric.clab.yml"
+empty_topology="${tmp_dir}/empty-fabric.clab.yml"
+
+cat >"${non_empty_topology}" <<'YAML'
+name: fabric
+topology:
+  nodes:
+    router:
+      kind: linux
+  links: []
+YAML
+
+cat >"${empty_topology}" <<'YAML'
+name: fabric
+topology:
+  nodes: {}
+  links: []
+YAML
+
 failures=0
 
 # ---------------------------------------------------------------------------
@@ -75,10 +94,15 @@ write_status() {
 # interfaces via docker ps + docker exec.
 # ---------------------------------------------------------------------------
 verify_containers() {
+  local topology_file="${1:-${non_empty_topology}}"
   local containers
   containers="$(docker ps --format '{{.Names}}' | grep '^clab-fabric-' || true)"
 
   test -n "${containers}" || {
+    if grep -Eq '^[[:space:]]+nodes:[[:space:]]*\{\}[[:space:]]*$' "${topology_file}"; then
+      echo "empty containerlab topology; no containers expected"
+      return 0
+    fi
     echo "no clab-fabric containers are running after deploy" >&2
     return 1
   }
@@ -337,6 +361,29 @@ else
     cat "${test4_dir}/stderr" >&2
     failures=$((failures + 1))
   fi
+fi
+
+# ===========================================================================
+# Test 5b: Empty topology with no containers is an explicit no-op success
+# ===========================================================================
+test4_empty_dir="${tmp_dir}/test4-empty"
+mkdir -p "${test4_empty_dir}"
+
+if (
+  export PATH="${fake_bin}:${PATH}"
+  verify_containers "${empty_topology}"
+) >"${test4_empty_dir}/stdout" 2>"${test4_empty_dir}/stderr"; then
+  if grep -q "empty containerlab topology" "${test4_empty_dir}/stdout"; then
+    echo "PASS test4-empty: empty topology accepted without containers"
+  else
+    echo "FAIL test4-empty: empty topology pass did not report no-op" >&2
+    cat "${test4_empty_dir}/stdout" >&2
+    failures=$((failures + 1))
+  fi
+else
+  echo "FAIL test4-empty: empty topology should not require containers" >&2
+  cat "${test4_empty_dir}/stderr" >&2
+  failures=$((failures + 1))
 fi
 
 # ===========================================================================
