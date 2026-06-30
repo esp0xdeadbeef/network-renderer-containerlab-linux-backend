@@ -131,8 +131,71 @@ for cmd in nat_ips:
 nat_dhcp = [c for c in cmds_nat if "udhcpc" in c]
 check("NAT mode does NOT emit DHCP", len(nat_dhcp) == 0)
 
-# ── Predicate 9: Missing eth_map entry produces no commands ──
-print("\n=== Predicate 9: Missing eth_map entry produces no commands ===")
+# ── Predicate 9: Fake-provider DHCP client binding uses explicit lab-emulation data ──
+print("\n=== Predicate 9: Fake-provider WAN binding uses explicit client address ===")
+fake_provider_node = {
+    "labEmulationArtifacts": [
+        {
+            "providerEmulationMode": "fake-provider",
+            "liveUpstreamReachability": {"vlan": 4},
+            "dhcp4": {
+                "address": "10.20.0.1/24",
+                "router": "10.20.0.1",
+                "clientAddress": "10.20.0.20",
+            },
+        }
+    ],
+    "interfaces": {
+        "wan0": {
+            "kind": "wan",
+            "hostUplink": {
+                "mode": "vlan",
+                "vlan": 4,
+                "ipv4": {"method": "dhcp"},
+                "ipv6": {"method": "slaac"},
+            },
+        }
+    },
+}
+cmds_fake = render(fake_provider_node, {"wan0": "ens80"})
+check(
+    "Fake provider emits explicit client address",
+    any("ip addr replace 10.20.0.20/24 dev ens80" in c for c in cmds_fake),
+)
+check(
+    "Fake provider emits explicit default route",
+    any("ip route replace default via 10.20.0.1 dev ens80 onlink" in c for c in cmds_fake),
+)
+check(
+    "Fake provider binding suppresses generic DHCP",
+    not any("udhcpc" in c for c in cmds_fake),
+)
+
+missing_client_node = {
+    "labEmulationArtifacts": [
+        {
+            "providerEmulationMode": "fake-provider",
+            "liveUpstreamReachability": {"vlan": 4},
+            "dhcp4": {
+                "address": "10.20.0.1/24",
+                "router": "10.20.0.1",
+            },
+        }
+    ],
+    "interfaces": fake_provider_node["interfaces"],
+}
+try:
+    render(missing_client_node, {"wan0": "ens80"})
+except ValueError as exc:
+    check(
+        "Missing fake-provider clientAddress fails closed",
+        "dhcp4.clientAddress" in str(exc),
+    )
+else:
+    check("Missing fake-provider clientAddress fails closed", False)
+
+# ── Predicate 10: Missing eth_map entry produces no commands ──
+print("\n=== Predicate 10: Missing eth_map entry produces no commands ===")
 orphan_node = {
     "interfaces": {
         "orphan_wan": {

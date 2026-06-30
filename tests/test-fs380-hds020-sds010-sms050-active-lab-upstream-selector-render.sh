@@ -86,6 +86,12 @@ grep -F 'clab.link.bridge: internet-vlan4' "${tmp_dir}/fabric.clab.yml" >/dev/nu
 grep -E 'ip addr replace 10\.20\.0\.1/24 dev veth-[0-9a-f]{10}' "${tmp_dir}/fabric.clab.yml" >/dev/null
 grep -F 'udhcpd /run/udhcpd/fake-provider.conf' "${tmp_dir}/fabric.clab.yml" >/dev/null
 grep -F 'ip saddr 10.20.0.0/24 masquerade' "${tmp_dir}/fabric.clab.yml" >/dev/null
+grep -F 'ip addr replace 10.20.0.20/24 dev u0' "${tmp_dir}/fabric.clab.yml" >/dev/null
+grep -F 'ip route replace default via 10.20.0.1 dev u0 onlink' "${tmp_dir}/fabric.clab.yml" >/dev/null
+if grep -F 'udhcpc -b -i u0' "${tmp_dir}/fabric.clab.yml" >/dev/null; then
+  echo "FAIL FS-380 active-lab CLAB render: u0 must use explicit fake-provider client binding, not generic DHCP" >&2
+  exit 1
+fi
 
 python3 - "${tmp_dir}/vm-bridges-generated.nix" <<'PY'
 import json
@@ -114,6 +120,7 @@ assert artifact["liveUpstreamVlan"] == 4, artifact
 assert artifact["liveUpstreamReachability"] == {"vlan": 4}, artifact
 assert artifact["dhcp4"]["address"] == "10.20.0.1/24", artifact
 assert artifact["dhcp4"]["router"] == "10.20.0.1", artifact
+assert artifact["dhcp4"]["clientAddress"] == "10.20.0.20", artifact
 assert artifact["dhcp4"]["rangeStart"] == "10.20.0.20", artifact
 assert artifact["dhcp4"]["rangeEnd"] == "10.20.0.99", artifact
 assert artifact["dhcp4"]["sourcePrefix"] == "10.20.0.0/24", artifact

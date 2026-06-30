@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 import ipaddress
+import copy
 
 from clabgen.models import NodeModel, SiteModel
 from clabgen.s88.site.node_runtime import render_linux_node
@@ -16,7 +17,11 @@ def _loopback_ip(value: str | None) -> str | None:
         return None
 
 
-def _node_extra(site: SiteModel, node_name: str) -> Dict[str, Any]:
+def _node_extra(
+    site: SiteModel,
+    node_name: str,
+    lab_emulation_artifacts: list[Dict[str, Any]] | None = None,
+) -> Dict[str, Any]:
     node = site.nodes[node_name]
     bgp = getattr(node, "bgp", {}) or {}
     if not isinstance(bgp, dict):
@@ -37,11 +42,14 @@ def _node_extra(site: SiteModel, node_name: str) -> Dict[str, Any]:
         },
         "bgp": bgp,
         "containerlab": containerlab,
+        "labEmulationArtifacts": copy.deepcopy(lab_emulation_artifacts or []),
     }
 
 
 def render_nodes(
-    site: SiteModel, eth_maps: Dict[str, Dict[str, str]]
+    site: SiteModel,
+    eth_maps: Dict[str, Dict[str, str]],
+    lab_emulation_artifacts: list[Dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
     nodes: Dict[str, Any] = {}
 
@@ -59,7 +67,7 @@ def render_nodes(
         }:
             raise ValueError(f"No Unit renderer for role={role!r} node={node_name!r}")
 
-        extra = _node_extra(site, node_name)
+        extra = _node_extra(site, node_name, lab_emulation_artifacts)
 
         nodes[node_name] = render_linux_node(
             node_name=node_name,
