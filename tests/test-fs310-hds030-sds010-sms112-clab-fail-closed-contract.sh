@@ -40,9 +40,9 @@ KNOWN_GAPS = {
     ("clabgen/s88/site/tenant_links.py", 64, "or \"\" — labels[clab.host.interface] defaults to empty string"),
     ("clabgen/s88/site/overlay_paths.py", 138, "or \"\" — peer policy_iface defaults to empty string"),
     ("clabgen/s88/site/interface_model.py", 88, "or \"\" — tenant lookup defaults to empty string"),
-    ("clabgen/s88/site/nodes.py", 50, "or \"\" — node role defaults to empty string"),
-    ("clabgen/s88/enterprise/site_loader.py", 140, "or \"\" — policy_node_name defaults to empty string"),
-    ("clabgen/s88/enterprise/site_loader.py", 142, "or \"\" — upstreamSelectorNodeName defaults to empty string"),
+    ("clabgen/s88/site/nodes.py", 58, "or \"\" — node role defaults to empty string"),
+    ("clabgen/s88/enterprise/site_loader.py", 152, "or \"\" — policy_node_name defaults to empty string"),
+    ("clabgen/s88/enterprise/site_loader.py", 154, "or \"\" — upstreamSelectorNodeName defaults to empty string"),
     ("clabgen/s88/CM/linux_runtime.py", 31, "or \"\" — routing_mode defaults to empty string"),
 }
 
