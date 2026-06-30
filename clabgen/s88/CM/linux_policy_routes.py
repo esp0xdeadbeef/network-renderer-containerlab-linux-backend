@@ -4,8 +4,14 @@ import ipaddress
 from typing import Any, Dict, List, Set, Tuple
 
 from clabgen.s88.CM.linux_addressing import _peer_in_subnet
-from clabgen.s88.CM.linux_route_values import _dst, _normalize_prefix, _route_lists
-from clabgen.s88.CM.linux_route_via import _effective_via4, _effective_via6
+from clabgen.s88.CM.linux_route_values import (
+    _dst,
+    _normalize_prefix,
+    _route_lists,
+    _via4,
+    _via6,
+)
+from clabgen.s88.CM.linux_route_via import _effective_via4, _effective_via6, _same_subnet
 
 
 def _lane(iface_or_route: Dict[str, Any]) -> Dict[str, Any]:
@@ -15,6 +21,13 @@ def _lane(iface_or_route: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(backing, dict):
             value = backing.get("lane")
     lane = value if isinstance(value, dict) else {}
+    direct_uplinks = iface_or_route.get("uplinks")
+    if isinstance(direct_uplinks, list) and direct_uplinks:
+        merged = dict(lane)
+        merged["uplinks"] = _dedupe_strings(
+            list(merged.get("uplinks") or []) + direct_uplinks
+        )
+        lane = merged
     if isinstance(backing, dict):
         backing_uplinks = backing.get("uplinks")
         if isinstance(backing_uplinks, list) and backing_uplinks:
@@ -130,7 +143,18 @@ def _route_surface_for_lane(
     eth_map: Dict[str, str],
     fallback_ifname: str,
     route_lane: Dict[str, Any],
+    route: Dict[str, Any],
+    family: int,
 ) -> Tuple[Dict[str, Any], str] | None:
+    via = _via4(route) if family == 4 else _via6(route)
+    addr_field = "addr4" if family == 4 else "addr6"
+    if isinstance(via, str) and via:
+        for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
+            iface = node["interfaces"][ifname]
+            eth = eth_map.get(ifname)
+            if eth is not None and _same_subnet(via, iface.get(addr_field)):
+                return iface, eth
+
     route_access = _lane_access(route_lane)
     route_uplink = _lane_uplink(route_lane)
     if route_access is not None and route_uplink is not None:
@@ -210,7 +234,7 @@ def _policy_groups_for_lane(
             # Skip routes whose dst is the addr4/addr6 of another lane's interface
             if dst and (dst in other_addrs4 or dst in other_addrs6):
                 continue
-            route_surface = _route_surface_for_lane(node, eth_map, ifname, route_lane)
+            route_surface = _route_surface_for_lane(node, eth_map, ifname, route_lane, route, 4)
             if route_surface is None:
                 continue
             route_iface, route_eth = route_surface
@@ -232,7 +256,7 @@ def _policy_groups_for_lane(
             # Skip routes whose dst is the addr4/addr6 of another lane's interface
             if dst and (dst in other_addrs4 or dst in other_addrs6):
                 continue
-            route_surface = _route_surface_for_lane(node, eth_map, ifname, route_lane)
+            route_surface = _route_surface_for_lane(node, eth_map, ifname, route_lane, route, 6)
             if route_surface is None:
                 continue
             route_iface, route_eth = route_surface

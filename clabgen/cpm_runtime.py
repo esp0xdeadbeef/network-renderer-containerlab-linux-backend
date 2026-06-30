@@ -107,6 +107,7 @@ def _interface_output(
         "tenant": iface.get("tenant"),
         "overlay": _interface_overlay(kind, backing_ref, iface),
         "lane": _dict_value(backing_ref.get("lane") or iface.get("lane")),
+        "uplinks": _list_strings(backing_ref.get("uplinks")) or _list_strings(iface.get("uplinks")),
         "policyRoutingAllocation": _dict_value(iface.get("policyRoutingAllocation")),
         "dnsResolver": _dict_value(iface.get("dnsResolver")),
         "attachBridge": attach_bridge,

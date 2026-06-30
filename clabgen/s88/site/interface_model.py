@@ -106,6 +106,12 @@ def _attach_bridge(iface: Dict[str, Any]) -> str | None:
     return None
 
 
+def _string_list(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item]
+
+
 def build_interfaces(
     site: Dict[str, Any],
     node_name: str,
@@ -133,6 +139,7 @@ def build_interfaces(
             dns_resolver=dict(iface.get("dnsResolver", {}) or {}),
             attach_bridge=_attach_bridge(iface),
             host_uplink=dict(iface.get("hostUplink", {}) or {}),
+            uplinks=_string_list(iface.get("uplinks")),
             runtime_if_name=iface.get("runtimeIfName")
             if isinstance(iface.get("runtimeIfName"), str)
             else None,

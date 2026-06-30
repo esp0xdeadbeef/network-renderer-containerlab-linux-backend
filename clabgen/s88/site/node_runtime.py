@@ -58,6 +58,7 @@ def build_node_data(
             "overlay": iface.overlay,
             "upstream": iface.upstream,
             "lane": copy.deepcopy(iface.lane),
+            "uplinks": list(getattr(iface, "uplinks", []) or []),
             "policyRoutingAllocation": copy.deepcopy(
                 iface.policy_routing_allocation
             ),
