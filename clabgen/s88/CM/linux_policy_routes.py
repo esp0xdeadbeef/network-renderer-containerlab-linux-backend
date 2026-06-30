@@ -381,6 +381,30 @@ def _add_connected_subnet_route(
     )
 
 
+def _explicit_downstream_route_groups(
+    node: Dict[str, Any],
+    iface: Dict[str, Any],
+    eth: str,
+    family: int,
+) -> Dict[str, List[Tuple[str, str]]]:
+    routes = _route_lists(iface)
+    source = routes["ipv4"] if family == 4 else routes["ipv6"]
+    groups: Dict[str, List[Tuple[str, str]]] = {}
+    for route in source:
+        if route.get("policyOnly") is True:
+            continue
+        dst = _dst(route)
+        if not dst or _is_default(dst):
+            continue
+        via = (
+            _effective_via4(node, iface, route)
+            if family == 4
+            else _effective_via6(node, iface, route)
+        )
+        _append_policy_route(groups, dst, via, eth)
+    return groups
+
+
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
 
@@ -593,19 +617,31 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             for ds_table, ds_priority, routes4, routes6, ds_iface, ds_eth in downstream_by_access[access]:
                 if us_table == ds_table:
                     continue
-                if routes4:
-                    for dst in sorted(routes4.keys()):
+                downstream_routes4 = dict(routes4)
+                for dst, hops in _explicit_downstream_route_groups(node, ds_iface, ds_eth, 4).items():
+                    for hop in hops:
+                        downstream_routes4.setdefault(dst, [])
+                        if hop not in downstream_routes4[dst]:
+                            downstream_routes4[dst].append(hop)
+                downstream_routes6 = dict(routes6)
+                for dst, hops in _explicit_downstream_route_groups(node, ds_iface, ds_eth, 6).items():
+                    for hop in hops:
+                        downstream_routes6.setdefault(dst, [])
+                        if hop not in downstream_routes6[dst]:
+                            downstream_routes6[dst].append(hop)
+                if downstream_routes4:
+                    for dst in sorted(downstream_routes4.keys()):
                         if dst == "0.0.0.0/0":
                             continue
-                        for via, eth in routes4[dst]:
+                        for via, eth in downstream_routes4[dst]:
                             cmds.append(
                                 f"sh -c 'ip route replace table {us_table} {dst} via {via} dev {eth} onlink 2>/dev/null || true'"
                             )
-                if routes6:
-                    for dst in sorted(routes6.keys()):
+                if downstream_routes6:
+                    for dst in sorted(downstream_routes6.keys()):
                         if dst == "::/0":
                             continue
-                        for via, eth in routes6[dst]:
+                        for via, eth in downstream_routes6[dst]:
                             cmds.append(
                                 f"sh -c 'ip -6 route replace table {us_table} {dst} via {via} dev {eth} onlink 2>/dev/null || true'"
                             )

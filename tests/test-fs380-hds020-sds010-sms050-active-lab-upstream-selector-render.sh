@@ -54,20 +54,38 @@ CLABGEN_RENDERER_INVENTORY_JSON="${tmp_dir}/renderer-inventory.json" \
     "${tmp_dir}/fabric.clab.yml" \
     "${tmp_dir}/vm-bridges-generated.nix" >/dev/null
 
-node_block="$(
+upstream_node_block="$(
   awk '
     $0 == "    mini-smt-internet-mode-verification-upstream-selector:" { in_node = 1; print; next }
     in_node && /^    [^ ].*:$/ { exit }
     in_node { print }
   ' "${tmp_dir}/fabric.clab.yml"
 )"
-node_flat="$(tr '\n' ' ' <<<"${node_block}" | sed -E 's/[[:space:]]+/ /g')"
+upstream_node_flat="$(tr '\n' ' ' <<<"${upstream_node_block}" | sed -E 's/[[:space:]]+/ /g')"
+
+policy_node_block="$(
+  awk '
+    $0 == "    mini-smt-internet-mode-verification-policy:" { in_node = 1; print; next }
+    in_node && /^    [^ ].*:$/ { exit }
+    in_node { print }
+  ' "${tmp_dir}/fabric.clab.yml"
+)"
+policy_node_flat="$(tr '\n' ' ' <<<"${policy_node_block}" | sed -E 's/[[:space:]]+/ /g')"
 
 require_line() {
   local expected="$1"
-  if ! grep -Fq -- "${expected}" <<<"${node_flat}"; then
+  if ! grep -Fq -- "${expected}" <<<"${upstream_node_flat}"; then
     echo "FAIL FS-380 active-lab CLAB render: missing upstream-selector command: ${expected}" >&2
-    printf '%s\n' "${node_block}" >&2
+    printf '%s\n' "${upstream_node_block}" >&2
+    exit 1
+  fi
+}
+
+require_policy_line() {
+  local expected="$1"
+  if ! grep -Fq -- "${expected}" <<<"${policy_node_flat}"; then
+    echo "FAIL FS-380 active-lab CLAB render: missing policy-node command: ${expected}" >&2
+    printf '%s\n' "${policy_node_block}" >&2
     exit 1
   fi
 }
@@ -78,6 +96,9 @@ require_line "ip route replace table 1003 0.0.0.0/0 via 10.10.0.4 dev p0 onlink"
 require_line "sh -c 'ip rule add iif p0 priority 10001 table 1001 2>/dev/null || true'"
 require_line "sh -c 'ip rule add iif p1 priority 10002 table 1002 2>/dev/null || true'"
 require_line "sh -c 'ip rule add iif p2 priority 10003 table 1003 2>/dev/null || true'"
+
+require_policy_line "sh -c 'ip route replace table 1002 10.20.20.0/24 via 10.10.0.2 dev p0 onlink 2>/dev/null || true'"
+require_policy_line "sh -c 'ip -6 route replace table 1002 fd42:380:20::/64 via fd42:380:ff:0:0:0:0:2 dev p0 onlink 2>/dev/null || true'"
 
 grep -F 'lab-emulation-fs380-internet-mode-provider:' "${tmp_dir}/fabric.clab.yml" >/dev/null
 grep -F 'clab.lab-emulation: fake-provider' "${tmp_dir}/fabric.clab.yml" >/dev/null

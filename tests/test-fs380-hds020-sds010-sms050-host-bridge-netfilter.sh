@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# GAMP-ID: FS-380-HDS-020-SDS-010-SMS-050
+# GAMP-SCOPE: software-module-test
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+host_module="${repo_root}/host-module.nix"
+
+grep -F 'pkgs.procps' "${host_module}" >/dev/null || {
+  echo "FAIL FS-380 host bridge netfilter: host-module runtimeInputs must include procps for sysctl" >&2
+  exit 1
+}
+
+python3 - "${host_module}" <<'PY'
+import sys
+from pathlib import Path
+
+content = Path(sys.argv[1]).read_text()
+required = [
+    "net.bridge.bridge-nf-call-iptables",
+    "net.bridge.bridge-nf-call-ip6tables",
+    "net.bridge.bridge-nf-call-arptables",
+]
+missing = [value for value in required if value not in content]
+if missing:
+    raise SystemExit(
+        "FAIL FS-380 host bridge netfilter: missing sysctl keys: "
+        + ", ".join(missing)
+    )
+
+sysctl_pos = content.find("net.bridge.bridge-nf-call-iptables")
+setup_pos = content.find("bash '$work_dir/setup-bridge-links.sh'")
+deploy_pos = content.find("containerlab deploy -t '$work_dir/fabric.clab.yml'")
+if not (0 <= sysctl_pos < setup_pos < deploy_pos):
+    raise SystemExit(
+        "FAIL FS-380 host bridge netfilter: bridge-netfilter sysctl must be "
+        "generated into setup-bridge-links.sh and setup must run before deploy"
+    )
+
+print("PASS FS-380 host bridge netfilter guard")
+PY

@@ -117,5 +117,92 @@ assert (
 assert "ip rule add iif core0 priority 10002 table 1002" in upstream_policy
 assert "ip rule add iif pol-client priority 10002 table 1002" in upstream_policy
 
+policy_node = {
+    "interfaces": {
+        "downstream": {
+            "addr4": "10.10.0.3/31",
+            "addr6": "fd42:520:ff::3/127",
+            "lane": {"kind": "access", "access": "client"},
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "allocation": "fixture-explicit",
+                "tableId": 1001,
+                "priority": 10001,
+            },
+            "routes": {
+                "ipv4": [
+                    {
+                        "dst": "10.20.20.0/24",
+                        "via4": "10.10.0.2",
+                        "proto": "internal",
+                    }
+                ],
+                "ipv6": [
+                    {
+                        "dst": "fd42:520:20::/64",
+                        "via6": "fd42:520:ff::2",
+                        "proto": "internal",
+                    }
+                ],
+            },
+        },
+        "uplink": {
+            "addr4": "10.10.0.6/31",
+            "addr6": "fd42:520:ff::6/127",
+            "lane": {
+                "kind": "access-uplink",
+                "access": "client",
+                "uplink": "internet-vlan4",
+                "uplinks": ["internet-vlan4"],
+            },
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "allocation": "fixture-explicit",
+                "tableId": 1002,
+                "priority": 10002,
+            },
+            "routes": {
+                "ipv4": [
+                    {
+                        "dst": "0.0.0.0/0",
+                        "via4": "10.10.0.7",
+                        "policyOnly": True,
+                        "lane": {
+                            "kind": "access-uplink",
+                            "access": "client",
+                            "uplink": "internet-vlan4",
+                        },
+                    }
+                ],
+                "ipv6": [
+                    {
+                        "dst": "::/0",
+                        "via6": "fd42:520:ff::7",
+                        "policyOnly": True,
+                        "lane": {
+                            "kind": "access-uplink",
+                            "access": "client",
+                            "uplink": "internet-vlan4",
+                        },
+                    }
+                ],
+            },
+        },
+    }
+}
+
+policy_node_text = "\n".join(
+    render_policy_routes(policy_node, {"downstream": "p0", "uplink": "p1"})
+)
+assert (
+    "ip route replace table 1002 10.20.20.0/24 via 10.10.0.2 dev p0 onlink"
+    in policy_node_text
+)
+assert (
+    "ip -6 route replace table 1002 fd42:520:20::/64 via fd42:520:ff::2 dev p0 onlink"
+    in policy_node_text
+)
+assert "ip route replace table 1002 10.20.20.0/24 via 10.10.0.7 dev p1 onlink" not in policy_node_text
+
 print("PASS policy-no-main-defaults")
 PY

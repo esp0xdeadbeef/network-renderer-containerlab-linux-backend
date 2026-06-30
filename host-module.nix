@@ -50,6 +50,7 @@ let
         pkgs.iproute2
         pkgs.jq
         pkgs.nix
+        pkgs.procps
         pkgs.python3
         pkgs.systemd
         pkgs.util-linux
@@ -170,7 +171,10 @@ let
 
         bridge_networks = json.loads(match.group(1))
         bridges_match = re.search(r"bridges = \[\n(.*?)\n  \];", bridges, re.S)
-        commands = ["set -euo pipefail"]
+        commands = [
+            "set -euo pipefail",
+            "for key in net.bridge.bridge-nf-call-iptables net.bridge.bridge-nf-call-ip6tables net.bridge.bridge-nf-call-arptables; do sysctl -w \"$key=0\" >/dev/null 2>&1 || true; done",
+        ]
         bridge_names = set()
         if bridges_match:
             for bridge in re.findall(r'"([^"]+)"', bridges_match.group(1)):
