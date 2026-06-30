@@ -81,6 +81,14 @@ def _logical_nodes_for_host(
     return allowed
 
 
+def _has_runtime_targets(site_rows: list[tuple[str, str, Dict[str, Any]]]) -> bool:
+    for _enterprise, _site_name, site in site_rows:
+        runtime_targets = site.get("runtimeTargets")
+        if isinstance(runtime_targets, dict) and runtime_targets:
+            return True
+    return False
+
+
 def load_sites(
     path: str | Path,
     renderer_inventory: Dict[str, Any] | None = None,
@@ -88,6 +96,8 @@ def load_sites(
     data = load_solver(Path(path))
     result: Dict[str, SiteModel] = {}
     solver_meta = dict(data.get("meta", {}) or {})
+    site_rows = list(extract_enterprise_sites(data))
+    has_runtime_targets = _has_runtime_targets(site_rows)
     renderer_inventory = dict(renderer_inventory or {})
     target_host = _target_host(renderer_inventory)
     allowed_logical_nodes = (
@@ -96,12 +106,14 @@ def load_sites(
         else None
     )
     if target_host is not None and not allowed_logical_nodes:
+        if not has_runtime_targets:
+            return {}
         raise ValueError(
             "containerlab renderer targetHost "
             f"'{target_host}' matched zero inventory realization nodes"
         )
 
-    for enterprise, site_name, site in extract_enterprise_sites(data):
+    for enterprise, site_name, site in site_rows:
         filtered_site = filter_site_to_target_host(
             enterprise, site_name, site, allowed_logical_nodes
         )
@@ -145,7 +157,7 @@ def load_sites(
             host_nat=dict(site.get("hostNat", {}) or {}),
         )
 
-    if target_host is not None and not result:
+    if target_host is not None and has_runtime_targets and not result:
         raise ValueError(
             "containerlab renderer targetHost "
             f"'{target_host}' selected zero runtime targets"
