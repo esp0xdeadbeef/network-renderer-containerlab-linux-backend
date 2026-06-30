@@ -212,8 +212,13 @@ let
         cat > "$work_dir/verify-containerlab-deploy.sh" <<'VERIFY_CLAB'
         set -euo pipefail
 
+        topology_file="''${1:?topology file required}"
         containers="$(docker ps --format '{{.Names}}' | grep '^clab-fabric-' || true)"
         test -n "$containers" || {
+          if grep -Eq '^[[:space:]]+nodes:[[:space:]]*\{\}[[:space:]]*$' "$topology_file"; then
+            echo "empty containerlab topology; no containers expected"
+            exit 0
+          fi
           echo "no clab-fabric containers are running after deploy" >&2
           exit 1
         }
@@ -276,7 +281,7 @@ let
           docker ps -aq --filter 'name=^clab-fabric-' | xargs -r docker rm -f
           bash '$work_dir/setup-bridge-links.sh'
           containerlab deploy -t '$work_dir/fabric.clab.yml' -d --reconfigure
-          bash '$work_dir/verify-containerlab-deploy.sh'
+          bash '$work_dir/verify-containerlab-deploy.sh' '$work_dir/fabric.clab.yml'
         "
         phase="complete"
         write_status success "$phase" ""
