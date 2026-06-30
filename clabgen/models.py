@@ -35,6 +35,7 @@ class InterfaceModel:
     attach_bridge: Optional[str] = None
     host_uplink: Dict[str, Any] = field(default_factory=dict)
     lane: Dict[str, Any] = field(default_factory=dict)
+    uplinks: List[str] = field(default_factory=list)
     policy_routing_allocation: Dict[str, Any] = field(default_factory=dict)
     dns_resolver: Dict[str, Any] = field(default_factory=dict)
     runtime_if_name: Optional[str] = None
