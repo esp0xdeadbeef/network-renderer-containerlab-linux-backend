@@ -72,22 +72,25 @@ CLABGEN_RENDERER_INVENTORY_JSON="${tmp_dir}/renderer-inventory.json" \
     "${tmp_dir}/fabric.clab.yml" \
     "${tmp_dir}/vm-bridges-generated.nix" >/dev/null
 
-upstream_node_block="$(
-  awk '
-    $0 == "    mini-smt-internet-mode-verification-upstream-selector:" { in_node = 1; print; next }
+extract_node_block() {
+  local node_name="$1"
+  awk -v node_name="${node_name}" '
+    $0 == "    " node_name ":" { in_node = 1; print; next }
     in_node && /^    [^ ].*:$/ { exit }
     in_node { print }
   ' "${tmp_dir}/fabric.clab.yml"
-)"
+}
+
+upstream_node_block="$(extract_node_block "mini-smt-internet-mode-verification-upstream-selector")"
+if [[ -z "${upstream_node_block}" ]]; then
+  upstream_node_block="$(extract_node_block "mini-smt-FS-380-HDS-020-SDS-010-SMS-050-upstream-selector")"
+fi
 upstream_node_flat="$(tr '\n' ' ' <<<"${upstream_node_block}" | sed -E 's/[[:space:]]+/ /g')"
 
-policy_node_block="$(
-  awk '
-    $0 == "    mini-smt-internet-mode-verification-policy:" { in_node = 1; print; next }
-    in_node && /^    [^ ].*:$/ { exit }
-    in_node { print }
-  ' "${tmp_dir}/fabric.clab.yml"
-)"
+policy_node_block="$(extract_node_block "mini-smt-internet-mode-verification-policy")"
+if [[ -z "${policy_node_block}" ]]; then
+  policy_node_block="$(extract_node_block "mini-smt-FS-380-HDS-020-SDS-010-SMS-050-policy")"
+fi
 policy_node_flat="$(tr '\n' ' ' <<<"${policy_node_block}" | sed -E 's/[[:space:]]+/ /g')"
 
 require_line() {
