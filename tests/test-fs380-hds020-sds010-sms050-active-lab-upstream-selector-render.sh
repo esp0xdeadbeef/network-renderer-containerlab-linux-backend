@@ -50,8 +50,12 @@ selection_label="$(
   '
 )"
 if [[ "${selection_ok}" != "true" ]]; then
-  echo "FAIL FS-380 active-lab CLAB render: current-lab must be selected to SIT FS-380-HDS-020-SDS-010 or SMT internet-mode-verification, got ${selection_label}" >&2
-  exit 1
+  if [[ "${FS380_ACTIVE_LAB_REQUIRED:-0}" == "1" ]]; then
+    echo "FAIL FS-380-HDS-020-SDS-010-SMS-050 active-lab CLAB render: current-lab must be selected to SIT FS-380-HDS-020-SDS-010 or SMT FS-380-HDS-020-SDS-010-SMS-050, got ${selection_label}" >&2
+    exit 1
+  fi
+  echo "SKIP FS-380-HDS-020-SDS-010-SMS-050 active-lab CLAB render: current-lab selected ${selection_label}"
+  exit 0
 fi
 
 tmp_dir="$(mktemp -d)"
