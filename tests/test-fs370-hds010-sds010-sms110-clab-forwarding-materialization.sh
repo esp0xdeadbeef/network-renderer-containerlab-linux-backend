@@ -93,6 +93,7 @@ access_node = {
             "runtimeIfName": "ens21",
             "lane": {"access": "client", "uplink": "us", "kind": "access-uplink"},
             "addr4": "10.100.1.0/31",
+            "addr6": "fd42:172:0:0:0:0:0:0/127",
             "routes": {
                 "ipv4": [
                     {
@@ -101,7 +102,16 @@ access_node = {
                     }
                 ],
 
-                "ipv6": [],
+                "ipv6": [
+                    {
+                        "dst": "::/0",
+                        "via6": "fd42:172:0:0:0:0:0:1",
+                    },
+                    {
+                        "dst": "fd42:0172:0000:0000:0000:0000:0000:0002/127",
+                        "via6": "fd42:172:0:0:0:0:0:1",
+                    },
+                ],
             },
         },
     },
@@ -280,6 +290,7 @@ access_fw_cmds = render_policy_firewall(access_fw_rules_input)
 access_fw_text = "\n".join(access_fw_cmds)
 access_route_cmds = _render_default_routes(access_node, access_eth_map) + _render_static_routes(access_node, access_eth_map)
 access_all_cmds = access_route_cmds + access_fw_cmds
+access_route_text = "\n".join(access_route_cmds)
 validate_fs370_forwarding_commands(access_node, access_eth_map, access_all_cmds)
 
 # Verify accept rule exists with correct path label
@@ -294,6 +305,9 @@ check("Access node forward chain has policy drop",
 
 check("Access node forward chain has ct established,related accept",
       "ct state established,related accept" in access_fw_text)
+
+check("Access node emits normalized IPv6 selector route from expanded CPM prefix",
+      "ip -6 route replace fd42:172::2/127 via fd42:172:0:0:0:0:0:1 dev ens21 onlink" in access_route_text)
 
 # ── Seeded Negative 1: "no-uplink" comment detection ──
 print("\n--- Seeded Negative 1: no-uplink comment detection ---")
