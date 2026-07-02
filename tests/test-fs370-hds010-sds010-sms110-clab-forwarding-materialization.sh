@@ -29,6 +29,10 @@ from clabgen.s88.CM.policy_firewall import render as render_policy_firewall
 from clabgen.s88.CM.linux_routes import _render_default_routes, _render_static_routes
 from clabgen.s88.CM.linux_policy_routes import render as render_policy_routes
 from clabgen.s88.CM.forwarding import render as render_forwarding
+from clabgen.s88.CM.fs370_forwarding_validation import (
+    validate_fs370_counter_snapshot,
+    validate_fs370_forwarding_commands,
+)
 
 repo = Path(".")
 failures = 0
@@ -44,6 +48,18 @@ def check(description, condition):
         print(f"  PASS: {description}")
     else:
         fail(description)
+
+def expect_diagnostic(description, expected, fn):
+    global failures
+    try:
+        fn()
+    except ValueError as exc:
+        if expected in str(exc):
+            print(f"  PASS: {description}")
+            return
+        fail(f"{description}: wrong diagnostic {exc}")
+        return
+    fail(f"{description}: expected {expected}")
 
 # ═══════════════════════════════════════════════════════════════════════
 # FIXTURES
@@ -68,12 +84,7 @@ access_node = {
             "lane": {"access": "client", "kind": "access"},
             "addr4": "10.100.0.1/24",
             "routes": {
-                "ipv4": [
-                    {
-                        "dst": "0.0.0.0/0",
-                        "via4": "10.100.0.2",
-                    }
-                ],
+                "ipv4": [],
                 "ipv6": [],
             },
         },
@@ -81,9 +92,14 @@ access_node = {
             "kind": "p2p",
             "runtimeIfName": "ens21",
             "lane": {"access": "client", "uplink": "us", "kind": "access-uplink"},
-            "addr4": "10.100.0.2/24",
+            "addr4": "10.100.1.0/31",
             "routes": {
-                "ipv4": [],
+                "ipv4": [
+                    {
+                        "dst": "0.0.0.0/0",
+                        "via4": "10.100.1.1",
+                    }
+                ],
 
                 "ipv6": [],
             },
@@ -262,6 +278,9 @@ access_fw_rules_input = {
 }
 access_fw_cmds = render_policy_firewall(access_fw_rules_input)
 access_fw_text = "\n".join(access_fw_cmds)
+access_route_cmds = _render_default_routes(access_node, access_eth_map) + _render_static_routes(access_node, access_eth_map)
+access_all_cmds = access_route_cmds + access_fw_cmds
+validate_fs370_forwarding_commands(access_node, access_eth_map, access_all_cmds)
 
 # Verify accept rule exists with correct path label
 check("Access node emits nft forward accept for tenant→selector",
@@ -278,14 +297,22 @@ check("Access node forward chain has ct established,related accept",
 
 # ── Seeded Negative 1: "no-uplink" comment detection ──
 print("\n--- Seeded Negative 1: no-uplink comment detection ---")
-# Inject a rule with "no-uplink" comment into output and verify scanner catches it
-injected_no_uplink = access_fw_text + '\nsh -c "nft \'add rule inet fw forward iifname \\"client0\\" oifname \\"ens21\\" counter accept comment no-uplink\' 2>/dev/null || true"'
-no_uplink_hits = [line for line in injected_no_uplink.splitlines() if "no-uplink" in line and "nft" in line]
-check("Seeded negative 1: scanner detects no-uplink comment in nft output",
-      len(no_uplink_hits) >= 1)
+injected_no_uplink = 'sh -c "nft \'add rule inet fw forward iifname \\"client0\\" oifname \\"ens21\\" counter accept comment no-uplink\' 2>/dev/null || true"'
+expect_diagnostic(
+    "Seeded negative 1: renderer validator rejects no-uplink comment",
+    "wrong-comment diagnostic",
+    lambda: validate_fs370_forwarding_commands(access_node, access_eth_map, access_all_cmds + [injected_no_uplink]),
+)
 check("Seeded negative 1: original clean output has zero no-uplink hits",
       "no-uplink" not in access_fw_text)
 
+# ── Seeded Negative 2: missing selector route on access node ──
+print("\n--- Seeded Negative 2: missing selector route on access node ---")
+expect_diagnostic(
+    "Seeded negative 2: renderer validator rejects missing selector route",
+    "missing-selector-route diagnostic",
+    lambda: validate_fs370_forwarding_commands(access_node, access_eth_map, access_fw_cmds),
+)
 
 # ═══════════════════════════════════════════════════════════════════════
 # CHECK 2: Core forward chain + tenant accept rules (SMS-070)
@@ -299,6 +326,7 @@ core_fw_rules_input = {
 }
 core_fw_cmds = render_policy_firewall(core_fw_rules_input)
 core_fw_text = "\n".join(core_fw_cmds)
+validate_fs370_forwarding_commands(core_node, core_eth_map, core_fw_cmds)
 
 check("Core forward chain has policy drop",
       "policy drop" in core_fw_text)
@@ -312,27 +340,29 @@ check("Core accept rule has fabric-chain comment",
 check("Core forward chain has ct invalid drop",
       "ct state invalid drop" in core_fw_text)
 
-# ── Seeded Negative 2: Core missing tenant accept rule ──
-print("\n--- Seeded Negative 2: Core missing tenant accept rule ---")
-# Build a core node fixture with NO forwarding rules
-core_no_rules = dict(core_node)
-core_no_rules["forwardingIntent"] = {"mode": "explicit-policy-forwarding", "rules": []}
-core_no_fw_input = _firewall_cm_input(core_no_rules, core_eth_map)
-core_no_rules_input = {
-    "rules": core_no_fw_input.get("rules", []),
-    "interface_tags": core_no_fw_input.get("interface_tags", {}),
-}
-core_no_cmds = render_policy_firewall(core_no_rules_input)
-core_no_text = "\n".join(core_no_cmds)
-# When forwardingIntent rules is empty, _firewall_cm_input returns {} (no firewall key)
-# which means no nftables accept rules are emitted — just the base chain defaults.
-# The scanner should detect: base chain exists but no explicit tenant accept rules.
-has_base_chain = "add chain inet fw forward" in core_no_text
-has_tenant_accept = 'iifname "ens20" oifname "ens80" counter accept' in core_no_text
-check("Seeded negative 2: base forward chain still created (no rules fixture)",
-      has_base_chain)
-check("Seeded negative 2: scanner detects NO tenant accept rules (empty forwardingIntent)",
-      not has_tenant_accept)
+# ── Seeded Negative 3: Core missing tenant accept rule ──
+print("\n--- Seeded Negative 3: Core missing tenant accept rule ---")
+core_missing_accept = [
+    cmd for cmd in core_fw_cmds
+    if not ('iifname "ens20"' in cmd and 'oifname "ens80"' in cmd and "counter accept" in cmd)
+]
+expect_diagnostic(
+    "Seeded negative 3: renderer validator rejects missing core tenant accept",
+    "missing-tenant-accept diagnostic",
+    lambda: validate_fs370_forwarding_commands(core_node, core_eth_map, core_missing_accept),
+)
+
+# ── Seeded Negative 4: Core forward counter stays at zero ──
+print("\n--- Seeded Negative 4: Core forward counter at zero ---")
+expect_diagnostic(
+    "Seeded negative 4: runtime counter snapshot rejects zero core forward counter",
+    "core-forward-counter-zero diagnostic",
+    lambda: validate_fs370_counter_snapshot(
+        core_node,
+        core_eth_map,
+        ['nft list chain inet fw forward iifname "ens20" oifname "ens80" counter packets 0 bytes 0'],
+    ),
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -401,6 +431,13 @@ print("\n=== Check 5: Shared interface policy routing (SMS-100) ===")
 
 selector_policy_cmds = render_policy_routes(selector_node, selector_eth_map)
 selector_policy_text = "\n".join(selector_policy_cmds)
+selector_fw_input = _firewall_cm_input(selector_node, selector_eth_map)
+selector_fw_cmds = render_policy_firewall({
+    "rules": selector_fw_input.get("rules", []),
+    "interface_tags": selector_fw_input.get("interface_tags", {}),
+})
+selector_all_cmds = selector_policy_cmds + selector_fw_cmds
+validate_fs370_forwarding_commands(selector_node, selector_eth_map, selector_all_cmds)
 
 # Verify no "to 0.0.0.0/0 iif" or "to ::/0 iif" rules on shared interface
 default_catch_rules = [
@@ -414,18 +451,29 @@ check("Selector policy routes: zero default-route catch-all ip rules",
 has_ip_rule = any("ip rule add" in line or "ip -6 rule add" in line
                   for line in selector_policy_text.splitlines())
 check("Selector emits ip rule commands for policy routing",
-      has_ip_rule or len(selector_policy_cmds) >= 0)
+      has_ip_rule or len(selector_policy_cmds) > 0)
 
-# ── Seeded Negative 3: Default-route catch-all on shared interface ──
-print("\n--- Seeded Negative 3: Default-route catch-all on shared interface ---")
-injected_catchall = selector_policy_text + '\nsh -c \'ip rule add to 0.0.0.0/0 iif ens23 priority 10001 table 1002 2>/dev/null || true\''
-catchall_hits = [
-    line for line in injected_catchall.splitlines()
-    if re.search(r'to\s+0\.0\.0\.0/0\s+iif', line)
+# ── Seeded Negative 5: lower-priority lane captures return traffic ──
+print("\n--- Seeded Negative 5: priority inversion route capture ---")
+duplicate_capture = [
+    "sh -c 'ip rule add to 10.60.0.0/31 iif ens23 priority 10003 table 1003 2>/dev/null || true'",
+    "sh -c 'ip rule add to 10.60.0.0/31 iif ens23 priority 99999 table 99999 2>/dev/null || true'",
 ]
-check("Seeded negative 3: scanner detects injected default-route catch-all",
-      len(catchall_hits) >= 1)
-check("Seeded negative 3: original clean output has zero catch-alls",
+expect_diagnostic(
+    "Seeded negative 5: renderer validator rejects priority inversion capture",
+    "diagnostic.priority-inversion-route-capture",
+    lambda: validate_fs370_forwarding_commands(selector_node, selector_eth_map, selector_all_cmds + duplicate_capture),
+)
+
+# ── Seeded Negative 6: Default-route catch-all on shared interface ──
+print("\n--- Seeded Negative 6: Default-route catch-all on shared interface ---")
+injected_catchall = "sh -c 'ip rule add to 0.0.0.0/0 iif ens23 priority 10001 table 1002 2>/dev/null || true'"
+expect_diagnostic(
+    "Seeded negative 6: renderer validator rejects default-route catch-all",
+    "prohibited-default-route diagnostic",
+    lambda: validate_fs370_forwarding_commands(selector_node, selector_eth_map, selector_all_cmds + [injected_catchall]),
+)
+check("Seeded negative 6: original clean output has zero catch-alls",
       len(default_catch_rules) == 0)
 
 
@@ -442,9 +490,9 @@ check("Forwarding enables IPv6 forwarding",
 check("Forwarding disables eth0 IPv4 forwarding",
       any("eth0" in c and "forwarding=0" in c and "ipv4" in c for c in fwd_cmds))
 
-# ── Seeded Negative 4: forwarding disabled produces no commands ──
+# ── Guard check: forwarding disabled produces no commands ──
 fwd_empty = render_forwarding({"enable_ipv4": False, "enable_ipv6": False, "disable_eth0": False})
-check("Seeded negative 4: no forwarding → no commands",
+check("Forwarding disabled guard: no forwarding → no commands",
       len(fwd_empty) == 0)
 
 

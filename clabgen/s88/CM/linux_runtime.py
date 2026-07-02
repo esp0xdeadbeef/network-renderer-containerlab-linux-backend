@@ -10,6 +10,9 @@ from clabgen.s88.CM.linux_routes import (
     _render_default_routes,
     _render_static_routes,
 )
+from clabgen.s88.CM.fs370_forwarding_validation import (
+    validate_fs370_forwarding_commands,
+)
 from clabgen.s88.CM.linux_policy_routes import render as render_policy_routes
 from clabgen.s88.CM.linux_uplink_routes import _render_uplink_routes
 from clabgen.s88.CM.linux_shell import _sh
@@ -28,7 +31,10 @@ def render(
         _sh('for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$i"; done'),
     ]
 
-    routing_mode = str(node_data.get("routing_mode") or "").strip().lower()
+    raw_routing_mode = node_data.get("routing_mode")
+    routing_mode = (
+        raw_routing_mode.strip().lower() if isinstance(raw_routing_mode, str) else ""
+    )
     if routing_mode not in {"static", "bgp"}:
         raise ValueError(
             f"node {node_name!r} has invalid routing_mode {routing_mode!r}"
@@ -54,5 +60,7 @@ def render(
     cmds.extend(render_dns_service(node_data, node_name))
     cmds.extend(render_access_advertisements(node_data, eth_map))
     cmds.extend(render_pppoe_runtime(node_name, node_data, eth_map))
+
+    validate_fs370_forwarding_commands(node_data, eth_map, cmds)
 
     return cmds
