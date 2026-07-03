@@ -8,9 +8,15 @@ cd "${repo_root}"
 
 python3 - <<'PY'
 from clabgen.s88.CM.linux_policy_routes import render
+from clabgen.s88.CM.linux_routes import _render_default_routes
 
 node = {
     "role": "access",
+    "routingAuthority": {
+        "defaultReachability": False,
+        "exitsSite": False,
+        "explicit": True,
+    },
     "interfaces": {
         "p2p-access-vlan2-downstream-selector": {
             "runtimeIfName": "p0",
@@ -86,15 +92,19 @@ node = {
     },
 }
 
-text = "\n".join(
-    render(
-        node,
-        {
-            "p2p-access-vlan2-downstream-selector": "p0",
-            "tenant-client": "lan2",
-        },
+eth_map = {
+    "p2p-access-vlan2-downstream-selector": "p0",
+    "tenant-client": "lan2",
+}
+
+main_defaults = _render_default_routes(node, eth_map)
+if main_defaults:
+    raise AssertionError(
+        "prod-like access default leaked into the main table:\n"
+        + "\n".join(main_defaults)
     )
-)
+
+text = "\n".join(render(node, eth_map))
 
 expected = [
     "ip route replace table 1001 10.38.120.0/24 dev lan2",
