@@ -471,11 +471,11 @@ def _source_prefixes_for_interface(
     return _dedupe_strings(result)
 
 
-def _dns_outgoing_source_prefixes(
+def _dns_outgoing_source_bindings(
     node: Dict[str, Any],
     source_ifnames: List[str],
     family: int,
-) -> List[str]:
+) -> List[Tuple[str, str, Dict[str, Any]]]:
     services = node.get("services")
     dns = services.get("dns") if isinstance(services, dict) else None
     if not isinstance(dns, dict):
@@ -487,12 +487,14 @@ def _dns_outgoing_source_prefixes(
 
     field = "addr4" if family == 4 else "addr6"
     host_prefix = 32 if family == 4 else 128
-    source_interfaces = {
-        ifname: iface
-        for ifname, iface in (node.get("interfaces", {}) or {}).items()
-        if ifname in source_ifnames and isinstance(iface, dict)
-    }
-    result: List[str] = []
+    interfaces = node.get("interfaces", {}) or {}
+    source_interfaces = [
+        (ifname, interfaces.get(ifname))
+        for ifname in sorted(source_ifnames)
+        if isinstance(interfaces.get(ifname), dict)
+    ]
+    result: List[Tuple[str, str, Dict[str, Any]]] = []
+    seen: Set[Tuple[str, str]] = set()
 
     for value in outgoing:
         if not isinstance(value, str) or not value:
@@ -504,7 +506,7 @@ def _dns_outgoing_source_prefixes(
         if address.version != family:
             continue
 
-        for iface in source_interfaces.values():
+        for ifname, iface in source_interfaces:
             cidr = iface.get(field)
             if not isinstance(cidr, str) or not cidr:
                 continue
@@ -513,10 +515,35 @@ def _dns_outgoing_source_prefixes(
             except ValueError:
                 continue
             if address in network:
-                result.append(f"{address}/{host_prefix}")
+                prefix = f"{address}/{host_prefix}"
+                key = (prefix, ifname)
+                if key not in seen:
+                    seen.add(key)
+                    result.append((prefix, ifname, iface))
                 break
 
-    return _dedupe_strings(result)
+    return result
+
+
+def _append_direct_connected_subnet_route(
+    cmds: List[str],
+    *,
+    ip_cmd: str,
+    table_id: int,
+    iface: Dict[str, Any],
+    eth: str,
+    field: str,
+) -> None:
+    cidr = iface.get(field)
+    if not isinstance(cidr, str) or not cidr:
+        return
+    try:
+        subnet = str(ipaddress.ip_interface(cidr).network)
+    except ValueError:
+        return
+    if _is_default(subnet):
+        return
+    cmds.append(f"sh -c '{ip_cmd} route replace table {table_id} {subnet} dev {eth} 2>/dev/null || true'")
 
 
 def _append_local_origin_source_rules(
@@ -526,10 +553,22 @@ def _append_local_origin_source_rules(
     table_id: int,
     priority: int,
     node: Dict[str, Any],
+    eth_map: Dict[str, str],
     source_ifnames: List[str],
     family: int,
 ) -> None:
-    for prefix in _dns_outgoing_source_prefixes(node, source_ifnames, family):
+    field = "addr4" if family == 4 else "addr6"
+    for prefix, ifname, iface in _dns_outgoing_source_bindings(node, source_ifnames, family):
+        eth = eth_map.get(ifname)
+        if eth is not None:
+            _append_direct_connected_subnet_route(
+                cmds,
+                ip_cmd=ip_cmd,
+                table_id=table_id,
+                iface=iface,
+                eth=eth,
+                field=field,
+            )
         cmds.append(
             f"sh -c '{ip_cmd} rule add from {prefix} priority {priority} table {table_id} 2>/dev/null || true'"
         )
@@ -721,6 +760,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                         table_id=table_id,
                         priority=priority,
                         node=node,
+                        eth_map=eth_map,
                         source_ifnames=rule_ifnames,
                         family=4,
                     )
@@ -768,6 +808,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                         table_id=table_id,
                         priority=priority,
                         node=node,
+                        eth_map=eth_map,
                         source_ifnames=rule_ifnames,
                         family=6,
                     )
