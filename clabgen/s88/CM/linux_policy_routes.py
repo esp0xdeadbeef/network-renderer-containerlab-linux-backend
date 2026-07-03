@@ -629,7 +629,9 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         if routes4 != {}:
             _render_policy_table(cmds, "ip", table_id, routes4)
             if not is_uplink or _has_default(routes4):
-                rule_ifnames = lane_ifnames if is_uplink else lane_ifnames + shared_ifnames
+                rule_ifnames = lane_ifnames + (
+                    shared_ifnames if (not is_uplink or _has_default(routes4)) else []
+                )
                 for source_ifname in rule_ifnames:
                     source_eth = eth_map.get(source_ifname)
                     source_iface = (node.get("interfaces", {}) or {}).get(source_ifname, {})
@@ -664,7 +666,9 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         if routes6 != {}:
             _render_policy_table(cmds, "ip -6", table_id, routes6)
             if not is_uplink or _has_default(routes6):
-                rule_ifnames = lane_ifnames if is_uplink else lane_ifnames + shared_ifnames
+                rule_ifnames = lane_ifnames + (
+                    shared_ifnames if (not is_uplink or _has_default(routes6)) else []
+                )
                 for source_ifname in rule_ifnames:
                     source_eth = eth_map.get(source_ifname)
                     source_iface = (node.get("interfaces", {}) or {}).get(source_ifname, {})
