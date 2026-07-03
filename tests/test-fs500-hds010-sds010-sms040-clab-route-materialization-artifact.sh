@@ -213,13 +213,18 @@ assert all(route["source"] == "control-plane-model" for route in routes), routes
 
 host_module = (repo / "host-module.nix").read_text()
 control_plane_copy = 'cp "$cpm_json" "$artifact_dir/control-plane.json"'
+forwarding_artifact = 'jq -S \'.forwardingOut // {}\' "$cpm_json" > "$artifact_dir/forwarding.json"'
+compiler_artifact = 'jq -S \'.compilerOut // {}\' "$cpm_json" > "$artifact_dir/compiler.json"'
 cpm_copy = 'cp "$cpm_json" "$work_dir/cpm.json"'
 inventory_copy = 'cp "$renderer_inventory_json" "$artifact_dir/inventory.json"'
 route_artifact = "clabgen.s88.CM.route_materialization_artifact"
 assert control_plane_copy in host_module, "host module must publish current CPM as control-plane artifact"
+assert forwarding_artifact in host_module, "host module must publish CPM forwardingOut as forwarding artifact"
+assert compiler_artifact in host_module, "host module must publish CPM compilerOut as compiler artifact"
 assert cpm_copy in host_module, "host module must publish current CPM as cpm.json"
 assert inventory_copy in host_module, "host module must publish current renderer inventory artifact"
 assert host_module.index(control_plane_copy) < host_module.index(route_artifact), host_module
+assert host_module.index(forwarding_artifact) < host_module.index(route_artifact), host_module
 PY
 
 echo "PASS FS-500-HDS-010-SDS-010-SMS-040 clab-route-materialization-artifact"
