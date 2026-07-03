@@ -123,6 +123,8 @@ let
         fi
         cp "$cpm_json" "$work_dir/cpm.json"
         cp "$cpm_json" "$artifact_dir/control-plane.json"
+        jq -S '.forwardingOut // {}' "$cpm_json" > "$artifact_dir/forwarding.json"
+        jq -S '.compilerOut // {}' "$cpm_json" > "$artifact_dir/compiler.json"
 
         phase="render"
         CLABGEN_RENDERER_INVENTORY_JSON="$renderer_inventory_json" \
