@@ -121,6 +121,7 @@ text = "\n".join(render(node, eth_map))
 
 expected = [
     "ip route replace table 1001 10.38.120.0/24 dev lan2",
+    "sh -c 'ip route replace table 1002 10.38.120.0/24 dev lan2 2>/dev/null || true'",
     "ip route replace table 1002 0.0.0.0/0 via 10.10.0.1 dev p0 onlink",
     "sh -c 'ip rule add from 10.38.120.0/24 iif lan2 priority 1002 table 1002 2>/dev/null || true'",
     "sh -c 'ip rule add from 10.38.120.1/32 priority 1002 table 1002 2>/dev/null || true'",
