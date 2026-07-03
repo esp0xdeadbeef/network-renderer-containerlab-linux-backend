@@ -162,7 +162,7 @@ jq -e '
   and .artifacts.topology == "'"${tmp_dir}"'/run/fabric.clab.yml"
   and .artifacts.bridgePlan == "'"${tmp_dir}"'/run/clab-bridge-plan.json"
 ' "${tmp_dir}/run/clab-renderer-deploy-provenance.json" >/dev/null
-grep -F 'would ensure Docker tooling image cache, cleanup fabric, materialize bridges, materialize lab emulation, deploy, and verify containers' \
+grep -F 'would ensure Docker tooling image cache, cleanup fabric, materialize bridges, deploy, rematerialize bridges, materialize lab emulation, retry WAN DHCP, and verify containers' \
   "${tmp_dir}/dry-run.log" >/dev/null
 grep -F "renderer deploy provenance=${tmp_dir}/run/clab-renderer-deploy-provenance.json" \
   "${tmp_dir}/dry-run.log" >/dev/null
@@ -212,7 +212,7 @@ jq -e '
   and .labEmulationArtifacts[0].dhcp4.rangeEnd == "10.20.0.99"
   and .labEmulationArtifacts[0].nat44.enabled == true
 ' "${tmp_dir}/lab-emulation/clab-bridge-plan.json" >/dev/null
-grep -F 'would ensure Docker tooling image cache, cleanup fabric, materialize bridges, materialize lab emulation, deploy, and verify containers' \
+grep -F 'would ensure Docker tooling image cache, cleanup fabric, materialize bridges, deploy, rematerialize bridges, materialize lab emulation, retry WAN DHCP, and verify containers' \
   "${tmp_dir}/lab-emulation-dry-run.log" >/dev/null
 
 echo "PASS deploy-clab-app-contract"

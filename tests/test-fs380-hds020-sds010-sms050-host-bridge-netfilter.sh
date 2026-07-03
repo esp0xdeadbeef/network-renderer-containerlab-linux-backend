@@ -31,10 +31,14 @@ if missing:
 sysctl_pos = content.find("net.bridge.bridge-nf-call-iptables")
 setup_pos = content.find("bash '$work_dir/setup-bridge-links.sh'")
 deploy_pos = content.find("containerlab deploy -t '$work_dir/fabric.clab.yml'")
-if not (0 <= sysctl_pos < setup_pos < deploy_pos):
+post_setup_pos = content.find("bash '$work_dir/setup-bridge-links.sh'", deploy_pos)
+retry_pos = content.find("bash '$work_dir/retry-wan-dhcp.sh'", deploy_pos)
+verify_pos = content.find("bash '$work_dir/verify-containerlab-deploy.sh'", deploy_pos)
+if not (0 <= sysctl_pos < setup_pos < deploy_pos < post_setup_pos < retry_pos < verify_pos):
     raise SystemExit(
         "FAIL FS-380 host bridge netfilter: bridge-netfilter sysctl must be "
-        "generated into setup-bridge-links.sh and setup must run before deploy"
+        "generated into setup-bridge-links.sh, setup must run before and after "
+        "deploy, and WAN DHCP retry must run before verification"
     )
 
 print("PASS FS-380 host bridge netfilter guard")

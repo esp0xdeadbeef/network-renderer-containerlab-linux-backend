@@ -256,6 +256,36 @@ let
         EOF
         VERIFY_CLAB
 
+        cat > "$work_dir/retry-wan-dhcp.sh" <<'RETRY_WAN_DHCP'
+        set -euo pipefail
+
+        containers="$(docker ps --format '{{.Names}}' | grep '^clab-fabric-' || true)"
+        test -n "$containers" || exit 0
+
+        while IFS= read -r container; do
+          test -n "$container" || continue
+          docker exec "$container" sh -eu -c '
+            for path in /sys/class/net/u*; do
+              test -e "$path" || continue
+              iface="${path##*/}"
+              case "$iface" in
+                u*[!0-9]*)
+                  continue
+                  ;;
+              esac
+              ip link set "$iface" up
+              if ip -4 addr show dev "$iface" | grep -q " inet "; then
+                continue
+              fi
+              test -x /sbin/udhcpc || continue
+              timeout 12 udhcpc -q -n -i "$iface" -s /bin/true >/dev/null 2>&1 || true
+            done
+          '
+        done <<EOF
+        $containers
+        EOF
+        RETRY_WAN_DHCP
+
         cat > "$work_dir/ensure-clab-tooling-image.sh" <<'ENSURE_CLAB_TOOLING'
         set -euo pipefail
 
@@ -281,6 +311,8 @@ let
           docker ps -aq --filter 'name=^clab-fabric-' | xargs -r docker rm -f
           bash '$work_dir/setup-bridge-links.sh'
           containerlab deploy -t '$work_dir/fabric.clab.yml' -d --reconfigure
+          bash '$work_dir/setup-bridge-links.sh'
+          bash '$work_dir/retry-wan-dhcp.sh'
           bash '$work_dir/verify-containerlab-deploy.sh' '$work_dir/fabric.clab.yml'
         "
         phase="complete"
