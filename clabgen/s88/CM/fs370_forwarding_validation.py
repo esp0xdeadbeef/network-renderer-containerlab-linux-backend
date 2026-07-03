@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 from clabgen.s88.CM.linux_route_values import _dst, _normalize_prefix, _route_lists
 from clabgen.s88.CM.linux_route_via import _effective_via4, _effective_via6
+from clabgen.s88.CM.linux_routes import _main_default_route_allowed
 
 
 _RULE_PATTERN = (
@@ -52,6 +53,8 @@ def _route_command_fragments(node: Dict[str, Any], eth_map: Dict[str, str]) -> L
             via = _effective_via4(node, iface, route)
             if not dst or not via:
                 continue
+            if dst == "0.0.0.0/0" and not _main_default_route_allowed(node, iface, route):
+                continue
             rendered_dst = "default" if dst == "0.0.0.0/0" else _normalize_prefix(dst)
             fragments.append((dst, f"ip route replace {rendered_dst} via {via} dev {eth}"))
         for route in routes["ipv6"]:
@@ -60,6 +63,8 @@ def _route_command_fragments(node: Dict[str, Any], eth_map: Dict[str, str]) -> L
             dst = _dst(route)
             via = _effective_via6(node, iface, route)
             if not dst or not via:
+                continue
+            if dst == "::/0" and not _main_default_route_allowed(node, iface, route):
                 continue
             rendered_dst = "default" if dst == "::/0" else _normalize_prefix(dst)
             fragments.append((dst, f"ip -6 route replace {rendered_dst} via {via} dev {eth}"))
