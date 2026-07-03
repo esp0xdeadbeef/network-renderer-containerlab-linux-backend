@@ -8,7 +8,24 @@ import sys
 import threading
 import time
 
-from dns_proxy_protocol import address_family, forward_udp
+from dns_proxy_protocol import address_family, forward_udp, servfail
+
+
+_TRACE = "FS-540-HDS-010-SDS-010-SMS-020"
+
+
+def _resolve_or_servfail(
+    config: Dict[str, Any], query: bytes, family: socket.AddressFamily
+) -> bytes:
+    try:
+        return forward_udp(config, query, family)
+    except Exception as error:
+        print(
+            f"{_TRACE}: DNS proxy upstream resolution failed: {type(error).__name__}: {error}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return servfail(query)
 
 
 def udp_server(config: Dict[str, Any], address: str) -> None:
@@ -18,7 +35,7 @@ def udp_server(config: Dict[str, Any], address: str) -> None:
     server_socket.bind((address, 53))
     while True:
         data, peer = server_socket.recvfrom(4096)
-        server_socket.sendto(forward_udp(config, data, family), peer)
+        server_socket.sendto(_resolve_or_servfail(config, data, family), peer)
 
 
 def tcp_server(config: Dict[str, Any], address: str) -> None:
@@ -46,7 +63,7 @@ def handle_tcp(
         query = read_exact(connection, query_size)
         if query is None:
             return
-        answer = forward_udp(config, query, family)
+        answer = _resolve_or_servfail(config, query, family)
         connection.sendall(struct.pack("!H", len(answer)) + answer)
     finally:
         connection.close()
