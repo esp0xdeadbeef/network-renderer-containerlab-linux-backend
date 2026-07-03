@@ -96,6 +96,13 @@ node = {
             },
         ],
     },
+    "services": {
+        "dns": {
+            "forwarders": ["1.1.1.1", "9.9.9.9"],
+            "listen": ["10.38.120.1"],
+            "outgoingInterfaces": ["10.38.120.1"],
+        },
+    },
 }
 
 eth_map = {
@@ -116,6 +123,7 @@ expected = [
     "ip route replace table 1001 10.38.120.0/24 dev lan2",
     "ip route replace table 1002 0.0.0.0/0 via 10.10.0.1 dev p0 onlink",
     "sh -c 'ip rule add from 10.38.120.0/24 iif lan2 priority 1002 table 1002 2>/dev/null || true'",
+    "sh -c 'ip rule add from 10.38.120.1/32 priority 1002 table 1002 2>/dev/null || true'",
     "sh -c 'ip rule add to 10.38.120.0/24 iif p0 priority 1001 table 1001 2>/dev/null || true'",
     "sh -c 'ip rule add from 10.38.120.0/24 iif lan2 priority 11002 table main suppress_prefixlength 0 2>/dev/null || true'",
 ]
@@ -135,6 +143,7 @@ for forbidden in [
     "ip rule add iif lan2 priority 1001 table 1001",
     "ip rule add iif lan2 priority 1002 table 1002",
     "ip rule add to 10.38.120.0/24 iif lan2 priority 1002 table 1002",
+    "ip route replace default via 10.10.0.1 dev p0",
 ]:
     if forbidden in text:
         raise AssertionError(f"broad or blackhole client ingress rule rendered: {forbidden}\n{text}")

@@ -471,6 +471,70 @@ def _source_prefixes_for_interface(
     return _dedupe_strings(result)
 
 
+def _dns_outgoing_source_prefixes(
+    node: Dict[str, Any],
+    source_ifnames: List[str],
+    family: int,
+) -> List[str]:
+    services = node.get("services")
+    dns = services.get("dns") if isinstance(services, dict) else None
+    if not isinstance(dns, dict):
+        return []
+
+    outgoing = dns.get("outgoingInterfaces")
+    if not isinstance(outgoing, list):
+        return []
+
+    field = "addr4" if family == 4 else "addr6"
+    host_prefix = 32 if family == 4 else 128
+    source_interfaces = {
+        ifname: iface
+        for ifname, iface in (node.get("interfaces", {}) or {}).items()
+        if ifname in source_ifnames and isinstance(iface, dict)
+    }
+    result: List[str] = []
+
+    for value in outgoing:
+        if not isinstance(value, str) or not value:
+            continue
+        try:
+            address = ipaddress.ip_address(value)
+        except ValueError:
+            continue
+        if address.version != family:
+            continue
+
+        for iface in source_interfaces.values():
+            cidr = iface.get(field)
+            if not isinstance(cidr, str) or not cidr:
+                continue
+            try:
+                network = ipaddress.ip_interface(cidr).network
+            except ValueError:
+                continue
+            if address in network:
+                result.append(f"{address}/{host_prefix}")
+                break
+
+    return _dedupe_strings(result)
+
+
+def _append_local_origin_source_rules(
+    cmds: List[str],
+    *,
+    ip_cmd: str,
+    table_id: int,
+    priority: int,
+    node: Dict[str, Any],
+    source_ifnames: List[str],
+    family: int,
+) -> None:
+    for prefix in _dns_outgoing_source_prefixes(node, source_ifnames, family):
+        cmds.append(
+            f"sh -c '{ip_cmd} rule add from {prefix} priority {priority} table {table_id} 2>/dev/null || true'"
+        )
+
+
 def _append_policy_rule_commands(
     cmds: List[str],
     *,
@@ -650,6 +714,16 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                         add_destination_rules=source_ifname in lane_ifnames,
                         include_reachable_sources=source_ifname not in lane_ifnames,
                     )
+                if _has_default(routes4):
+                    _append_local_origin_source_rules(
+                        cmds,
+                        ip_cmd="ip",
+                        table_id=table_id,
+                        priority=priority,
+                        node=node,
+                        source_ifnames=rule_ifnames,
+                        family=4,
+                    )
         elif not is_uplink:
             # Deny-by-default lane: add blackhole default so the kernel
             # can route silently instead of generating ICMP (FS-170/D9).
@@ -686,6 +760,16 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                         allow_unscoped=source_ifname in lane_ifnames,
                         add_destination_rules=source_ifname in lane_ifnames,
                         include_reachable_sources=source_ifname not in lane_ifnames,
+                    )
+                if _has_default(routes6):
+                    _append_local_origin_source_rules(
+                        cmds,
+                        ip_cmd="ip -6",
+                        table_id=table_id,
+                        priority=priority,
+                        node=node,
+                        source_ifnames=rule_ifnames,
+                        family=6,
                     )
         elif routes4 == {} and not is_uplink:
             # Deny-by-default lane: add IPv6 ip rule too.

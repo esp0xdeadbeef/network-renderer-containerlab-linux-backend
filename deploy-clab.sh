@@ -450,6 +450,35 @@ deploy_lab() {
   containerlab inspect -t "${topology_file}" >/dev/null
 }
 
+retry_wan_dhcp_clients() {
+  local name="$1"
+  local containers=()
+  local container
+
+  mapfile -t containers < <(docker ps --format '{{.Names}}' | grep -E "^clab-${name}-" | sort || true)
+  ((${#containers[@]} > 0)) || return 0
+
+  for container in "${containers[@]}"; do
+    docker exec "${container}" sh -eu -c '
+      for path in /sys/class/net/u*; do
+        test -e "$path" || continue
+        iface="${path##*/}"
+        case "$iface" in
+          u*[!0-9]*)
+            continue
+            ;;
+        esac
+        ip link set "$iface" up
+        if ip -4 addr show dev "$iface" | grep -q " inet "; then
+          continue
+        fi
+        test -x /sbin/udhcpc || continue
+        timeout 12 udhcpc -q -n -i "$iface" -s /bin/true >/dev/null 2>&1 || true
+      done
+    '
+  done
+}
+
 verify_fabric_containers() {
   local name="$1"
   local containers=()
@@ -495,7 +524,7 @@ if ((dry_run)); then
   log "dry-run: bridge plan=${bridge_plan_file}"
   log "dry-run: renderer deploy provenance=${deploy_provenance_file}"
   log "dry-run: Docker tooling image cache evidence=${tooling_cache_evidence_file}"
-  log "dry-run: would ensure Docker tooling image cache, cleanup ${name}, materialize bridges, materialize lab emulation, deploy, and verify containers"
+  log "dry-run: would ensure Docker tooling image cache, cleanup ${name}, materialize bridges, deploy, rematerialize bridges, materialize lab emulation, retry WAN DHCP, and verify containers"
   exit 0
 fi
 
@@ -503,6 +532,8 @@ wait_for_docker
 ensure_tooling_image_cache
 cleanup_stale_lab "${name}"
 materialize_bridges
-materialize_lab_emulation
 deploy_lab
+materialize_bridges
+materialize_lab_emulation
+retry_wan_dhcp_clients "${name}"
 verify_fabric_containers "${name}"
