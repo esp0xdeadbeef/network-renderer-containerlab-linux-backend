@@ -43,6 +43,28 @@ def _main_default_routes_allowed(node: Dict[str, Any]) -> bool:
     return True
 
 
+def _main_default_route_allowed(
+    node: Dict[str, Any],
+    iface: Dict[str, Any],
+    route: Dict[str, Any],
+) -> bool:
+    role = node.get("role", "")
+    if role in ("downstream-selector", "upstream-selector"):
+        return True
+    if not _main_default_routes_allowed(node):
+        return False
+
+    intent = _dict(route.get("intent"))
+    interface_class = _dict(iface.get("interfaceClass"))
+    if (
+        intent.get("kind") == "default-reachability"
+        and isinstance(iface.get("policyRoutingAllocation"), dict)
+        and interface_class.get("exitFacing") is not True
+    ):
+        return False
+    return True
+
+
 def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
     seen: set[str] = set()
@@ -139,7 +161,7 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> Lis
                 continue
             if _dst(route) != "0.0.0.0/0":
                 continue
-            if not main_defaults_allowed:
+            if not main_defaults_allowed or not _main_default_route_allowed(node, iface, route):
                 continue
             if _route_via_is_local(route, 4, local4, local6):
                 continue
@@ -153,7 +175,7 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> Lis
                 continue
             if _dst(route) != "::/0":
                 continue
-            if not main_defaults_allowed:
+            if not main_defaults_allowed or not _main_default_route_allowed(node, iface, route):
                 continue
             if _route_via_is_local(route, 6, local4, local6):
                 continue

@@ -21,6 +21,9 @@ node = {
         "p2p-access-vlan2-downstream-selector": {
             "runtimeIfName": "p0",
             "addr4": "10.10.0.0/31",
+            "interfaceClass": {
+                "exitFacing": False,
+            },
             "backingRef": {
                 "lane": {
                     "access": "access-vlan2",
@@ -38,6 +41,9 @@ node = {
                 "ipv4": [
                     {
                         "dst": "0.0.0.0/0",
+                        "intent": {
+                            "kind": "default-reachability",
+                        },
                         "via4": "10.10.0.1",
                         "proto": "default",
                     },
