@@ -247,6 +247,8 @@ ds_text = "\n".join(
 for expected_line in [
     "ip route replace table 1002 0.0.0.0/0 via 10.10.0.5 dev p1 onlink",
     "sh -c 'ip rule add from 10.38.120.0/24 iif p0 priority 1002 table 1002 2>/dev/null || true'",
+    "sh -c 'ip rule add to 10.38.120.0/24 iif p1 priority 1001 table 1001 2>/dev/null || true'",
+    "sh -c 'ip route replace table 1002 10.38.120.0/24 via 10.10.0.0 dev p0 onlink 2>/dev/null || true'",
 ]:
     if expected_line not in ds_text:
         raise AssertionError(
@@ -353,6 +355,8 @@ policy_text = "\n".join(
 for expected_line in [
     "ip route replace table 1002 0.0.0.0/0 via 10.10.0.7 dev p1 onlink",
     "sh -c 'ip rule add from 10.38.120.0/24 iif p0 priority 1002 table 1002 2>/dev/null || true'",
+    "sh -c 'ip rule add to 10.38.120.0/24 iif p1 priority 1001 table 1001 2>/dev/null || true'",
+    "sh -c 'ip route replace table 1002 10.38.120.0/24 via 10.10.0.4 dev p0 onlink 2>/dev/null || true'",
 ]:
     if expected_line not in policy_text:
         raise AssertionError(
