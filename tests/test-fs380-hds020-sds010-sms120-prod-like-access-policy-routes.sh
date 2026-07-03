@@ -118,6 +118,7 @@ for forbidden in [
     "ip route replace table 1002 blackhole 0.0.0.0/0",
     "ip rule add iif lan2 priority 1001 table 1001",
     "ip rule add iif lan2 priority 1002 table 1002",
+    "ip rule add to 10.38.120.0/24 iif lan2 priority 1002 table 1002",
 ]:
     if forbidden in text:
         raise AssertionError(f"broad or blackhole client ingress rule rendered: {forbidden}\n{text}")

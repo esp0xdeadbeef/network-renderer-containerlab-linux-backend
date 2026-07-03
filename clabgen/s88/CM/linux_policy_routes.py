@@ -468,6 +468,7 @@ def _append_policy_rule_commands(
     source_eth: str,
     family: int,
     allow_unscoped: bool,
+    add_destination_rules: bool,
 ) -> None:
     prefixes = _source_prefixes_for_interface(source_iface, family)
     if prefixes:
@@ -475,16 +476,18 @@ def _append_policy_rule_commands(
             cmds.append(
                 f"sh -c '{ip_cmd} rule add from {prefix} iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
             )
-            cmds.append(
-                f"sh -c '{ip_cmd} rule add to {prefix} iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
-            )
+            if add_destination_rules:
+                cmds.append(
+                    f"sh -c '{ip_cmd} rule add to {prefix} iif {source_eth} priority {priority} table {table_id} 2>/dev/null || true'"
+                )
             if main_suppress_priority is not None:
                 cmds.append(
                     f"sh -c '{ip_cmd} rule add from {prefix} iif {source_eth} priority {main_suppress_priority} table main suppress_prefixlength 0 2>/dev/null || true'"
                 )
-                cmds.append(
-                    f"sh -c '{ip_cmd} rule add to {prefix} iif {source_eth} priority {main_suppress_priority} table main suppress_prefixlength 0 2>/dev/null || true'"
-                )
+                if add_destination_rules:
+                    cmds.append(
+                        f"sh -c '{ip_cmd} rule add to {prefix} iif {source_eth} priority {main_suppress_priority} table main suppress_prefixlength 0 2>/dev/null || true'"
+                    )
         return
 
     if allow_unscoped:
@@ -623,6 +626,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                         source_eth=source_eth,
                         family=4,
                         allow_unscoped=source_ifname in lane_ifnames,
+                        add_destination_rules=source_ifname in lane_ifnames,
                     )
         elif not is_uplink:
             # Deny-by-default lane: add blackhole default so the kernel
@@ -656,6 +660,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                         source_eth=source_eth,
                         family=6,
                         allow_unscoped=source_ifname in lane_ifnames,
+                        add_destination_rules=source_ifname in lane_ifnames,
                     )
         elif routes4 == {} and not is_uplink:
             # Deny-by-default lane: add IPv6 ip rule too.
