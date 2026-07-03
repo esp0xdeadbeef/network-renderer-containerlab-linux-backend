@@ -20,6 +20,29 @@ def _dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _has_policy_routing_allocation(node: Dict[str, Any]) -> bool:
+    for iface in _dict(node.get("interfaces")).values():
+        if isinstance(iface, dict) and isinstance(iface.get("policyRoutingAllocation"), dict):
+            return True
+    return False
+
+
+def _main_default_routes_allowed(node: Dict[str, Any]) -> bool:
+    role = node.get("role", "")
+    if role in ("downstream-selector", "upstream-selector"):
+        return True
+
+    routing_authority = _dict(node.get("routingAuthority"))
+    if routing_authority.get("exitsSite") is True:
+        return True
+    if (
+        routing_authority.get("defaultReachability") is False
+        and _has_policy_routing_allocation(node)
+    ):
+        return False
+    return True
+
+
 def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
     seen: set[str] = set()
@@ -101,6 +124,7 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> Lis
     defaults4: Dict[str, List[Tuple[str, str]]] = {}
     defaults6: Dict[str, List[Tuple[str, str]]] = {}
     local4, local6 = _local_ips(node)
+    main_defaults_allowed = _main_default_routes_allowed(node)
 
     for ifname in sorted((node.get("interfaces", {}) or {}).keys()):
         iface = node["interfaces"][ifname]
@@ -115,6 +139,8 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> Lis
                 continue
             if _dst(route) != "0.0.0.0/0":
                 continue
+            if not main_defaults_allowed:
+                continue
             if _route_via_is_local(route, 4, local4, local6):
                 continue
 
@@ -126,6 +152,8 @@ def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> Lis
             if route.get("policyOnly") is True:
                 continue
             if _dst(route) != "::/0":
+                continue
+            if not main_defaults_allowed:
                 continue
             if _route_via_is_local(route, 6, local4, local6):
                 continue
