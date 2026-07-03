@@ -62,6 +62,7 @@ assert "ip -6 rule add iif tenant0 priority 10001 table 1001" in joined
 upstream = {
     "interfaces": {
         "core": {
+            "addr4": "10.50.0.15/31",
             "lane": {"uplink": "wan"},
             "routes": {
                 "ipv4": [
@@ -114,7 +115,8 @@ assert (
     "ip route replace table 1002 10.50.20.0/24 via 10.50.0.14 dev core0 onlink"
     not in upstream_policy
 )
-assert "ip rule add iif core0 priority 10002 table 1002" in upstream_policy
+assert "ip rule add to 10.50.20.0/24 iif core0 priority 10002 table 1002" in upstream_policy
+assert "ip rule add iif core0 priority 10002 table 1002" not in upstream_policy
 assert "ip rule add iif pol-client priority 10002 table 1002" in upstream_policy
 
 policy_node = {

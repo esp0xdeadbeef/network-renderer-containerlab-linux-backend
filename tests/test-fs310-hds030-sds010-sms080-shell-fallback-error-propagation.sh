@@ -49,6 +49,7 @@ RULES = [
         r"ip -6 route replace",
         r"ip rule add",
         r"ip -6 rule add",
+        r"\{ip_cmd\} rule add",
         r"sh -c .*route.*2>/dev/null \|\| true",
         r" via .*dev .*onlink 2>/dev/null",
     ]),
