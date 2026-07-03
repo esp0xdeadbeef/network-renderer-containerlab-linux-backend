@@ -267,7 +267,7 @@ let
           docker exec "$container" sh -eu -c '
             for path in /sys/class/net/u*; do
               test -e "$path" || continue
-              iface="${path##*/}"
+              iface="''${path##*/}"
               case "$iface" in
                 u*[!0-9]*)
                   continue
