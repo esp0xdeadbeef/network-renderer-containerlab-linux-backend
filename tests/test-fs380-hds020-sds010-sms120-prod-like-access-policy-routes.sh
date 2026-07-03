@@ -139,5 +139,109 @@ for forbidden in [
     if forbidden in text:
         raise AssertionError(f"broad or blackhole client ingress rule rendered: {forbidden}\n{text}")
 
+downstream_selector = {
+    "role": "downstream-selector",
+    "interfaces": {
+        "access-edge": {
+            "runtimeIfName": "p0",
+            "addr4": "10.10.0.1/31",
+            "backingRef": {
+                "lane": {
+                    "access": "access-vlan2",
+                    "kind": "access-edge",
+                },
+            },
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "tableId": 1001,
+                "priority": 10001,
+                "tableRulePriority": 1001,
+                "mainSuppressPriority": 11001,
+            },
+            "routes": {
+                "ipv4": [
+                    {
+                        "dst": "10.38.120.0/24",
+                        "intent": {
+                            "accessNode": "access-vlan2",
+                            "kind": "internal-reachability",
+                        },
+                        "proto": "internal",
+                        "via4": "10.10.0.0",
+                    },
+                ],
+                "ipv6": [],
+            },
+        },
+        "policy": {
+            "runtimeIfName": "p1",
+            "addr4": "10.10.0.4/31",
+            "backingRef": {
+                "lane": {
+                    "access": "access-vlan2",
+                    "kind": "access",
+                },
+            },
+            "policyRoutingAllocation": {
+                "source": "control-plane-model",
+                "tableId": 1002,
+                "priority": 10002,
+                "tableRulePriority": 1002,
+                "mainSuppressPriority": 11002,
+            },
+            "routes": {
+                "ipv4": [
+                    {
+                        "dst": "0.0.0.0/0",
+                        "intent": {
+                            "kind": "default-reachability",
+                        },
+                        "lane": {
+                            "access": "access-vlan2",
+                            "uplink": "internet-vlan4",
+                        },
+                        "policyOnly": True,
+                        "proto": "default",
+                        "via4": "10.10.0.5",
+                    },
+                ],
+                "ipv6": [],
+            },
+        },
+    },
+    "forwardingIntent": {
+        "rules": [
+            {
+                "action": "accept",
+                "fromInterface": "p0",
+                "toInterface": "p1",
+            },
+            {
+                "action": "accept",
+                "fromInterface": "p1",
+                "toInterface": "p0",
+            },
+        ],
+    },
+}
+
+ds_text = "\n".join(
+    render(
+        downstream_selector,
+        {
+            "access-edge": "p0",
+            "policy": "p1",
+        },
+    )
+)
+for expected_line in [
+    "ip route replace table 1002 0.0.0.0/0 via 10.10.0.5 dev p1 onlink",
+    "sh -c 'ip rule add from 10.38.120.0/24 iif p0 priority 1002 table 1002 2>/dev/null || true'",
+]:
+    if expected_line not in ds_text:
+        raise AssertionError(
+            f"missing downstream-selector prod-like policy route: {expected_line}\n{ds_text}"
+        )
+
 print("PASS FS-380-HDS-020-SDS-010-SMS-120 prod-like access policy routes")
 PY
