@@ -6,6 +6,7 @@
 , clabRendererInventoryJsonPath ? null
 , containerlabLinuxRendererInput ? {}
 , containerlabLinuxRendererSelf  ? null
+, containerlabLinuxGenerateClabConfig ? null
 , ...
 }:
 let
@@ -29,10 +30,16 @@ let
     else throw "host-module: missing required input: clabRendererInventoryJsonPath";
 
   rendererRepo = if containerlabLinuxRendererSelf == null then null else containerlabLinuxRendererSelf;
+  generateClabConfig =
+    if containerlabLinuxGenerateClabConfig == null then null else containerlabLinuxGenerateClabConfig;
 
   # Renderer requires: renderer repo + pre-built CPM JSON + renderer inventory JSON.
   # No compiler-chain repos or intent/inventory files are needed.
-  hasInputs = rendererRepo != null && cpmJsonPath != null && rendererInventoryJsonPath != null;
+  hasInputs =
+    rendererRepo != null
+    && generateClabConfig != null
+    && cpmJsonPath != null
+    && rendererInventoryJsonPath != null;
 
   s-router-clab-render-live =
     if hasInputs then
@@ -49,7 +56,6 @@ let
         pkgs.gnumake
         pkgs.iproute2
         pkgs.jq
-        pkgs.nix
         pkgs.procps
         pkgs.python3
         pkgs.systemd
@@ -129,7 +135,7 @@ let
         phase="render"
         CLABGEN_RENDERER_INVENTORY_JSON="$renderer_inventory_json" \
         CLABGEN_DEPLOYMENT_HOST="$deployment_host" \
-          nix run --show-trace "path:$renderer_repo#generate-clab-config" -- \
+          ${generateClabConfig}/bin/generate-clab-config \
             "$cpm_json" \
             "$work_dir/fabric.clab.yml" \
             "$work_dir/vm-bridges-generated.nix" >/dev/null
