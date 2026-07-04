@@ -55,12 +55,14 @@
             deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
             rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or null;
           in
-          { lib, ... }:
+          { lib, pkgs, ... }:
           {
             _module.args.clabDeploymentHost = deploymentHost;
             _module.args.clabCpmJsonPath = cpmJsonPath;
             _module.args.clabRendererInventoryJsonPath = rendererInventoryJsonPath;
             _module.args.containerlabLinuxRendererSelf = self.outPath;
+            _module.args.containerlabLinuxGenerateClabConfig =
+              self.packages.${pkgs.system}.generate-clab-config;
             # Keep containerlabLinuxRendererInput for non-string fields (bridgeControl etc)
             _module.args.containerlabLinuxRendererInput =
               builtins.removeAttrs rendererInput [ "cpmJsonPath" "deploymentHost" "rendererInventoryJsonPath" "cpm" "controlPlane" ];
@@ -98,7 +100,7 @@
           rendererSourceDirty =
             if self ? rev then "0" else if self ? dirtyRev then "1" else "unknown";
           rendererSourceLastModified = toString (self.lastModified or 0);
-          rendererSourceNarHash = self.narHash or "";
+          rendererSourceNarHash = self.narHash or "unknown";
 
           rendererSourceEnv = ''
             export PYTHONDONTWRITEBYTECODE=1

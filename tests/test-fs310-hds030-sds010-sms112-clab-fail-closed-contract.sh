@@ -43,7 +43,6 @@ KNOWN_GAPS = {
     ("clabgen/s88/site/nodes.py", 58, "or \"\" — node role defaults to empty string"),
     ("clabgen/s88/enterprise/site_loader.py", 152, "or \"\" — policy_node_name defaults to empty string"),
     ("clabgen/s88/enterprise/site_loader.py", 154, "or \"\" — upstreamSelectorNodeName defaults to empty string"),
-    ("clabgen/s88/CM/linux_runtime.py", 31, "or \"\" — routing_mode defaults to empty string"),
 }
 
 # Pre-existing silent error hiders (also tracked in SMS-102 KNOWN_GAPS)
@@ -55,9 +54,7 @@ SILENT_HIDER_KNOWN_GAPS = {
 # `or ""` used as a safe default for string comparisons (e.g. `(x.mode or "") == "nat"`)
 # is NOT a behavioral default — absent mode defaults to "" which doesn't match
 # any mode check, so no mode-specific behavior is triggered (fail-closed).
-# `or ""` for provenance/version fields (narHash) is also non-network-affecting.
 NIX_ACCEPTABLE_OR_EMPTY = {
-    ("flake.nix", 101, "or \"\" — narHash provenance field, non-network-affecting"),
     ("vm-network-nat.nix", 9, "or \"\" — guard: (uplink.mode or \"\") == \"nat\", fail-closed comparison"),
     ("vm-network-nat.nix", 29, "or \"\" — guard: (cfg.mode or \"\") == \"nat\", fail-closed comparison"),
     ("vm-network-nat.nix", 33, "or \"\" — guard: (cfg.mode or \"\") == \"nat\", fail-closed comparison"),
