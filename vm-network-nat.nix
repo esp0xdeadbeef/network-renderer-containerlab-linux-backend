@@ -17,11 +17,11 @@ let
   # yet emitted by CPM for bridge networks. Until CPM emits them, NAT
   # bridge networks will throw at evaluation time.
   addressFor = network: (ipv4For network).address
-    or throw "vm-network-nat: missing CPM ipv4.address for NAT network ${network.bridge or network.inventoryName or "unknown"} — CPM must provide";
+    or (throw "vm-network-nat: missing CPM ipv4.address for NAT network ${network.bridge or network.inventoryName or "unknown"} — CPM must provide");
   poolOffsetFor = network: (ipv4For network).dhcpPoolOffset
-    or throw "vm-network-nat: missing CPM ipv4.dhcpPoolOffset for NAT network ${network.bridge or network.inventoryName or "unknown"} — CPM must provide";
+    or (throw "vm-network-nat: missing CPM ipv4.dhcpPoolOffset for NAT network ${network.bridge or network.inventoryName or "unknown"} — CPM must provide");
   poolSizeFor = network: (ipv4For network).dhcpPoolSize
-    or throw "vm-network-nat: missing CPM ipv4.dhcpPoolSize for NAT network ${network.bridge or network.inventoryName or "unknown"} — CPM must provide";
+    or (throw "vm-network-nat: missing CPM ipv4.dhcpPoolSize for NAT network ${network.bridge or network.inventoryName or "unknown"} — CPM must provide");
 in
 {
   natBridgeNames = builtins.attrNames natUplinks;

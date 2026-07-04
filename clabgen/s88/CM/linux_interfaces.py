@@ -23,6 +23,20 @@ def _nested_address(iface: Dict[str, Any], family: str) -> str | None:
     return address
 
 
+def _is_nat_host_uplink_wan(iface: Dict[str, Any]) -> bool:
+    is_wan = (
+        iface.get("kind") == "wan"
+        or iface.get("sourceKind") == "wan"
+        or iface.get("adapterClass") == "wan-uplink"
+    )
+    if not is_wan:
+        return False
+    host_uplink = iface.get("hostUplink")
+    if not isinstance(host_uplink, dict):
+        return False
+    return host_uplink.get("mode") == "nat"
+
+
 def _render_interfaces(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
     interfaces = node.get("interfaces", {})
@@ -76,7 +90,12 @@ def _render_addressing(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[st
         if eth is None:
             continue
 
-        addr4 = iface.get("addr4") or _nested_address(iface, "ipv4")
+        if _is_nat_host_uplink_wan(iface):
+            addr4 = None
+        else:
+            addr4 = iface.get("addr4")
+        if not addr4 and not _is_nat_host_uplink_wan(iface):
+            addr4 = _nested_address(iface, "ipv4")
         addr6 = iface.get("addr6") or _nested_address(iface, "ipv6")
         ll6 = iface.get("ll6")
 

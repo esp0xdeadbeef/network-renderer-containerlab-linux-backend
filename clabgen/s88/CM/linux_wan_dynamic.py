@@ -81,8 +81,8 @@ def _nat4_commands(interface_name: str, host_uplink: Dict[str, Any]) -> List[str
     if gateway.ip.version != 4 or network.num_addresses < 4:
         return []
 
-    client_ip = str(ipv4.get("clientAddress"))
-    if not client_ip:
+    client_ip = ipv4.get("clientAddress")
+    if not isinstance(client_ip, str) or not client_ip:
         raise ValueError(
             "CLAB WAN NAT requires clientAddress in hostUplink.ipv4. "
             "CPM must provide the client address for NAT mode interfaces. "

@@ -59,6 +59,72 @@ for enterprise, sites in data.items():
 PY
 }
 
+extract_runtime_target_tenant_dataplane_checks() {
+  local cpm_json="$1"
+
+  python3 - <<'PY' "$cpm_json"
+import ipaddress
+import json
+import sys
+
+data = json.load(open(sys.argv[1]))["control_plane_model"]["data"]
+
+def source_in_prefix(cidr):
+    iface = ipaddress.ip_interface(cidr)
+    network = iface.network
+    if iface.ip.version != 4 or network.num_addresses < 4:
+        return None
+    candidate = network.broadcast_address - 1
+    if candidate == iface.ip:
+        candidate = network.network_address + 1
+    if candidate != iface.ip and candidate in network:
+        return str(candidate)
+    return None
+
+for enterprise, sites in data.items():
+    for site, site_data in sites.items():
+        for runtime_name, rt in sorted(site_data.get("runtimeTargets", {}).items()):
+            logical = rt.get("logicalNode") or {}
+            logical_name = logical.get("name")
+            if not logical_name or "-access-" not in logical_name:
+                continue
+            realization = rt.get("effectiveRuntimeRealization") or {}
+            interfaces = realization.get("interfaces") or {}
+            default_iface = None
+            default_via4 = None
+            for iface_name, iface in sorted(interfaces.items()):
+                routes = ((iface.get("routes") or {}).get("ipv4")) or []
+                for route in routes:
+                    if route.get("policyOnly") is True:
+                        continue
+                    if route.get("dst") != "0.0.0.0/0":
+                        continue
+                    via4 = route.get("via4")
+                    runtime_if = iface.get("runtimeIfName") or iface.get("renderedIfName")
+                    if isinstance(via4, str) and via4 and isinstance(runtime_if, str) and runtime_if:
+                        default_iface = runtime_if
+                        default_via4 = via4
+                        break
+                if default_iface:
+                    break
+            if not default_iface or not default_via4:
+                continue
+            for iface_name, iface in sorted(interfaces.items()):
+                kind = iface.get("sourceKind") or iface.get("kind")
+                if kind != "tenant":
+                    continue
+                runtime_if = iface.get("runtimeIfName") or iface.get("renderedIfName")
+                addr4 = iface.get("addr4") or ((iface.get("ipv4") or {}).get("address"))
+                if not isinstance(runtime_if, str) or not runtime_if:
+                    continue
+                if not isinstance(addr4, str) or not addr4:
+                    continue
+                source4 = source_in_prefix(addr4)
+                if source4:
+                    print(f"{site}\t{logical_name}\t{runtime_if}\t{source4}\t{default_iface}\t{default_via4}")
+PY
+}
+
 resolve_container_name() {
   local site="$1"
   local logical_name="$2"
@@ -122,7 +188,7 @@ check_runtime_target_dataplane() {
     IFS=$'\t' read -r site logical_name loop4 loop6 <<<"${check}"
     container="$(resolve_container_name "${site}" "${logical_name}")"
     log "checking ${container} loopback/routes from CPM runtime target ${site}:${logical_name}"
-    ssh_vm_once "
+    if ! ssh_vm_once "
       docker exec '${container}' sh -c '
         set -e
         ip -br link
@@ -135,13 +201,30 @@ check_runtime_target_dataplane() {
         if [ -n \"${loop6}\" ]; then
           ip -6 route get \"${loop6}\" | grep -F \"dev lo\"
         fi
-        case \"${logical_name}\" in
-          *-access-*)
-            ip route get 8.8.8.8 >/dev/null
-            ip -6 route get 2001:db8::1 >/dev/null
-            ;;
-        esac
       '
-    "
+    "; then
+      return 1
+    fi
+  done
+}
+
+check_runtime_target_tenant_dataplane() {
+  local check site logical_name tenant_if source4 default_if default_via4 container
+
+  for check in "$@"; do
+    IFS=$'\t' read -r site logical_name tenant_if source4 default_if default_via4 <<<"${check}"
+    container="$(resolve_container_name "${site}" "${logical_name}")"
+    log "checking ${container} tenant policy route ${source4} iif ${tenant_if} -> ${default_if} via ${default_via4}"
+    if ! ssh_vm_once "
+      docker exec '${container}' sh -c '
+        set -e
+        route=\$(ip route get 8.8.8.8 from ${source4} iif ${tenant_if})
+        printf \"%s\\n\" \"\$route\"
+        printf \"%s\\n\" \"\$route\" | grep -F \"dev ${default_if}\"
+        printf \"%s\\n\" \"\$route\" | grep -F \"via ${default_via4}\"
+      '
+    "; then
+      return 1
+    fi
   done
 }

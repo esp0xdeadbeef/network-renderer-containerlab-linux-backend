@@ -12,7 +12,9 @@ cd "${repo_root}"
 python3 - <<'PY'
 import sys
 import re
+from clabgen.cpm_runtime import _interface_output
 from clabgen.s88.CM.linux_wan_dynamic import render, _dhcp4_command, _slaac_command
+from clabgen.s88.CM.linux_interfaces import _render_addressing
 
 failures = 0
 
@@ -107,6 +109,8 @@ nat_node = {
     "interfaces": {
         "wan0": {
             "kind": "wan",
+            "sourceKind": "wan",
+            "adapterClass": "wan-uplink",
             "hostUplink": {
                 "mode": "nat",
                 "ipv4": {
@@ -127,9 +131,71 @@ check("NAT mode emits ip addr replace", len(nat_ips) > 0)
 for cmd in nat_ips:
     check("NAT mode uses CPM address (not 10.11.0.x)", "10.11.0." not in cmd)
     check("NAT mode uses CPM-derived 192.168.1.x", "192.168.1." in cmd)
+    check("NAT mode never emits None as an address", "None/" not in cmd)
+    check("NAT mode assigns client address, not bridge gateway", "192.168.1.1/24" not in cmd)
+
+nat_addressing_cmds = _render_addressing(nat_node, eth_map_nat)
+check(
+    "NAT host uplink bridge gateway is not assigned by generic addressing",
+    not any("192.168.1.1/24" in c for c in nat_addressing_cmds),
+)
+nat_flat_node = {
+    "interfaces": {
+        "wan0": {
+            **nat_node["interfaces"]["wan0"],
+            "addr4": "192.168.1.1/24",
+        }
+    }
+}
+nat_flat_addressing_cmds = _render_addressing(nat_flat_node, eth_map_nat)
+check(
+    "NAT flat addr4 bridge gateway is not assigned by generic addressing",
+    not any("192.168.1.1/24" in c for c in nat_flat_addressing_cmds),
+)
+link_bridges = {}
+link_host_uplinks = {}
+link_metadata = {}
+cpm_iface = {
+    "sourceKind": "wan",
+    "adapterClass": "wan-uplink",
+    "hostUplink": nat_node["interfaces"]["wan0"]["hostUplink"],
+    "ipv4": nat_node["interfaces"]["wan0"]["hostUplink"]["ipv4"],
+}
+cpm_output = _interface_output(
+    "wan0",
+    cpm_iface,
+    link_bridges,
+    link_host_uplinks,
+    link_metadata,
+)
+check("CPM runtime adapter does not map NAT bridge gateway to addr4", cpm_output.get("addr4") is None)
 # NAT mode should NOT use DHCP
 nat_dhcp = [c for c in cmds_nat if "udhcpc" in c]
 check("NAT mode does NOT emit DHCP", len(nat_dhcp) == 0)
+
+missing_nat_client_node = {
+    "interfaces": {
+        "wan0": {
+            "kind": "wan",
+            "hostUplink": {
+                "mode": "nat",
+                "ipv4": {
+                    "method": "static",
+                    "address": "192.168.1.1/24",
+                }
+            },
+        }
+    }
+}
+try:
+    render(missing_nat_client_node, eth_map_nat)
+except ValueError as exc:
+    check(
+        "Missing NAT clientAddress fails closed",
+        "clientAddress" in str(exc),
+    )
+else:
+    check("Missing NAT clientAddress fails closed", False)
 
 # ── Predicate 9: Fake-provider DHCP client binding uses explicit lab-emulation data ──
 print("\n=== Predicate 9: Fake-provider WAN binding uses explicit client address ===")

@@ -127,7 +127,11 @@ do
   echo
 
   echo "[ ip route get 8.8.8.8 ]"
-  docker exec "$c" ip route get 8.8.8.8 || true
+  if docker exec "$c" sh -c 'ip route show default | grep -q "^default "'; then
+    docker exec "$c" ip route get 8.8.8.8 || true
+  else
+    echo "skipped: no main-table default route"
+  fi
   echo
 
   #echo "[ traceroute -> s-router-access (10.10.0.0) ]"
@@ -139,7 +143,11 @@ do
   #echo
 
   echo "[ traceroute -> internet (8.8.8.8) ]"
-  docker exec "$c" traceroute -I -n -w 1 -q 1 -m 8 8.8.8.8 || true
+  if docker exec "$c" sh -c 'ip route show default | grep -q "^default "'; then
+    docker exec "$c" traceroute -I -n -w 1 -q 1 -m 8 8.8.8.8 || true
+  else
+    echo "skipped: no main-table default route"
+  fi
   echo
 
   echo " [ FIREWALL - nft list ruleset]"

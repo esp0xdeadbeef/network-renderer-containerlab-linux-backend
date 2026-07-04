@@ -22,7 +22,7 @@ def _render_base_filter(wan_if: str) -> List[str]:
         "nft add rule inet filter input iif lo accept",
         "nft add rule inet filter input ct state established,related accept",
         "nft add rule inet filter input ct state invalid drop",
-        "nft add rule inet filter input meta l4proto ipv6-icmp accept",
+        "nft add rule inet filter input meta l4proto icmpv6 accept",
         f'nft add rule inet filter input iifname "{wan_if}" ip saddr {{ 0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,240.0.0.0/4 }} drop',
         f'nft add rule inet filter input iifname "{wan_if}" ip6 saddr {{ ::1,fc00::/7,fe80::/10 }} drop',
         f'nft add rule inet filter input iifname != "{wan_if}" tcp dport 22 accept',

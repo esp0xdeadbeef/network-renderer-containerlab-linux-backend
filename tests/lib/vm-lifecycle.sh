@@ -49,7 +49,7 @@ run_in_vm_validation() {
 
   log "running run-in-vm.sh inside the VM"
   stage_tooling_cache_into_vm
-  ssh_vm "
+  if ! ssh_vm "
     set -euo pipefail
     cd '${repo_root}'
     timeout 900 env \
@@ -57,7 +57,11 @@ run_in_vm_validation() {
       CLAB_FRR_TOOLING_CACHE_TAR='${vm_image_cache_tar}' \
       CLAB_FRR_TOOLING_CACHE_IMAGE_ID_FILE='${vm_image_cache_id}' \
       ./run-in-vm.sh
-  " 2>&1 | tee "${validation_log}"
-  guard_vm_runtime_log "${validation_log}"
+  " 2>&1 | tee "${validation_log}"; then
+    return 1
+  fi
+  if ! guard_vm_runtime_log "${validation_log}"; then
+    return 1
+  fi
   log "run-in-vm.sh completed"
 }

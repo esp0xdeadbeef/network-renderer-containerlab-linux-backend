@@ -2,6 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${repo_root}/tests/lib/input-path.sh"
+source "${repo_root}/tests/lib/vm-cpm-context.sh"
 example="${CLAB_FRR_TOOLING_CACHE_EXAMPLE:-single-wan}"
 ssh_host="${CLAB_VM_SSH_HOST:-127.0.0.1}"
 ssh_port="${CLAB_VM_SSH_PORT:-2222}"
@@ -39,6 +41,7 @@ if [[ -z "${state_dir}" ]]; then
     ephemeral_state_dir="$(mktemp -d "${state_root}/state.XXXXXX")"
     state_dir="${ephemeral_state_dir}"
 fi
+cpm_json="${state_dir}/${example}.cpm.json"
 
 ssh_opts=(
     -T
@@ -78,12 +81,15 @@ wait_for_ssh() {
 }
 
 printf '[clab-cache] starting nixos-shell VM for %s\n' "${example}"
+labs_path="$(resolve_input_path network-labs)"
+cpm_path="$(resolve_input_path network-control-plane-model)"
+compile_example_cpm "${example}" "${cpm_json}" "${labs_path}" "${cpm_path}"
 (
     cd "${repo_root}"
     CLAB_VM_STATE_DIR="${state_dir}" \
     CLAB_VM_SSH_HOST="${ssh_host}" \
     CLAB_VM_SSH_PORT="${ssh_port}" \
-        ./start-vm.sh "${example}"
+        ./start-vm.sh "${cpm_json}"
 ) >"${state_dir}/nixos-shell-cache-update.log" 2>&1 &
 vm_pid="$!"
 
