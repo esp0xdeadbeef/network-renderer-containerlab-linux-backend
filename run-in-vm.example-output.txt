@@ -668,7 +668,7 @@ table inet filter {
 		iif "lo" accept
 		ct state established,related accept
 		ct state invalid drop
-		meta l4proto ipv6-icmp accept
+		meta l4proto icmpv6 accept
 		iifname "eth2" ip saddr { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16, 224.0.0.0-255.255.255.255 } drop
 		iifname "eth2" ip6 saddr { ::1, fc00::/7, fe80::/10 } drop
 		iifname != "eth2" tcp dport 22 accept
@@ -1192,7 +1192,7 @@ table inet filter {
 		iif "lo" accept
 		ct state established,related accept
 		ct state invalid drop
-		meta l4proto ipv6-icmp accept
+		meta l4proto icmpv6 accept
 		iifname "eth2" ip saddr { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16, 224.0.0.0-255.255.255.255 } drop
 		iifname "eth2" ip6 saddr { ::1, fc00::/7, fe80::/10 } drop
 		iifname != "eth2" tcp dport 22 accept
@@ -1344,4 +1344,3 @@ table ip nat {
 		ip daddr 127.0.0.11 counter packets 0 bytes 0 jump DOCKER_POSTROUTING
 	}
 }
-

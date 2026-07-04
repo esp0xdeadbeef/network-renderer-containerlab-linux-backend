@@ -39,6 +39,10 @@ wait_for_ssh() {
     if ssh_vm_ready; then
       return 0
     fi
+    if [[ -n "${vm_launcher_pid:-}" ]] && ! kill -0 "${vm_launcher_pid}" >/dev/null 2>&1; then
+      wait "${vm_launcher_pid}" || return 1
+      return 1
+    fi
     sleep 2
   done
 

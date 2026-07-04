@@ -104,8 +104,9 @@ run_example() {
   log "starting VM for ${example}"
   (
     cd "$repo_root"
-    CLAB_VM_STATE_DIR="${vm_state_dir}" ./start-vm.sh "$example" 2>&1 | tee "$launcher_log"
+    CLAB_VM_STATE_DIR="${vm_state_dir}" ./start-vm.sh "${tmp_dir}/cpm.json" 2>&1 | tee "$launcher_log"
   ) &
+  vm_launcher_pid="$!"
 
   if ! wait_for_ssh; then
     cat "$launcher_log" >&2 || true
@@ -115,13 +116,19 @@ run_example() {
 
   log "running VM-backed validation for ${example}"
   stage_rendered_topology
-  run_in_vm_validation "${validation_log}"
+  if ! run_in_vm_validation "${validation_log}"; then
+    return 1
+  fi
   mapfile -t runtime_target_suffixes < <(extract_runtime_target_suffixes "${tmp_dir}/cpm.json")
   if ! check_runtime_target_suffixes_present "${runtime_target_suffixes[@]}"; then
     return 1
   fi
   mapfile -t runtime_dataplane_checks < <(extract_runtime_target_dataplane_checks "${tmp_dir}/cpm.json")
   if ! check_runtime_target_dataplane "${runtime_dataplane_checks[@]}"; then
+    return 1
+  fi
+  mapfile -t runtime_tenant_dataplane_checks < <(extract_runtime_target_tenant_dataplane_checks "${tmp_dir}/cpm.json")
+  if ! check_runtime_target_tenant_dataplane "${runtime_tenant_dataplane_checks[@]}"; then
     return 1
   fi
 

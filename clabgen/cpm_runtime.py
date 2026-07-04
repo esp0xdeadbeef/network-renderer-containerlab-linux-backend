@@ -85,6 +85,9 @@ def _interface_output(
     attach = _dict_value(iface.get("attach"))
     attach_bridge = _string_value(attach.get("bridge"))
     host_uplink = _dict_value(iface.get("hostUplink"))
+    addr4 = _address_value(iface, "addr4", "ipv4")
+    if kind == "wan" and host_uplink.get("mode") == "nat":
+        addr4 = None
 
     link_name = str(backing_ref.get("name") or if_key)
     if link_name:
@@ -97,7 +100,7 @@ def _interface_output(
         )
 
     return {
-        "addr4": _address_value(iface, "addr4", "ipv4"),
+        "addr4": addr4,
         "addr6": _address_value(iface, "addr6", "ipv6"),
         "ll6": iface.get("ll6"),
         "runtimeIfName": iface.get("runtimeIfName") or iface.get("renderedIfName"),

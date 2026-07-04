@@ -15,6 +15,8 @@
 #  6. No Alpine packages (must use Debian PPP path)
 #  7. Cache evidence JSON schema in build script
 #  8. update-repo-cache-with-vm.sh contract checks
+#  9. VM example harness fail-closes runtime validation failures
+# 10. CLAB WAN runtime commands use valid nftables/NAT syntax
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,7 +33,9 @@ if grep -q 'docker_wait_seconds=' "${script}" &&
    grep -q 'wait_for_docker()' "${script}" &&
    grep -q 'systemctl start docker' "${script}" &&
    grep -q 'docker_cmd.* info' "${script}" &&
-   grep -q 'docker did not become ready' "${script}"; then
+   grep -q 'docker did not become ready' "${script}" &&
+   grep -q 'if ! guard_vm_runtime_log "${validation_log}"; then' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
+   grep -q 'if ! run_in_vm_validation "${validation_log}"; then' "${repo_root}/tests/test-vm-examples.sh"; then
   echo "PASS test1: VM runner Docker readiness"
 else
   echo "FAIL test1: VM runner Docker readiness" >&2
@@ -172,7 +176,8 @@ fi
 cache_update="${repo_root}/docker-clab-frr-plus-tooling/update-repo-cache-with-vm.sh"
 if [[ -f "${cache_update}" ]]; then
   checks_ok=1
-  grep -q './start-vm.sh "${example}"' "${cache_update}" || checks_ok=0
+  grep -q 'compile_example_cpm "${example}" "${cpm_json}"' "${cache_update}" || checks_ok=0
+  grep -q './start-vm.sh "${cpm_json}"' "${cache_update}" || checks_ok=0
   grep -q 'CLAB_FRR_TOOLING_REPO_CACHE_DIR' "${cache_update}" || checks_ok=0
   grep -q 'renderer repository is under /nix/store' "${cache_update}" || checks_ok=0
   grep -q 'user-supplied cache/export directory' "${cache_update}" || checks_ok=0
@@ -191,6 +196,49 @@ if [[ -f "${cache_update}" ]]; then
   fi
 else
   echo "SKIP test11: update-repo-cache-with-vm.sh not found"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 12: VM example runtime failures must fail-close
+# ---------------------------------------------------------------------------
+if grep -q 'if ! run_in_vm_validation "${validation_log}"; then' "${repo_root}/tests/test-vm-examples.sh" &&
+   grep -q 'if ! ssh_vm_once "' "${repo_root}/tests/lib/vm-runtime-targets.sh" &&
+   grep -q 'extract_runtime_target_tenant_dataplane_checks' "${repo_root}/tests/test-vm-examples.sh" &&
+   grep -q 'check_runtime_target_tenant_dataplane' "${repo_root}/tests/test-vm-examples.sh" &&
+   grep -q 'ip route get 8.8.8.8 from ${source4} iif ${tenant_if}' "${repo_root}/tests/lib/vm-runtime-targets.sh" &&
+   grep -q 'return 1' "${repo_root}/tests/test-vm-examples.sh" &&
+   grep -q 'FATAL VM-backed Containerlab validation emitted runtime errors' "${repo_root}/tests/lib/vm-runtime-log-guard.sh"; then
+  echo "PASS test12: VM example runtime validation fail-closes"
+else
+  echo "FAIL test12: VM example runtime validation can be masked" >&2
+  failures=$((failures + 1))
+fi
+
+# ---------------------------------------------------------------------------
+# Test 13: CLAB WAN command rendering avoids invalid runtime syntax
+# ---------------------------------------------------------------------------
+if ! grep -q 'str(ipv4.get("clientAddress"))' "${repo_root}/clabgen/s88/CM/linux_wan_dynamic.py" &&
+   grep -q 'meta l4proto icmpv6 accept' "${repo_root}/clabgen/s88/CM/firewall_wan.py" &&
+   ! grep -q 'ipv6-icmp' "${repo_root}/clabgen/s88/CM/firewall_wan.py" &&
+   ! grep -q 'ipv6-icmp' "${repo_root}/fabric.clab.example.yml" &&
+   ! grep -q 'ipv6-icmp' "${repo_root}/run-in-vm.example-output.txt"; then
+  echo "PASS test13: CLAB WAN command rendering uses valid NAT and nftables syntax"
+else
+  echo "FAIL test13: CLAB WAN command rendering still allows invalid runtime syntax" >&2
+  failures=$((failures + 1))
+fi
+
+# ---------------------------------------------------------------------------
+# Test 14: run-in-vm diagnostics avoid false main-table internet probes
+# ---------------------------------------------------------------------------
+if grep -q 'skipped: no main-table default route' "${repo_root}/run-in-vm.sh" &&
+   grep -q 'if docker exec "$c" sh -c '\''ip route show default | grep -q "^default "'\''; then' "${repo_root}/run-in-vm.sh" &&
+   grep -q 'docker exec "$c" ip route get 8.8.8.8 || true' "${repo_root}/run-in-vm.sh" &&
+   grep -q 'docker exec "$c" traceroute -I -n -w 1 -q 1 -m 8 8.8.8.8 || true' "${repo_root}/run-in-vm.sh"; then
+  echo "PASS test14: run-in-vm diagnostics skip nodes without main default routes"
+else
+  echo "FAIL test14: run-in-vm still emits false main-table internet probes" >&2
+  failures=$((failures + 1))
 fi
 
 # ---------------------------------------------------------------------------
