@@ -196,6 +196,36 @@ assert_refuses(
     "missing CPM runtimeIfName",
 )
 
+# FC2/SN2: empty runtimeIfName
+empty_runtime = site_for(
+    {
+        "wan": InterfaceModel(name="wan", runtime_if_name=""),
+    },
+    {"router": {"interface": "wan"}},
+)
+
+assert_refuses(
+    "empty-runtime-if-name",
+    lambda: build_eth_maps(empty_runtime),
+    "missing CPM runtimeIfName",
+)
+assert_refuses(
+    "empty-runtime-if-name-output-gate",
+    lambda: render_site_topology(empty_runtime),
+    "missing CPM runtimeIfName",
+)
+
+# SN2 recovery: non-empty runtimeIfName after empty
+recovered_runtime = site_for(
+    {
+        "wan": InterfaceModel(name="wan", runtime_if_name="wan-recovered"),
+    },
+    {"router": {"interface": "wan"}},
+)
+recovered_maps = build_eth_maps(recovered_runtime)
+if recovered_maps["router"]["wan"] != "wan-recovered":
+    raise AssertionError(f"recovery-after-empty: unexpected eth map {recovered_maps!r}")
+
 duplicate_runtime = SiteModel(
     enterprise="test",
     site="clab",
