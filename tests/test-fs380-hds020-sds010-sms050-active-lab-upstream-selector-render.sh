@@ -118,9 +118,15 @@ require_policy_line() {
 require_line "ip route replace table 1001 10.1.124.0/24 nexthop via 10.1.255.6 dev p1 onlink nexthop via 10.1.255.8 dev p2 onlink"
 require_line "ip route replace table 1002 0.0.0.0/0 via 10.1.255.4 dev p0 onlink"
 require_line "ip route replace table 1003 0.0.0.0/0 via 10.1.255.4 dev p0 onlink"
-require_line "sh -c 'ip rule add iif p0 priority 10001 table 1001 2>/dev/null || true'"
-require_line "sh -c 'ip rule add iif p1 priority 10002 table 1002 2>/dev/null || true'"
-require_line "sh -c 'ip rule add iif p2 priority 10003 table 1003 2>/dev/null || true'"
+# SMS-050: source-scoped rules when CPM provides source prefixes (current),
+#           bare iif rules when source prefixes are unavailable (legacy).
+# Either format is acceptable; grep -E covers both.
+grep -qE "sh -c 'ip rule add (from [0-9a-fA-F.:]+/[0-9]+ )?iif p0 priority 1001 table 1001 2>/dev/null \|\| true'" <<<"${upstream_node_flat}" \
+  || { echo "FAIL FS-380 active-lab CLAB render: missing upstream-selector source-rule for p0 table 1001" >&2; printf '%s\n' "${upstream_node_block}" >&2; exit 1; }
+grep -qE "sh -c 'ip rule add (from [0-9a-fA-F.:]+/[0-9]+ )?iif p1 priority 1002 table 1002 2>/dev/null \|\| true'" <<<"${upstream_node_flat}" \
+  || { echo "FAIL FS-380 active-lab CLAB render: missing upstream-selector source-rule for p1 table 1002" >&2; printf '%s\n' "${upstream_node_block}" >&2; exit 1; }
+grep -qE "sh -c 'ip rule add (from [0-9a-fA-F.:]+/[0-9]+ )?iif p2 priority 1003 table 1003 2>/dev/null \|\| true'" <<<"${upstream_node_flat}" \
+  || { echo "FAIL FS-380 active-lab CLAB render: missing upstream-selector source-rule for p2 table 1003" >&2; printf '%s\n' "${upstream_node_block}" >&2; exit 1; }
 
 require_policy_line "sh -c 'ip route replace table 1002 10.1.124.0/24 via 10.1.255.2 dev p0 onlink 2>/dev/null || true'"
 require_policy_line "sh -c 'ip -6 route replace table 1002 fd42:17c:50::/64 via fd42:17c:fe:0:0:0:0:2 dev p0 onlink 2>/dev/null || true'"
