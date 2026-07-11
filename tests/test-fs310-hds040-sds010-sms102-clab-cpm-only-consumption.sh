@@ -34,8 +34,6 @@ KNOWN_GAPS = {
     ("clabgen/provenance_fields.py", 106, "except Exception: return None — _git_rev swallows git errors silently"),
     ("clabgen/provenance_fields.py", 123, "except Exception: return None — _git_dirty swallows git errors silently"),
     ("clabgen/provenance_fields.py", 178, "except Exception: return {available: False} — renderer_lock_summary swallows JSON parse errors silently"),
-    ("clabgen/parse-solver-json.py", 39, "except Exception: return {} — _load_renderer_inventory_for_input swallows JSON/env errors silently"),
-    ("clabgen/parse-solver-json.py", 45, "except Exception: return {} — _load_renderer_inventory_for_input swallows file read errors silently"),
     ("clabgen/s88/CM/linux_route_values.py", 61, "except Exception: pass — silent pass on int(prefix) failure"),
     ("clabgen/s88/CM/linux_route_values.py", 67, "except Exception: return dst — swallows IPv4Network parse errors silently"),
     ("clabgen/s88/CM/linux_route_values.py", 76, "except Exception: return None — _host_prefix swallows IP parse errors silently"),
@@ -130,15 +128,15 @@ for find in check2_finds:
 for gap_path, gap_lineno, gap_desc in sorted(KNOWN_GAPS):
     gap_file = repo / gap_path
     if not gap_file.exists():
-        warn(f"KNOWN_GAP file removed (remove from list): {gap_path}")
+        fail(f"KNOWN_GAP file removed (remove from list): {gap_path}")
         continue
     lines = gap_file.read_text().splitlines()
     if gap_lineno > len(lines):
-        warn(f"KNOWN_GAP line {gap_lineno} out of range in {gap_path} (remove from list)")
+        fail(f"KNOWN_GAP line {gap_lineno} out of range in {gap_path} (remove from list)")
         continue
     line = lines[gap_lineno - 1]
     if not EXCEPT_PATTERN.match(line):
-        warn(f"KNOWN_GAP line {gap_lineno} in {gap_path} no longer matches — gap may be fixed (remove from list)")
+        fail(f"KNOWN_GAP line {gap_lineno} in {gap_path} no longer matches — gap may be fixed (remove from list)")
 
 if failures == 0:
     print(f"  PASS: {len(check2_finds)} except Exception: sites, all in KNOWN_GAPS ({len(KNOWN_GAPS)} gaps)")
@@ -264,6 +262,28 @@ if rejects_nix or "intent/inventory Nix" in deploy_content:
     print("  PASS: deploy-clab.sh requires CPM JSON, rejects .nix input")
 else:
     warn("  deploy-clab.sh: verify CPM JSON requirement (may use other validation)")
+
+# ═══════════════════════════════════════════════════════════════════════
+# CHECK 7: Normal rendering does not emit ad-hoc diagnostic chatter
+# ═══════════════════════════════════════════════════════════════════════
+print("\n=== Check 7: no unconditional normal-render DIAGNOSTIC chatter ===")
+
+normal_diag_patterns = [
+    "DIAGNOSTIC: node=",
+    "has core-uplink-egress?",
+    "interface runtimeNames:",
+]
+diag_fails = 0
+for py_file in sorted(repo.glob("clabgen/**/*.py")):
+    content = py_file.read_text()
+    for pattern in normal_diag_patterns:
+        if pattern in content:
+            rel_path = str(py_file.relative_to(repo))
+            fail(f"{rel_path}: unconditional render diagnostic pattern {pattern!r}")
+            diag_fails += 1
+
+if diag_fails == 0:
+    print("  PASS: renderer normal path has no unconditional DIAGNOSTIC stderr")
 
 # ═══════════════════════════════════════════════════════════════════════
 # SEEDED NEGATIVE 1: Silent error hiding via except Exception: pass

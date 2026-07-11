@@ -1,11 +1,95 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import shlex
 from typing import Dict, Any, List
 
 from clabgen.models import NodeModel
 from clabgen.s88.EM.base import render as render_em
+
+EXEC_BUNDLE_SIZE = 100
+INTERNAL_SELECTOR_RELATION_AUDIT_KEY = "_clabgen.selector.interface.relation.audit"
+
+SELECTOR_RELATION_AUDIT_FILE_LABEL = "clab.selector.interface.relation.audit.file"
+SELECTOR_RELATION_AUDIT_SHA256_LABEL = "clab.selector.interface.relation.audit.sha256"
+SELECTOR_RELATION_AUDIT_INTERFACE_COUNT_LABEL = (
+    "clab.selector.interface.relation.audit.interface.count"
+)
+SELECTOR_RELATION_AUDIT_RECORD_COUNT_LABEL = (
+    "clab.selector.interface.relation.audit.record.count"
+)
+
+
+def selector_relation_audit_sidecar_path(topology_out: Any) -> Any:
+    return topology_out.with_name(
+        f"{topology_out.stem}.selector-interface-relation-audit.json"
+    )
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def _selector_relation_record_count(audit: Dict[str, Any]) -> int:
+    total = 0
+    for records in audit.values():
+        if isinstance(records, list):
+            total += len(records)
+    return total
+
+
+def collect_selector_relation_audit_sidecar(
+    topology_doc: Dict[str, Any],
+    *,
+    sidecar_name: str,
+) -> Dict[str, Any]:
+    topology = topology_doc.get("topology")
+    nodes = topology.get("nodes") if isinstance(topology, dict) else None
+    if not isinstance(nodes, dict):
+        return {}
+
+    sidecar_nodes: Dict[str, Any] = {}
+    for node_name, node_def in sorted(nodes.items()):
+        if not isinstance(node_def, dict):
+            continue
+
+        audit = node_def.pop(INTERNAL_SELECTOR_RELATION_AUDIT_KEY, None)
+        if not audit:
+            continue
+        if not isinstance(audit, dict):
+            raise ValueError(
+                f"selector relation audit for node {node_name!r} must be an object"
+            )
+
+        canonical = _canonical_json(audit)
+        digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        record_count = _selector_relation_record_count(audit)
+
+        labels = node_def.setdefault("labels", {})
+        if not isinstance(labels, dict):
+            raise ValueError(f"node {node_name!r} labels must be an object")
+        labels[SELECTOR_RELATION_AUDIT_FILE_LABEL] = sidecar_name
+        labels[SELECTOR_RELATION_AUDIT_SHA256_LABEL] = digest
+        labels[SELECTOR_RELATION_AUDIT_INTERFACE_COUNT_LABEL] = str(len(audit))
+        labels[SELECTOR_RELATION_AUDIT_RECORD_COUNT_LABEL] = str(record_count)
+
+        sidecar_nodes[str(node_name)] = {
+            "sha256": digest,
+            "interfaceCount": len(audit),
+            "recordCount": record_count,
+            "relations": audit,
+        }
+
+    if not sidecar_nodes:
+        return {}
+
+    return {
+        "schemaVersion": 1,
+        "kind": "containerlab-selector-interface-relation-audit",
+        "nodes": sidecar_nodes,
+    }
 
 
 def _routing_mode(node: NodeModel) -> str:
@@ -128,6 +212,31 @@ def _selector_relation_audit(
     return result
 
 
+def bundle_exec_commands(
+    exec_cmds: List[str],
+    *,
+    bundle_size: int = EXEC_BUNDLE_SIZE,
+) -> List[str]:
+    commands = [str(cmd) for cmd in exec_cmds if str(cmd).strip()]
+    if not commands:
+        return []
+    if bundle_size < 1:
+        raise ValueError("exec bundle size must be positive")
+
+    bundled: List[str] = []
+    total = len(commands)
+    for start in range(0, total, bundle_size):
+        chunk = commands[start : start + bundle_size]
+        end = start + len(chunk)
+        script_lines = [
+            "set -e",
+            f"echo '[clab-node-init] commands {start + 1}-{end}/{total}' >&2",
+            *chunk,
+        ]
+        bundled.append(f"sh -e -c {shlex.quote(chr(10).join(script_lines))}")
+    return bundled
+
+
 def render_linux_node(
     node_name: str,
     node: NodeModel,
@@ -154,17 +263,20 @@ def render_linux_node(
         "clab.interface.map": json.dumps(eth_map, sort_keys=True),
         "clab.interface.audit": json.dumps(audit_map, sort_keys=True),
     }
-    if selector_relation_audit:
-        labels["clab.selector.interface.relation.audit"] = json.dumps(
-            selector_relation_audit, sort_keys=True
-        )
+    bundled_exec_cmds = bundle_exec_commands(exec_cmds)
+    labels["clab.exec.command.count"] = str(len(exec_cmds))
+    labels["clab.exec.bundle.count"] = str(len(bundled_exec_cmds))
+    labels["clab.exec.bundle.size"] = str(EXEC_BUNDLE_SIZE)
 
-    return {
+    rendered = {
         "kind": "linux",
         "image": "clab-frr-plus-tooling:latest",
         "labels": labels,
         "network-mode": "none",
         "restart-policy": "no",
         "cmd": "/bin/sh -c 'sleep infinity'",
-        "exec": exec_cmds,
+        "exec": bundled_exec_cmds,
     }
+    if selector_relation_audit:
+        rendered[INTERNAL_SELECTOR_RELATION_AUDIT_KEY] = selector_relation_audit
+    return rendered

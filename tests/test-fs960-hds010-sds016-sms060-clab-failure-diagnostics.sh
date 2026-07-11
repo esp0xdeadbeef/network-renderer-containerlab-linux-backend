@@ -24,14 +24,35 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 fake_bin="${tmp_dir}/bin"
 mkdir -p "${fake_bin}"
 
+# This test verifies failure classification from deploy-clab.sh. The HAT
+# full-test gate can oversubscribe the host enough for an inner GNU timeout to
+# kill a fake command before it emits the diagnostic under test, so fake timeout
+# in the isolated PATH and keep the classifier assertions unchanged.
+cat >"${fake_bin}/timeout" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "--foreground" ]]; then
+  shift
+fi
+if (($# > 0)); then
+  shift
+fi
+exec "$@"
+SH
+chmod +x "${fake_bin}/timeout"
+
 # Isolate the fail() and wait_for_docker() functions from deploy-clab.sh.
 fail() { printf '[deploy-clab] error: %s\n' "$*" >&2; return 1; }
+# Keep this bounded but high enough for the HAT full-test gate, where this fake
+# sudo/docker check runs under heavy cross-repo Nix/build parallel load.
+docker_info_timeout_seconds=30
+systemctl_timeout_seconds=1
 
 eval "$(
   awk '/^wait_for_docker\(\) \{/,/^\}/' "${deploy_script}"
 )"
 
 failures=0
+diagnostic_wait_seconds="${FS960_TEST_DOCKER_WAIT_SECONDS:-60}"
 
 classify_failure_record() {
   local signal="$1"
@@ -116,16 +137,18 @@ fi
 # Expected diagnostic: "docker permission denied — user not authorized..."
 # This is the primary privilege_failure class.
 # ---------------------------------------------------------------------------
-cat >"${fake_bin}/docker" <<'SH'
+permission_bin="${tmp_dir}/bin-test2-permission"
+mkdir -p "${permission_bin}"
+cat >"${permission_bin}/docker" <<'SH'
 #!/usr/bin/env bash
 echo "Got permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock" >&2
 exit 1
 SH
-chmod +x "${fake_bin}/docker"
+chmod +x "${permission_bin}/docker"
 
 if (
-  export PATH="${fake_bin}:${PATH}"
-  export CLAB_DOCKER_WAIT_SECONDS=2
+  export PATH="${permission_bin}:${fake_bin}:${PATH}"
+  export CLAB_DOCKER_WAIT_SECONDS="${diagnostic_wait_seconds}"
   export CLAB_TEST_EUID=1000
   export CLAB_TEST_DISABLE_SUDO=1
   wait_for_docker
@@ -146,14 +169,16 @@ fi
 # Test 3: sudo -n fails with "password is required".
 # Expected diagnostic: "docker privilege check failed — sudo -n requires NOPASSWD..."
 # ---------------------------------------------------------------------------
-cat >"${fake_bin}/docker" <<'SH'
+sudo_password_bin="${tmp_dir}/bin-test3-sudo-password"
+mkdir -p "${sudo_password_bin}"
+cat >"${sudo_password_bin}/docker" <<'SH'
 #!/usr/bin/env bash
 echo "FAIL: docker called directly when sudo was expected" >&2
 exit 99
 SH
-chmod +x "${fake_bin}/docker"
+chmod +x "${sudo_password_bin}/docker"
 
-cat >"${fake_bin}/sudo" <<'SH'
+cat >"${sudo_password_bin}/sudo" <<'SH'
 #!/usr/bin/env bash
 if [[ "$1" == "-n" ]]; then
   echo "sudo: a password is required" >&2
@@ -162,11 +187,11 @@ fi
 shift
 exec "$@"
 SH
-chmod +x "${fake_bin}/sudo"
+chmod +x "${sudo_password_bin}/sudo"
 
 if (
-  export PATH="${fake_bin}:${PATH}"
-  export CLAB_DOCKER_WAIT_SECONDS=2
+  export PATH="${sudo_password_bin}:${fake_bin}:${PATH}"
+  export CLAB_DOCKER_WAIT_SECONDS="${diagnostic_wait_seconds}"
   export CLAB_TEST_EUID=1000
   wait_for_docker
 ) 2>"${tmp_dir}/test3.stderr"; then
@@ -335,18 +360,20 @@ fi
 # contains the privilege-specific markers, not deployment markers.
 # ---------------------------------------------------------------------------
 # Simulate: permission denied scenario
-cat >"${fake_bin}/docker" <<'SH'
+permission_seed_bin="${tmp_dir}/bin-test9-permission-seed"
+mkdir -p "${permission_seed_bin}"
+cat >"${permission_seed_bin}/docker" <<'SH'
 #!/usr/bin/env bash
 echo "Got permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock" >&2
 exit 1
 SH
-chmod +x "${fake_bin}/docker"
+chmod +x "${permission_seed_bin}/docker"
 
 rm -f "${fake_bin}/sudo"
 
 if (
-  export PATH="${fake_bin}:${PATH}"
-  export CLAB_DOCKER_WAIT_SECONDS=2
+  export PATH="${permission_seed_bin}:${fake_bin}:${PATH}"
+  export CLAB_DOCKER_WAIT_SECONDS="${diagnostic_wait_seconds}"
   export CLAB_TEST_EUID=1000
   export CLAB_TEST_DISABLE_SUDO=1
   wait_for_docker
@@ -454,6 +481,41 @@ if grep -q 'directHostContext=' "${deploy_script}" &&
   echo "PASS test12: deploy-clab fail diagnostics preserve direct-host context and locked source identity"
 else
   echo "FAIL test12: deploy-clab fail diagnostics omit context or locked source identity" >&2
+  failures=$((failures + 1))
+fi
+
+# ---------------------------------------------------------------------------
+# Test 13: Containerlab deploy failures remain fail-closed under bounded retry.
+# ---------------------------------------------------------------------------
+host_module="${repo_root}/host-module.nix"
+if grep -q 'CLAB_DEPLOY_MAX_WORKERS' "${deploy_script}" &&
+   grep -q 'CLAB_DEPLOY_IDLE_TIMEOUT_SECONDS' "${deploy_script}" &&
+   grep -q 'CLAB_CONTAINERLAB_API_TIMEOUT' "${deploy_script}" &&
+   grep -q 'deploy_max_workers=' "${deploy_script}" &&
+   grep -q 'containerlab_api_timeout=' "${deploy_script}" &&
+   grep -q 'run_containerlab_deploy_once()' "${deploy_script}" &&
+   grep -q 'stop_containerlab_deploy()' "${deploy_script}" &&
+   grep -q -- '--timeout "${containerlab_api_timeout}"' "${deploy_script}" &&
+   grep -q -- '--max-workers' "${deploy_script}" &&
+   grep -q 'Containerlab deploy emitted ERRO; stopping attempt' "${deploy_script}" &&
+   grep -q 'Containerlab deploy produced no output' "${deploy_script}" &&
+   grep -q 'failed to Statfs "/proc/0/ns/net"' "${deploy_script}" &&
+   grep -q 'failed deploy links.*file exists' "${deploy_script}" &&
+   grep -q 'Containerlab deploy did not complete cleanly' "${deploy_script}" &&
+   grep -q 'CLAB_DEPLOY_MAX_WORKERS' "${host_module}" &&
+   grep -q 'CLAB_DEPLOY_IDLE_TIMEOUT_SECONDS' "${host_module}" &&
+   grep -q 'CLAB_CONTAINERLAB_API_TIMEOUT' "${host_module}" &&
+   grep -q 'deploy_max_workers=' "${host_module}" &&
+   grep -q 'deploy_idle_timeout_seconds=' "${host_module}" &&
+   grep -q 'containerlab_api_timeout=' "${host_module}" &&
+   grep -q 'stop_containerlab_deploy()' "${host_module}" &&
+   grep -q -- '--timeout "$containerlab_api_timeout"' "${host_module}" &&
+   grep -q -- '--max-workers' "${host_module}" &&
+   grep -q 'containerlab deploy produced no output' "${host_module}" &&
+   grep -q 'containerlab deploy emitted ERRO lines; refusing readiness marker' "${host_module}"; then
+  echo "PASS test13: bounded Containerlab deploy keeps netns pid 0 and ERRO failures fail-closed"
+else
+  echo "FAIL test13: Containerlab deploy retry/ERRO diagnostics can be masked" >&2
   failures=$((failures + 1))
 fi
 

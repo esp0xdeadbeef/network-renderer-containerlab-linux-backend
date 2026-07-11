@@ -16,6 +16,7 @@ cd "${repo_root}"
 PYTHONPATH="${repo_root}" python3 - <<'PY'
 import json
 import re
+import shlex
 import sys
 import tempfile
 from pathlib import Path
@@ -90,8 +91,30 @@ def extract_all_exec_cmds(rendered):
             continue
         for cmd in exec_cmds:
             if isinstance(cmd, str):
-                cmds.append(cmd)
+                cmds.extend(expand_bundled_exec(cmd))
     return cmds
+
+
+def expand_bundled_exec(cmd):
+    """Expand renderer exec bundles back into the original primitive commands."""
+    try:
+        parts = shlex.split(cmd)
+    except ValueError:
+        return [cmd]
+    if not parts or parts[0] != "sh" or "-c" not in parts:
+        return [cmd]
+    c_index = parts.index("-c")
+    if c_index + 1 >= len(parts):
+        return [cmd]
+    expanded = []
+    for line in parts[c_index + 1].splitlines():
+        line = line.strip()
+        if not line or line == "set -e":
+            continue
+        if line.startswith("echo '[clab-node-init]"):
+            continue
+        expanded.append(line)
+    return expanded or [cmd]
 
 
 def extract_nft_commands(cmds):

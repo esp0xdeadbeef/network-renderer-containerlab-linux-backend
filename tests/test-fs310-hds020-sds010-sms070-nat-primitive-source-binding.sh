@@ -17,6 +17,7 @@ PYTHONPATH="${repo_root}" python3 - <<'PY'
 import json
 import re
 import shutil
+import shlex
 import sys
 import tempfile
 from pathlib import Path
@@ -137,16 +138,39 @@ def extract_nat_commands(rendered):
         for cmd in exec_cmds:
             if not isinstance(cmd, str):
                 continue
-            # Match commands related to NAT: nft nat tables, postrouting chains,
-            # masquerade/snat/dnat rules, or nft commands within ip nat / ip6 nat
-            if re.search(
-                r'(?:ip6?\s+nat\b|postrouting|masquerade|'
-                r'\bsnat\b|\bdnat\b|'
-                r'nft\s+(?:add|create)\s+table\s+ip6?\s+nat)',
-                cmd,
-            ):
-                commands.append(cmd)
+            for cmd in expand_bundled_exec(cmd):
+                # Match commands related to NAT: nft nat tables, postrouting chains,
+                # masquerade/snat/dnat rules, or nft commands within ip nat / ip6 nat
+                if re.search(
+                    r'(?:ip6?\s+nat\b|postrouting|masquerade|'
+                    r'\bsnat\b|\bdnat\b|'
+                    r'nft\s+(?:add|create)\s+table\s+ip6?\s+nat)',
+                    cmd,
+                ):
+                    commands.append(cmd)
     return commands
+
+
+def expand_bundled_exec(cmd):
+    """Expand renderer exec bundles back into the original primitive commands."""
+    try:
+        parts = shlex.split(cmd)
+    except ValueError:
+        return [cmd]
+    if not parts or parts[0] != "sh" or "-c" not in parts:
+        return [cmd]
+    c_index = parts.index("-c")
+    if c_index + 1 >= len(parts):
+        return [cmd]
+    expanded = []
+    for line in parts[c_index + 1].splitlines():
+        line = line.strip()
+        if not line or line == "set -e":
+            continue
+        if line.startswith("echo '[clab-node-init]"):
+            continue
+        expanded.append(line)
+    return expanded or [cmd]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

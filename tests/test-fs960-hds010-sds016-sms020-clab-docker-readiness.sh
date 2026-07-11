@@ -31,9 +31,30 @@ failures=0
 # ---------------------------------------------------------------------------
 if grep -q 'docker_wait_seconds=' "${script}" &&
    grep -q 'wait_for_docker()' "${script}" &&
+   grep -q 'deploy_containerlab()' "${script}" &&
+   grep -q 'run_containerlab_deploy_once()' "${script}" &&
+   grep -q 'CLAB_DEPLOY_TIMEOUT_SECONDS' "${script}" &&
+   grep -q 'CLAB_DEPLOY_IDLE_TIMEOUT_SECONDS' "${script}" &&
+   grep -q 'CLAB_CONTAINERLAB_API_TIMEOUT' "${script}" &&
+   grep -q 'CLAB_DEPLOY_MAX_WORKERS' "${script}" &&
+   grep -q -- '--timeout "${containerlab_api_timeout}"' "${script}" &&
+   grep -q -- '--max-workers "${deploy_max_workers}"' "${script}" &&
+   grep -q 'stop_containerlab_deploy()' "${script}" &&
+   grep -q 'Containerlab deploy emitted ERRO; stopping attempt' "${script}" &&
+   grep -q 'Containerlab deploy produced no output' "${script}" &&
+   grep -q 'CLAB_SYSTEMCTL_TIMEOUT_SECONDS' "${script}" &&
+   grep -q 'CLAB_DOCKER_INFO_TIMEOUT_SECONDS' "${script}" &&
+   grep -q 'failed to Statfs "/proc/0/ns/net"' "${script}" &&
+   grep -q 'failed deploy links.*file exists' "${script}" &&
    grep -q 'systemctl start docker' "${script}" &&
    grep -q 'docker_cmd.* info' "${script}" &&
    grep -q 'docker did not become ready' "${script}" &&
+   grep -q 'CLAB_DEPLOY_ATTEMPTS' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
+   grep -q 'CLAB_DEPLOY_IDLE_TIMEOUT_SECONDS' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
+   grep -q 'CLAB_CONTAINERLAB_API_TIMEOUT' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
+   grep -q 'CLAB_DEPLOY_MAX_WORKERS' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
+   grep -q 'CLAB_VM_VALIDATION_TIMEOUT_SECONDS' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
+   grep -q 'if ! ssh_vm_once "' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
    grep -q 'if ! guard_vm_runtime_log "${validation_log}"; then' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
    grep -q 'if ! run_in_vm_validation "${validation_log}"; then' "${repo_root}/tests/test-vm-examples.sh"; then
   echo "PASS test1: VM runner Docker readiness"
@@ -207,7 +228,10 @@ if grep -q 'if ! run_in_vm_validation "${validation_log}"; then' "${repo_root}/t
    grep -q 'check_runtime_target_tenant_dataplane' "${repo_root}/tests/test-vm-examples.sh" &&
    grep -q 'ip route get 8.8.8.8 from ${source4} iif ${tenant_if}' "${repo_root}/tests/lib/vm-runtime-targets.sh" &&
    grep -q 'return 1' "${repo_root}/tests/test-vm-examples.sh" &&
-   grep -q 'FATAL VM-backed Containerlab validation emitted runtime errors' "${repo_root}/tests/lib/vm-runtime-log-guard.sh"; then
+   grep -q 'FATAL VM-backed Containerlab validation emitted runtime errors' "${repo_root}/tests/lib/vm-runtime-log-guard.sh" &&
+   grep -q 'test-vm-examples.sh)' "${repo_root}/run-all-tests.sh" &&
+   grep -q 'NETWORK_REPO_RUNTIME_TEST_OK' "${repo_root}/run-all-tests.sh" &&
+   grep -q 'VM-backed example matrix; explicit runtime opt-in' "${repo_root}/run-all-tests.sh"; then
   echo "PASS test12: VM example runtime validation fail-closes"
 else
   echo "FAIL test12: VM example runtime validation can be masked" >&2

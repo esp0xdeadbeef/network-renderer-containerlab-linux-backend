@@ -76,6 +76,11 @@ let
         cpm_json="${cpmJsonPath}"
         renderer_inventory_json="${rendererInventoryJsonPath}"
         deployment_host="${deploymentHost}"
+        deploy_timeout_seconds="''${CLAB_DEPLOY_TIMEOUT_SECONDS:-900}"
+        deploy_idle_timeout_seconds="''${CLAB_DEPLOY_IDLE_TIMEOUT_SECONDS:-180}"
+        cleanup_timeout_seconds="''${CLAB_CLEANUP_TIMEOUT_SECONDS:-120}"
+        deploy_max_workers="''${CLAB_DEPLOY_MAX_WORKERS:-1}"
+        containerlab_api_timeout="''${CLAB_CONTAINERLAB_API_TIMEOUT:-10m}"
 
         write_status() {
           local result="$1"
@@ -307,6 +312,110 @@ let
         ENSURE_CLAB_TOOLING
         chmod +x "$work_dir/ensure-clab-tooling-image.sh"
 
+        cat > "$work_dir/deploy-containerlab-on-host.sh" <<'DEPLOY_CLAB_HOST'
+        set -euo pipefail
+
+        topology_file="''${CLAB_HOST_TOPOLOGY:?missing CLAB_HOST_TOPOLOGY}"
+        deploy_log="''${CLAB_HOST_DEPLOY_LOG:?missing CLAB_HOST_DEPLOY_LOG}"
+        deploy_timeout_seconds="''${CLAB_DEPLOY_TIMEOUT_SECONDS:-900}"
+        deploy_idle_timeout_seconds="''${CLAB_DEPLOY_IDLE_TIMEOUT_SECONDS:-180}"
+        deploy_max_workers="''${CLAB_DEPLOY_MAX_WORKERS:-1}"
+        containerlab_api_timeout="''${CLAB_CONTAINERLAB_API_TIMEOUT:-10m}"
+
+        stop_containerlab_deploy() {
+          local deploy_pid="$1"
+          if ! kill -- "-''${deploy_pid}" &>/dev/null; then
+            if ! kill "''${deploy_pid}" &>/dev/null; then
+              :
+            fi
+          fi
+          sleep 1
+          if ! kill -KILL -- "-''${deploy_pid}" &>/dev/null; then
+            if ! kill -KILL "''${deploy_pid}" &>/dev/null; then
+              :
+            fi
+          fi
+        }
+
+        run_containerlab_deploy_once() {
+          local deploy_pipe
+          local deploy_fd
+          local deploy_pid
+          local line
+          local rc
+          local saw_erro=0
+          local saw_idle_timeout=0
+          local message
+
+          : > "$deploy_log"
+          deploy_pipe="$(mktemp -u "''${TMPDIR:-/tmp}/s-router-clab-deploy.XXXXXX.pipe")"
+          mkfifo "$deploy_pipe"
+          if command -v setsid >/dev/null 2>&1; then
+            setsid timeout --foreground "$deploy_timeout_seconds" \
+              containerlab deploy -t "$topology_file" -d --reconfigure --timeout "$containerlab_api_timeout" --max-workers "$deploy_max_workers" \
+              >"$deploy_pipe" 2>&1 &
+          else
+            timeout --foreground "$deploy_timeout_seconds" \
+              containerlab deploy -t "$topology_file" -d --reconfigure --timeout "$containerlab_api_timeout" --max-workers "$deploy_max_workers" \
+              >"$deploy_pipe" 2>&1 &
+          fi
+          deploy_pid="$!"
+          exec {deploy_fd}<"$deploy_pipe"
+
+          while true; do
+            if ! IFS= read -r -t "$deploy_idle_timeout_seconds" line <&''${deploy_fd}; then
+              if kill -0 "$deploy_pid" >/dev/null 2>&1; then
+                saw_idle_timeout=1
+                message="containerlab deploy produced no output for ''${deploy_idle_timeout_seconds}s; refusing readiness marker"
+                printf '%s\n' "$message" >&2
+                printf '%s\n' "$message" >>"$deploy_log"
+                stop_containerlab_deploy "$deploy_pid"
+              fi
+              break
+            fi
+            printf '%s\n' "$line"
+            printf '%s\n' "$line" >>"$deploy_log"
+            if [[ "$line" =~ (^|[[:space:]])ERRO([[:space:]]|$) ]]; then
+              saw_erro=1
+              printf 'containerlab deploy emitted ERRO lines; refusing readiness marker\n' >&2
+              stop_containerlab_deploy "$deploy_pid"
+              break
+            fi
+          done
+
+          exec {deploy_fd}<&-
+          wait "$deploy_pid"
+          rc="$?"
+          rm -f "$deploy_pipe"
+
+          if ((saw_erro == 1)); then
+            return 66
+          elif ((saw_idle_timeout == 1)); then
+            return 67
+          fi
+          return "$rc"
+        }
+
+        set +e
+        run_containerlab_deploy_once
+        deploy_rc="$?"
+        set -e
+
+        if ((deploy_rc == 66)); then
+          exit 1
+        elif ((deploy_rc == 67)); then
+          exit 1
+        elif ((deploy_rc != 0)); then
+          exit "$deploy_rc"
+        fi
+
+        if grep -Eq '(^|[[:space:]])ERRO([[:space:]]|$)' "$deploy_log"; then
+          echo 'containerlab deploy emitted ERRO lines; refusing readiness marker' >&2
+          exit 1
+        fi
+        DEPLOY_CLAB_HOST
+        chmod +x "$work_dir/deploy-containerlab-on-host.sh"
+
         phase="containerlab-deploy"
         flock /run/s-router-clab-render-live.lock bash -c "
           set -euo pipefail
@@ -315,10 +424,17 @@ let
           rm -rf /etc/network-artifacts
           ln -s '$artifact_dir' /etc/network-artifacts
           bash '$work_dir/ensure-clab-tooling-image.sh'
-          containerlab destroy --all --cleanup --yes || true
+          timeout --foreground '$cleanup_timeout_seconds' containerlab destroy --all --cleanup --yes || true
           docker ps -aq --filter 'name=^clab-fabric-' | xargs -r docker rm -f
           bash '$work_dir/setup-bridge-links.sh'
-          containerlab deploy -t '$work_dir/fabric.clab.yml' -d --reconfigure
+          deploy_log='$work_dir/containerlab-deploy.log'
+          CLAB_HOST_TOPOLOGY='$work_dir/fabric.clab.yml' \
+            CLAB_HOST_DEPLOY_LOG=\"\$deploy_log\" \
+            CLAB_DEPLOY_TIMEOUT_SECONDS='$deploy_timeout_seconds' \
+            CLAB_DEPLOY_IDLE_TIMEOUT_SECONDS='$deploy_idle_timeout_seconds' \
+            CLAB_DEPLOY_MAX_WORKERS='$deploy_max_workers' \
+            CLAB_CONTAINERLAB_API_TIMEOUT='$containerlab_api_timeout' \
+            bash '$work_dir/deploy-containerlab-on-host.sh'
           bash '$work_dir/setup-bridge-links.sh'
           bash '$work_dir/retry-wan-dhcp.sh'
           bash '$work_dir/verify-containerlab-deploy.sh' '$work_dir/fabric.clab.yml'
