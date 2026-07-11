@@ -46,14 +46,25 @@ stage_rendered_topology() {
 
 run_in_vm_validation() {
   local validation_log="$1"
+  local validation_timeout_seconds="${CLAB_VM_VALIDATION_TIMEOUT_SECONDS:-2100}"
 
   log "running run-in-vm.sh inside the VM"
   stage_tooling_cache_into_vm
-  if ! ssh_vm "
+  if ! ssh_vm_once "
     set -euo pipefail
     cd '${repo_root}'
-    timeout 900 env \
+    timeout '${validation_timeout_seconds}' env \
       CLAB_TOPO_FILE='${vm_remote_topology_file}' \
+      CLAB_DOCKER_WAIT_SECONDS='${CLAB_DOCKER_WAIT_SECONDS:-120}' \
+      CLAB_DOCKER_INFO_TIMEOUT_SECONDS='${CLAB_DOCKER_INFO_TIMEOUT_SECONDS:-10}' \
+      CLAB_SYSTEMCTL_TIMEOUT_SECONDS='${CLAB_SYSTEMCTL_TIMEOUT_SECONDS:-60}' \
+      CLAB_CLEANUP_TIMEOUT_SECONDS='${CLAB_CLEANUP_TIMEOUT_SECONDS:-120}' \
+      CLAB_DEPLOY_TIMEOUT_SECONDS='${CLAB_DEPLOY_TIMEOUT_SECONDS:-900}' \
+      CLAB_DEPLOY_IDLE_TIMEOUT_SECONDS='${CLAB_DEPLOY_IDLE_TIMEOUT_SECONDS:-180}' \
+      CLAB_DEPLOY_ATTEMPTS='${CLAB_DEPLOY_ATTEMPTS:-3}' \
+      CLAB_DEPLOY_RETRY_DELAY_SECONDS='${CLAB_DEPLOY_RETRY_DELAY_SECONDS:-5}' \
+      CLAB_DEPLOY_MAX_WORKERS='${CLAB_DEPLOY_MAX_WORKERS:-1}' \
+      CLAB_CONTAINERLAB_API_TIMEOUT='${CLAB_CONTAINERLAB_API_TIMEOUT:-10m}' \
       CLAB_FRR_TOOLING_CACHE_TAR='${vm_image_cache_tar}' \
       CLAB_FRR_TOOLING_CACHE_IMAGE_ID_FILE='${vm_image_cache_id}' \
       ./run-in-vm.sh

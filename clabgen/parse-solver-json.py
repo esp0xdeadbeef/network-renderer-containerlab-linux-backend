@@ -9,6 +9,10 @@ import yaml
 
 from clabgen.provenance import build_provenance
 from clabgen.provenance_fields import renderer_source_identity
+from clabgen.s88.site.node_runtime import (
+    collect_selector_relation_audit_sidecar,
+    selector_relation_audit_sidecar_path,
+)
 from clabgen.solver import load_solver
 from clabgen.s88.enterprise.enterprise import Enterprise
 
@@ -33,17 +37,15 @@ def _load_renderer_inventory_for_input(input_path: Path) -> Dict[str, Any]:
     env_path = os.environ.get("CLABGEN_RENDERER_INVENTORY_JSON", "").strip()
     if env_path:
         p = Path(env_path)
-        try:
-            data = json.loads(p.read_text())
-            return _with_env_target_host(data if isinstance(data, dict) else {})
-        except Exception:
-            return {}
+        data = json.loads(p.read_text())
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"CLABGEN_RENDERER_INVENTORY_JSON must contain a JSON object: {p}"
+            )
+        return _with_env_target_host(data)
 
-    try:
-        raw = input_path.read_text()
-        parsed = json.loads(raw)
-    except Exception:
-        return {}
+    raw = input_path.read_text()
+    parsed = json.loads(raw)
 
     if not isinstance(parsed, dict):
         return {}
@@ -110,13 +112,17 @@ def write_outputs(
     renderer_inventory = _load_renderer_inventory_for_input(solver_json)
     merged = render_topology(solver_json, renderer_inventory=renderer_inventory)
 
-    topo_yaml = yaml.safe_dump(
-        {
-            "name": merged["name"],
-            "topology": merged["topology"],
-        },
-        sort_keys=False,
+    topology_doc = {
+        "name": merged["name"],
+        "topology": merged["topology"],
+    }
+    selector_audit_out = selector_relation_audit_sidecar_path(topology_out)
+    selector_audit_sidecar = collect_selector_relation_audit_sidecar(
+        topology_doc,
+        sidecar_name=selector_audit_out.name,
     )
+
+    topo_yaml = yaml.safe_dump(topology_doc, sort_keys=False)
 
     repo_root = Path(__file__).resolve().parents[1]
 
@@ -135,6 +141,12 @@ def write_outputs(
     comment = _render_meta_comment(provenance)
 
     topology_out.write_text(f"{comment}\n# fabric.clab.yml\n{topo_yaml}")
+    if selector_audit_sidecar:
+        selector_audit_out.write_text(
+            json.dumps(selector_audit_sidecar, indent=2, sort_keys=True) + "\n"
+        )
+    elif selector_audit_out.exists():
+        selector_audit_out.unlink()
 
     bridges = list(merged.get("bridges", []))
     bridge_networks = dict(merged.get("bridge_networks", {}) or {})

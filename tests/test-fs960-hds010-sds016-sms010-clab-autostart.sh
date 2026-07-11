@@ -729,6 +729,29 @@ else
 fi
 
 # ===========================================================================
+# Test 11: Host autostart deploy is bounded, deterministic, and fail-closed.
+# ===========================================================================
+host_module="${repo_root}/host-module.nix"
+if grep -q 'CLAB_DEPLOY_MAX_WORKERS' "${host_module}" &&
+   grep -q 'CLAB_DEPLOY_TIMEOUT_SECONDS' "${host_module}" &&
+   grep -q 'CLAB_DEPLOY_IDLE_TIMEOUT_SECONDS' "${host_module}" &&
+   grep -q 'CLAB_CONTAINERLAB_API_TIMEOUT' "${host_module}" &&
+   grep -q 'CLAB_CLEANUP_TIMEOUT_SECONDS' "${host_module}" &&
+   grep -q 'deploy_max_workers=' "${host_module}" &&
+   grep -q 'deploy_idle_timeout_seconds=' "${host_module}" &&
+   grep -q 'containerlab_api_timeout=' "${host_module}" &&
+   grep -q 'stop_containerlab_deploy()' "${host_module}" &&
+   grep -q -- '--timeout "$containerlab_api_timeout"' "${host_module}" &&
+   grep -q -- '--max-workers' "${host_module}" &&
+   grep -q 'containerlab deploy produced no output' "${host_module}" &&
+   grep -q 'containerlab deploy emitted ERRO lines; refusing readiness marker' "${host_module}"; then
+  echo "PASS test11: host autostart deploy is bounded and refuses ERRO readiness"
+else
+  echo "FAIL test11: host autostart deploy can race or accept Containerlab ERRO output" >&2
+  failures=$((failures + 1))
+fi
+
+# ===========================================================================
 # Summary
 # ===========================================================================
 if (( failures > 0 )); then
@@ -736,4 +759,4 @@ if (( failures > 0 )); then
   exit 1
 fi
 
-echo "PASS FS-960-HDS-010-SDS-016-SMS-010: all 11 acceptance predicates covered (locked-source, readiness marker, container state, 6 seeded negatives)"
+echo "PASS FS-960-HDS-010-SDS-016-SMS-010: all 12 acceptance predicates covered (locked-source, readiness marker, container state, 7 seeded negatives)"

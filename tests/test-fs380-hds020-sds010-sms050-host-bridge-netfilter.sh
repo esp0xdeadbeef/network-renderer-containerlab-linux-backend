@@ -30,7 +30,15 @@ if missing:
 
 sysctl_pos = content.find("net.bridge.bridge-nf-call-iptables")
 setup_pos = content.find("bash '$work_dir/setup-bridge-links.sh'")
-deploy_pos = content.find("containerlab deploy -t '$work_dir/fabric.clab.yml'")
+if (
+    'CLAB_HOST_TOPOLOGY=\'$work_dir/fabric.clab.yml\'' not in content
+    or 'containerlab deploy -t "$topology_file"' not in content
+):
+    raise SystemExit(
+        "FAIL FS-380 host bridge netfilter: host deploy script must consume "
+        "the staged fabric.clab.yml topology"
+    )
+deploy_pos = content.find("bash '$work_dir/deploy-containerlab-on-host.sh'")
 post_setup_pos = content.find("bash '$work_dir/setup-bridge-links.sh'", deploy_pos)
 retry_pos = content.find("bash '$work_dir/retry-wan-dhcp.sh'", deploy_pos)
 verify_pos = content.find("bash '$work_dir/verify-containerlab-deploy.sh'", deploy_pos)

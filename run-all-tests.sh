@@ -43,14 +43,16 @@ mapfile -d '' tests < <(
   find "${repo_root}/tests" -maxdepth 1 -type f -name 'test-*.sh' -print0 | sort -z
 )
 
-# Runtime tests require Docker and live container orchestration; they are
-# gated behind NETWORK_REPO_RUNTIME_TEST_OK=1 to avoid false failures in
-# environments without Docker (e.g., Nix-based test runners, CI without
-# Docker socket).  This matches the gating in tests/test.sh.
+# Runtime tests require Docker, VM boot, or live container orchestration; they
+# are gated behind NETWORK_REPO_RUNTIME_TEST_OK=1 to keep the default runner at
+# the construction-test boundary used by the HAT preflight. Runtime rows remain
+# runnable through the explicit opt-in path and must not be promoted to HAT OK
+# by a construction sweep.
 if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" != "1" ]]; then
   filtered=()
   for t in "${tests[@]}"; do
     case "$(basename "${t}")" in
+      test-vm-examples.sh) ;;  # VM-backed example matrix; explicit runtime opt-in
       test-fs800-hds030-sds010-sms010-pppoe-runtime.sh) ;;  # requires Docker + /dev/ppp
       *) filtered+=("${t}") ;;
     esac

@@ -26,22 +26,6 @@ def _interface_name_map(
 ) -> Dict[str, str]:
     result: Dict[str, str] = {}
     interfaces = _dict(node_data.get("interfaces"))
-    # Diagnostic: check if any WAN-kind egress interfaces are present.
-    # CPM emits kind="wan" for uplink/egress interfaces; the name
-    # "core-uplink-egress" is a specific synthetic instance, not the kind.
-    has_egress = any(
-        isinstance(iface, dict) and iface.get("kind") == "wan"
-        for iface in interfaces.values()
-    )
-    if not has_egress:
-        import sys
-        node_name = node_data.get("name", node_data.get("nodeName", "unknown"))
-        all_runtime_names = [
-            iface.get("runtimeIfName") if isinstance(iface, dict) else None
-            for iface in interfaces.values()
-        ]
-        print(f"DIAGNOSTIC: node={node_name!r} has core-uplink-egress? {has_egress}", file=sys.stderr)
-        print(f"DIAGNOSTIC: node={node_name!r} interface runtimeNames: {[r for r in all_runtime_names if r]}", file=sys.stderr)
     for logical_name, iface in interfaces.items():
         if not isinstance(logical_name, str) or not isinstance(iface, dict):
             continue
