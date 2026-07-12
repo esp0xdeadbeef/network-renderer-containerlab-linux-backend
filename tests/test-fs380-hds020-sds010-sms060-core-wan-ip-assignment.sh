@@ -197,8 +197,60 @@ except ValueError as exc:
 else:
     check("Missing NAT clientAddress fails closed", False)
 
-# ── Predicate 9: Fake-provider DHCP client binding uses explicit lab-emulation data ──
-print("\n=== Predicate 9: Fake-provider WAN binding uses explicit client address ===")
+# ── Predicate 9: Static non-NAT WAN uses generic CPM addressing, not NAT client addressing ──
+print("\n=== Predicate 9: Static non-NAT WAN does not require NAT clientAddress ===")
+static_non_nat_node = {
+    "interfaces": {
+        "wan0": {
+            "kind": "wan",
+            "sourceKind": "wan",
+            "adapterClass": "wan-uplink",
+            "ipv4": {
+                "method": "static",
+                "address": "198.51.100.2/24",
+            },
+            "ipv6": {
+                "method": "static",
+                "address": "2001:db8:51::2/64",
+            },
+            "hostUplink": {
+                "ipv4": {
+                    "method": "static",
+                    "address": "198.51.100.2/24",
+                },
+                "ipv6": {
+                    "method": "static",
+                    "address": "2001:db8:51::2/64",
+                },
+            },
+        }
+    }
+}
+cmds_static_non_nat = render(static_non_nat_node, eth_map_nat)
+check(
+    "Static non-NAT WAN render accepts missing clientAddress",
+    isinstance(cmds_static_non_nat, list),
+)
+check(
+    "Static non-NAT WAN does not emit NAT ip addr replace",
+    not any("ip addr replace 198.51.100." in c for c in cmds_static_non_nat),
+)
+check(
+    "Static non-NAT WAN does not emit DHCP",
+    not any("udhcpc" in c for c in cmds_static_non_nat),
+)
+static_non_nat_addressing_cmds = _render_addressing(static_non_nat_node, eth_map_nat)
+check(
+    "Static non-NAT WAN address comes from generic addressing",
+    any("ip addr replace 198.51.100.2/24 dev ens80" in c for c in static_non_nat_addressing_cmds),
+)
+check(
+    "Static non-NAT WAN IPv6 address comes from generic addressing",
+    any("ip -6 addr replace 2001:db8:51::2/64 dev ens80" in c for c in static_non_nat_addressing_cmds),
+)
+
+# ── Predicate 10: Fake-provider DHCP client binding uses explicit lab-emulation data ──
+print("\n=== Predicate 10: Fake-provider WAN binding uses explicit client address ===")
 fake_provider_node = {
     "labEmulationArtifacts": [
         {
@@ -260,8 +312,8 @@ except ValueError as exc:
 else:
     check("Missing fake-provider clientAddress fails closed", False)
 
-# ── Predicate 10: Missing eth_map entry produces no commands ──
-print("\n=== Predicate 10: Missing eth_map entry produces no commands ===")
+# ── Predicate 11: Missing eth_map entry produces no commands ──
+print("\n=== Predicate 11: Missing eth_map entry produces no commands ===")
 orphan_node = {
     "interfaces": {
         "orphan_wan": {
