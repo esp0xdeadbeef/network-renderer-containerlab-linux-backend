@@ -60,6 +60,7 @@ tests=(
   test-fs540-hds020-sds010-sms010-clab-recursive-dns-requester-fixture.sh
   test-fs520-hds010-sds010-sms040-policy-no-main-defaults.sh
   test-fs500-hds010-sds010-sms040-clab-route-materialization-artifact.sh
+  test-FS-500-HDS-010-SDS-010-SMS-050-clab-bridge-colocation.sh
   test-fs960-hds010-sds016-sms010-clab-autostart.sh
   test-fs960-hds010-sds016-sms020-clab-docker-readiness.sh
   test-fs960-hds010-sds016-sms050-clab-privileged-inspect.sh
