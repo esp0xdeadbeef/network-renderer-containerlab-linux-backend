@@ -178,9 +178,10 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         host_uplink = interface_data["host_uplink"]
         cmds.append(_sh(_slaac_command(interface_name)))
         if isinstance(host_uplink, dict) and host_uplink:
-            # CPM provided hostUplink data — derive mode from ipv4.method/ipv6.method
-            # CPM emits hostUplink with ipv4.method/ipv6.method, not a top-level 'mode'.
+            # CPM provided hostUplink data. Address assignment mode comes from
+            # ipv4.method/ipv6.method; NAT remains an explicit top-level mode.
             # Trace: FS-380-HDS-010-SDS-010-SMS-060 (core WAN IP assignment).
+            uplink_mode = host_uplink.get("mode")
             ipv4_method = (host_uplink.get("ipv4") or {}).get("method")
             ipv6_method = (host_uplink.get("ipv6") or {}).get("method")
             host_mode = ipv4_method or ipv6_method
@@ -194,9 +195,11 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             if fake_provider_commands:
                 for command in fake_provider_commands:
                     cmds.append(_sh(command))
-            elif host_mode == "static":
+            elif host_mode == "static" and uplink_mode == "nat":
                 for command in _nat4_commands(interface_name, host_uplink):
                     cmds.append(_sh(command))
+            elif host_mode == "static":
+                pass
             elif host_mode in ("dhcp", None):
                 cmds.append(_sh(_dhcp4_command(interface_name)))
             else:
