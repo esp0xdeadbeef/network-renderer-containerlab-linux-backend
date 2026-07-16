@@ -98,6 +98,71 @@ def render_topology(
     return rendered
 
 
+def _host_firewall_authority(
+    renderer_inventory: Dict[str, Any],
+) -> Dict[str, Any] | None:
+    """
+    FS-310-HDS-020-SDS-010-SMS-200: VM host-firewall enablement must trace to
+    an explicit renderer inventory decision (`containerlab.hostFirewall`).
+
+    Returns the explicit authority record when present, or None when the
+    inventory is silent. A silent inventory emits no `hostFirewall` attribute
+    into the generated bridges artifact, so the VM module fails closed instead
+    of substituting a disabled-firewall convenience default. A malformed
+    record is rejected here rather than propagated as an implicit decision.
+    """
+
+    containerlab = renderer_inventory.get("containerlab")
+    if not isinstance(containerlab, dict):
+        return None
+    host_firewall = containerlab.get("hostFirewall")
+    if host_firewall is None:
+        return None
+    if not isinstance(host_firewall, dict) or not isinstance(
+        host_firewall.get("enable"), bool
+    ):
+        raise ValueError(
+            "FS-310-HDS-020-SDS-010-SMS-200: renderer inventory "
+            "containerlab.hostFirewall must be an object with a boolean "
+            "'enable' field; refusing to emit an implicit host-firewall "
+            "decision"
+        )
+    return host_firewall
+
+
+def _render_bridges_body(
+    bridges: list,
+    bridge_networks: Dict[str, Any],
+    lab_emulation_artifacts: list,
+    host_firewall: Dict[str, Any] | None,
+) -> str:
+    host_firewall_block = ""
+    if host_firewall is not None:
+        host_firewall_block = (
+            "  hostFirewall = builtins.fromJSON ''\n"
+            + json.dumps(host_firewall, sort_keys=True)
+            + "\n"
+            "  '';\n"
+        )
+
+    return (
+        "{ lib, ... }:\n"
+        "{\n"
+        "  bridges = [\n" + "\n".join(f'    "{b}"' for b in bridges) + "\n"
+        "  ];\n"
+        "  labEmulationArtifacts = builtins.fromJSON ''\n"
+        + json.dumps(lab_emulation_artifacts, sort_keys=True)
+        + "\n"
+        "  '';\n"
+        "  bridgeNetworks = builtins.fromJSON ''\n"
+        + json.dumps(bridge_networks, sort_keys=True)
+        + "\n"
+        "  '';\n"
+        + host_firewall_block
+        + "}\n"
+    )
+
+
 def write_outputs(
     solver_json: str | Path,
     topology_out: str | Path,
@@ -151,21 +216,13 @@ def write_outputs(
     bridges = list(merged.get("bridges", []))
     bridge_networks = dict(merged.get("bridge_networks", {}) or {})
     lab_emulation_artifacts = list(merged.get("lab_emulation_artifacts", []) or [])
+    host_firewall = _host_firewall_authority(renderer_inventory)
 
-    bridges_body = (
-        "{ lib, ... }:\n"
-        "{\n"
-        "  bridges = [\n" + "\n".join(f'    "{b}"' for b in bridges) + "\n"
-        "  ];\n"
-        "  labEmulationArtifacts = builtins.fromJSON ''\n"
-        + json.dumps(lab_emulation_artifacts, sort_keys=True)
-        + "\n"
-        "  '';\n"
-        "  bridgeNetworks = builtins.fromJSON ''\n"
-        + json.dumps(bridge_networks, sort_keys=True)
-        + "\n"
-        "  '';\n"
-        "}\n"
+    bridges_body = _render_bridges_body(
+        bridges,
+        bridge_networks,
+        lab_emulation_artifacts,
+        host_firewall,
     )
 
     bridges_out.write_text(bridges_body)

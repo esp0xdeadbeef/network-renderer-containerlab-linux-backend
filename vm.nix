@@ -16,6 +16,10 @@ let
 
   generated = import generatedBridgesFile { inherit lib; };
   vmNetwork = import ./vm-network.nix { inherit lib generated; };
+  # FS-310-HDS-020-SDS-010-SMS-200: host-firewall enablement traces to explicit
+  # renderer inventory authority (containerlab.hostFirewall) carried in the
+  # generated bridges artifact; fails closed when the source is silent.
+  hostFirewallEnable = import ./vm-host-firewall.nix { inherit generated; };
   natBridgeNames = vmNetwork.natBridgeNames or [ ];
   natBridgeSet = "{ " + lib.concatMapStringsSep ", " (name: ''"${name}"'') natBridgeNames + " }";
   vmMemorySize =
@@ -61,7 +65,7 @@ in
     // vmNetwork.vlanAttachmentNetworks;
 
   virtualisation.docker.enable = true;
-  networking.firewall.enable = false;
+  networking.firewall.enable = hostFirewallEnable;
 
   environment.systemPackages = with pkgs; [
     containerlab

@@ -17,4 +17,10 @@
     "br-e035268ceff9"
     "br-ee5b4e0a0df0"
   ];
+  # FS-310-HDS-020-SDS-010-SMS-200: hostFirewall is only present when the
+  # renderer inventory carries an explicit containerlab.hostFirewall decision.
+  # Without it, vm.nix fails closed instead of defaulting the host firewall off.
+  hostFirewall = builtins.fromJSON ''
+    {"enable": false, "source": "renderer-inventory:containerlab.hostFirewall"}
+  '';
 }
