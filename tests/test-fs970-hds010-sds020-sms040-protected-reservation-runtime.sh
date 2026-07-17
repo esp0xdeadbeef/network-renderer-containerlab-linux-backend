@@ -86,6 +86,7 @@ text = "\n".join(rendered["exec"])
 
 assert rendered["binds"] == [f"{source_file}:{source_file}:ro"]
 for required in (
+    "install -d -m 0700 /run/kea /var/lib/kea",
     "clab-protected-reservation-materializer --family ipv4",
     "clab-protected-reservation-materializer --family ipv6",
     "kea-dhcp4 -d -c /run/kea/eth1-dhcp4.json",

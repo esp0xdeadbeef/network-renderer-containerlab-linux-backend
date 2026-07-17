@@ -318,7 +318,10 @@ def _kea_command(
             "{ echo 'missing protected reservation materializer' >&2; exit 1; }",
             f"test -r {shlex.quote(source_file)} || "
             "{ echo 'protected reservation source unavailable' >&2; exit 1; }",
-            "install -d -m 0700 /run/kea",
+            # Kea DHCPv6 creates its server identifier below /var/lib/kea even
+            # when the lease database itself is runtime-local. Containerlab's
+            # minimal image does not create that directory for us.
+            "install -d -m 0700 /run/kea /var/lib/kea",
             f"cat > {template_path} <<'EOF'",
             template,
             "EOF",
