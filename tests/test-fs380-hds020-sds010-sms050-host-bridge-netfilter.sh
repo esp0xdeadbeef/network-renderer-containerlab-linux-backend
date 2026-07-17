@@ -41,12 +41,24 @@ if (
 deploy_pos = content.find("bash '$work_dir/deploy-containerlab-on-host.sh'")
 post_setup_pos = content.find("bash '$work_dir/setup-bridge-links.sh'", deploy_pos)
 retry_pos = content.find("bash '$work_dir/retry-wan-dhcp.sh'", deploy_pos)
+reconcile_pos = content.find(
+    "bash '$work_dir/reconcile-access-advertisements.sh'", deploy_pos
+)
 verify_pos = content.find("bash '$work_dir/verify-containerlab-deploy.sh'", deploy_pos)
-if not (0 <= sysctl_pos < setup_pos < deploy_pos < post_setup_pos < retry_pos < verify_pos):
+if not (
+    0
+    <= sysctl_pos
+    < setup_pos
+    < deploy_pos
+    < post_setup_pos
+    < retry_pos
+    < reconcile_pos
+    < verify_pos
+):
     raise SystemExit(
         "FAIL FS-380 host bridge netfilter: bridge-netfilter sysctl must be "
         "generated into setup-bridge-links.sh, setup must run before and after "
-        "deploy, and WAN DHCP retry must run before verification"
+        "deploy, and post-deploy reconciliation must run before verification"
     )
 
 print("PASS FS-380 host bridge netfilter guard")

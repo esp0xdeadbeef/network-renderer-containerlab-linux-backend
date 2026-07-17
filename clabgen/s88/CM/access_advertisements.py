@@ -289,6 +289,47 @@ def _kea_template(
     }
 
 
+def _kea_reconcile_script(
+    ifname: str,
+    family: str,
+    daemon: str,
+    config_path: str,
+    pid_path: str,
+    log_path: str,
+) -> str:
+    address_family = "-4" if family == "ipv4" else "-6"
+    socket_port = "67" if family == "ipv4" else "547"
+    quoted_ifname = shlex.quote(ifname)
+    return "\n".join(
+        [
+            "#!/bin/sh",
+            "set -eu",
+            "kea_interface_attempt=0",
+            f"until ip link show up dev {quoted_ifname} >/dev/null 2>&1 && "
+            f"ip {address_family} -o address show dev {quoted_ifname} "
+            "scope global | grep -q .; do",
+            "  kea_interface_attempt=$((kea_interface_attempt + 1))",
+            "  test \"${kea_interface_attempt}\" -lt 60 || "
+            f"{{ echo '{daemon} interface did not become ready' >&2; exit 1; }}",
+            "  sleep 1",
+            "done",
+            f"test ! -s {pid_path} || kill $(cat {pid_path}) 2>/dev/null || true",
+            "sleep 1",
+            f"{daemon} -d -c {config_path} >{log_path} 2>&1 &",
+            f"echo $! > {pid_path}",
+            "kea_socket_attempt=0",
+            f"until kill -0 $(cat {pid_path}) 2>/dev/null && "
+            f"ss -H -lun {shlex.quote(f'sport = :{socket_port}')} | grep -q .; do",
+            "  kea_socket_attempt=$((kea_socket_attempt + 1))",
+            "  test \"${kea_socket_attempt}\" -lt 30 || "
+            f"{{ echo '{daemon} did not open its service socket' >&2; exit 1; }}",
+            "  sleep 1",
+            "done",
+            "",
+        ]
+    )
+
+
 def _kea_command(
     scope: Dict[str, Any], ifname: str, family: str, source_file: str
 ) -> str:
@@ -297,6 +338,7 @@ def _kea_command(
     config_path = f"/run/kea/{ifname}-dhcp{suffix}.json"
     pid_path = f"/run/kea/{ifname}-dhcp{suffix}.pid"
     log_path = f"/run/kea/{ifname}-dhcp{suffix}.log"
+    reconcile_path = f"/run/kea/reconcile-{ifname}-dhcp{suffix}.sh"
     template = json.dumps(
         _kea_template(scope, ifname, family), sort_keys=True, separators=(",", ":")
     )
@@ -319,9 +361,14 @@ def _kea_command(
     ]
     materialize = " ".join(shlex.quote(value) for value in materializer_args)
     daemon = f"kea-dhcp{suffix}"
-    address_family = "-4" if family == "ipv4" else "-6"
-    socket_port = "67" if family == "ipv4" else "547"
-    quoted_ifname = shlex.quote(ifname)
+    reconcile = _kea_reconcile_script(
+        ifname,
+        family,
+        daemon,
+        config_path,
+        pid_path,
+        log_path,
+    )
     return "\n".join(
         [
             f"command -v {daemon} >/dev/null || {{ echo 'missing {daemon}' >&2; exit 1; }}",
@@ -334,33 +381,17 @@ def _kea_command(
             # when the lease database itself is runtime-local. Containerlab's
             # minimal image does not create that directory for us.
             "install -d -m 0700 /run/kea /var/lib/kea",
-            # Containerlab may execute independent init bundles concurrently.
-            # Do not let Kea permanently exhaust its socket-open attempt before
-            # the modeled tenant link and its family address have materialized.
-            "kea_interface_attempt=0",
-            f"until ip link show up dev {quoted_ifname} >/dev/null 2>&1 && "
-            f"ip {address_family} -o address show dev {quoted_ifname} "
-            "scope global | grep -q .; do",
-            "  kea_interface_attempt=$((kea_interface_attempt + 1))",
-            "  test \"${kea_interface_attempt}\" -lt 60 || "
-            f"{{ echo '{daemon} interface did not become ready' >&2; exit 1; }}",
-            "  sleep 1",
-            "done",
             f"cat > {template_path} <<'EOF'",
             template,
             "EOF",
             materialize,
-            f"test ! -s {pid_path} || kill $(cat {pid_path}) 2>/dev/null || true",
-            f"{daemon} -d -c {config_path} >{log_path} 2>&1 &",
-            f"echo $! > {pid_path}",
-            "kea_socket_attempt=0",
-            f"until kill -0 $(cat {pid_path}) 2>/dev/null && "
-            f"ss -H -lun {shlex.quote(f'sport = :{socket_port}')} | grep -q .; do",
-            "  kea_socket_attempt=$((kea_socket_attempt + 1))",
-            "  test \"${kea_socket_attempt}\" -lt 30 || "
-            f"{{ echo '{daemon} did not open its service socket' >&2; exit 1; }}",
-            "  sleep 1",
-            "done",
+            # Kea sockets are bound to an interface instance. Containerlab may
+            # replace that instance after node-init, so startup is reconciled by
+            # the host deployer only after `containerlab deploy` has completed.
+            f"cat > {reconcile_path} <<'EOF'",
+            reconcile,
+            "EOF",
+            f"chmod 0700 {reconcile_path}",
         ]
     )
 

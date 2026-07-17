@@ -299,6 +299,42 @@ let
         EOF
         RETRY_WAN_DHCP
 
+        cat > "$work_dir/reconcile-access-advertisements.sh" <<'RECONCILE_ACCESS_ADVERTISEMENTS'
+        set -euo pipefail
+
+        containers="$(
+          docker ps \
+            --filter 'label=clab.access-advertisements.runtime=kea' \
+            --format '{{.Names}}' | sort
+        )"
+        test -n "$containers" || exit 0
+
+        while IFS= read -r container; do
+          test -n "$container" || continue
+          scripts="$(
+            docker exec "$container" find /run/kea -maxdepth 1 -type f \
+              -name 'reconcile-*-dhcp[46].sh' -print | sort
+          )"
+          test -n "$scripts" || {
+            echo "container $container advertises Kea reconciliation without runtime scripts" >&2
+            exit 1
+          }
+          while IFS= read -r script; do
+            test -n "$script" || continue
+            docker exec "$container" sh -eu "$script" || {
+              echo "container $container failed post-deploy Kea reconciliation" >&2
+              exit 1
+            }
+          done <<EOF
+        $scripts
+        EOF
+          echo "reconciled post-deploy Kea services in $container"
+        done <<EOF
+        $containers
+        EOF
+        RECONCILE_ACCESS_ADVERTISEMENTS
+        chmod +x "$work_dir/reconcile-access-advertisements.sh"
+
         cat > "$work_dir/ensure-clab-tooling-image.sh" <<'ENSURE_CLAB_TOOLING'
         set -euo pipefail
 
@@ -437,6 +473,7 @@ let
             bash '$work_dir/deploy-containerlab-on-host.sh'
           bash '$work_dir/setup-bridge-links.sh'
           bash '$work_dir/retry-wan-dhcp.sh'
+          bash '$work_dir/reconcile-access-advertisements.sh'
           bash '$work_dir/verify-containerlab-deploy.sh' '$work_dir/fabric.clab.yml'
         "
         phase="complete"
