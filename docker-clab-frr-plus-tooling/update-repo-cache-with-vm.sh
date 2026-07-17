@@ -107,7 +107,8 @@ printf '[clab-cache] refreshing repository Docker image cache at %s\n' "${cache_
     cat <<'REMOTE_CACHE_UPDATE'
 cd "${repo_root}"
 dockerfile="docker-clab-frr-plus-tooling/Dockerfile"
-hash="$(sha256sum "${dockerfile}" | awk '{print $1}')"
+materializer="docker-clab-frr-plus-tooling/protected-reservation-materializer.py"
+hash="$(sha256sum "${dockerfile}" "${materializer}" | sha256sum | awk '{print $1}')"
 cache_tar="${cache_dir}/clab-frr-plus-tooling-${hash}.tar"
 cache_id="${cache_tar}.image-id"
 
@@ -125,7 +126,7 @@ test -s "${cache_tar}"
 test -s "${cache_id}"
 
 docker run --rm --entrypoint /bin/sh clab-frr-plus-tooling:latest -ec '
-    for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd vtysh python3; do
+    for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do
         command -v "$cmd" >/dev/null || exit 1
     done
     grep -q "^bgpd=yes" /etc/frr/daemons

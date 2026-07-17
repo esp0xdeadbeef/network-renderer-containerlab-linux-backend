@@ -7,6 +7,7 @@ import shlex
 from typing import Dict, Any, List
 
 from clabgen.models import NodeModel
+from clabgen.s88.CM.access_advertisements import protected_reservation_source
 from clabgen.s88.EM.base import render as render_em
 
 EXEC_BUNDLE_SIZE = 100
@@ -157,6 +158,24 @@ def build_node_data(
     return node_data
 
 
+def _protected_reservation_binds(node: NodeModel) -> List[str]:
+    advertisements = node.advertisements
+    if not isinstance(advertisements, dict):
+        return []
+    source_files: set[str] = set()
+    for advertisement_name, family in (("dhcp4", "ipv4"), ("dhcpv6", "ipv6")):
+        scopes = advertisements.get(advertisement_name, [])
+        if not isinstance(scopes, list):
+            continue
+        for scope in scopes:
+            if not isinstance(scope, dict) or scope.get("enabled") is not True:
+                continue
+            source_file = protected_reservation_source(scope, family)
+            if source_file is not None:
+                source_files.add(source_file)
+    return [f"{path}:{path}:ro" for path in sorted(source_files)]
+
+
 def _selector_relation_audit(
     node: NodeModel, eth_map: Dict[str, str]
 ) -> Dict[str, List[Dict[str, Any]]]:
@@ -277,6 +296,9 @@ def render_linux_node(
         "cmd": "/bin/sh -c 'sleep infinity'",
         "exec": bundled_exec_cmds,
     }
+    protected_binds = _protected_reservation_binds(node)
+    if protected_binds:
+        rendered["binds"] = protected_binds
     if selector_relation_audit:
         rendered[INTERNAL_SELECTOR_RELATION_AUDIT_KEY] = selector_relation_audit
     return rendered

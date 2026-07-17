@@ -1,3 +1,3 @@
 # Regression Log
 
-No unresolved regression entries.
+- state=solved | target=FS-970-HDS-010-SDS-020-SMS-040 protected dual-stack reservation materialization on CLAB | evidence=`tests/test-fs970-hds010-sds020-sms040-protected-reservation-runtime.sh` proves one deduplicated read-only `/run/secrets/` bind, runtime-only IPv4/IPv6 Kea materialization, managed non-autonomous RA, stable-IID validation, redacted failure diagnostics, and absence of protected client records from topology output; Kea 3.0.3 accepts both generated configurations | reason=the CLAB renderer now consumes the same opaque CPM protected-source contract as the NixOS renderer and fails closed before deployment for an unsupported schema, family, source path, or public reservation conflict.
