@@ -53,6 +53,7 @@ tests=(
   test-fs760-hds010-sds010-sms010-policy-firewall-forwarding.sh
   test-fs310-hds010-sds010-sms120-role-independent-cm-inputs.sh
   test-fs970-hds010-sds010-sms010-access-advertisements-runtime.sh
+  test-fs970-hds010-sds020-sms040-protected-reservation-runtime.sh
   test-fs570-hds010-sds010-sms010-namespace-fallback.sh
   test-FS-540-HDS-010-SDS-010-SMS-020-clab-dns-resolver-materialization.sh
   test-FS-540-HDS-010-SDS-010-SMS-020-clab-dns-proxy-runtime-resilience.sh

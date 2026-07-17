@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ipaddress
+import json
+import shlex
 from typing import Any, Dict, List
 
 from clabgen.s88.CM.linux_shell import _sh
@@ -51,6 +53,72 @@ def _network(value: Any, field: str) -> ipaddress.IPv4Network:
     return network
 
 
+def _network6(value: Any, field: str) -> ipaddress.IPv6Network:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"access DHCPv6 advertisement requires {field}")
+    try:
+        network = ipaddress.ip_network(value, strict=False)
+    except ValueError as exc:
+        raise ValueError(f"invalid access DHCPv6 {field}: {value!r}") from exc
+    if network.version != 6:
+        raise ValueError(f"access DHCPv6 {field} must be IPv6")
+    return network
+
+
+def _pool_string(scope: Dict[str, Any], family: str) -> str:
+    pool = scope.get("pool")
+    if isinstance(pool, str) and pool:
+        parts = [part.strip() for part in pool.split("-", maxsplit=1)]
+    elif isinstance(pool, dict):
+        parts = [pool.get("start"), pool.get("end")]
+    else:
+        parts = []
+    if len(parts) != 2 or not all(isinstance(part, str) and part for part in parts):
+        raise ValueError(
+            f"access DHCP{family} advertisement requires pool.start and pool.end"
+        )
+    try:
+        addresses = [ipaddress.ip_address(part) for part in parts]
+    except ValueError as exc:
+        raise ValueError(f"invalid access DHCP{family} pool") from exc
+    expected_version = 4 if family == "v4" else 6
+    if any(address.version != expected_version for address in addresses):
+        raise ValueError(f"access DHCP{family} pool has the wrong address family")
+    return f"{addresses[0]} - {addresses[1]}"
+
+
+def protected_reservation_source(
+    scope: Dict[str, Any], family: str
+) -> str | None:
+    source = scope.get("reservationSource")
+    if source is None:
+        return None
+    if not isinstance(source, dict):
+        raise ValueError(
+            "access reservationSource must be an opaque protected-source record"
+        )
+    if set(source) - {"schema", "sourceClass", "sourceFile", "family"}:
+        raise ValueError("access reservationSource carries unsupported public fields")
+    if source.get("schema") != "gamp-protected-reservation-set-v1":
+        raise ValueError("diagnostic.runtime-reservation-source-schema-invalid")
+    if source.get("sourceClass") != "protected":
+        raise ValueError("diagnostic.protected-reservation-identity-leaked")
+    if source.get("family") not in {None, family}:
+        raise ValueError("diagnostic.runtime-reservation-source-family-invalid")
+    source_file = source.get("sourceFile")
+    if (
+        not isinstance(source_file, str)
+        or not source_file.startswith("/run/secrets/")
+        or source_file == "/run/secrets/"
+        or "/../" in source_file
+    ):
+        raise ValueError("diagnostic.runtime-reservation-source-path-invalid")
+    reservations = scope.get("reservations", [])
+    if not isinstance(reservations, list) or reservations:
+        raise ValueError("diagnostic.runtime-reservation-source-conflict")
+    return source_file
+
+
 def _dhcp4_config(scope: Dict[str, Any], ifname: str) -> str:
     subnet = _network(scope.get("subnet"), "subnet")
     pool = _dict(scope.get("pool"))
@@ -91,6 +159,9 @@ def _dhcp4_config(scope: Dict[str, Any], ifname: str) -> str:
 
 
 def _dhcp4_command(scope: Dict[str, Any], ifname: str) -> str:
+    source_file = protected_reservation_source(scope, "ipv4")
+    if source_file is not None:
+        return _kea_command(scope, ifname, "ipv4", source_file)
     config_path = f"/run/udhcpd.{ifname}.conf"
     lease_path = f"/run/udhcpd.{ifname}.leases"
     config = _dhcp4_config(scope, ifname)
@@ -106,6 +177,161 @@ def _dhcp4_command(scope: Dict[str, Any], ifname: str) -> str:
             f"udhcpd {config_path}",
         ]
     )
+
+
+def _scope_id(scope: Dict[str, Any], family: str) -> str:
+    value = scope.get("id") or scope.get("scopeId")
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"access DHCP{family} advertisement requires id")
+    return value
+
+
+def _dns_servers(scope: Dict[str, Any], version: int) -> List[str]:
+    values = scope.get("dnsServers")
+    if not isinstance(values, list) or not values:
+        raise ValueError("access DHCP advertisement requires dnsServers")
+    result: List[str] = []
+    for value in values:
+        try:
+            address = ipaddress.ip_address(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("invalid access DHCP dnsServers[]") from exc
+        if address.version != version:
+            raise ValueError("access DHCP dnsServers[] has the wrong address family")
+        result.append(str(address))
+    return result
+
+
+def _domain(scope: Dict[str, Any]) -> str:
+    value = scope.get("domain")
+    if not isinstance(value, str) or not value:
+        raise ValueError("access DHCP advertisement requires domain")
+    return value
+
+
+def _kea_template(
+    scope: Dict[str, Any], ifname: str, family: str
+) -> Dict[str, Any]:
+    pool = _pool_string(scope, "v4" if family == "ipv4" else "v6")
+    if family == "ipv4":
+        subnet = _network(scope.get("subnet"), "subnet")
+        router = _address(
+            scope.get("routerAddress") or scope.get("router"), "routerAddress"
+        )
+        return {
+            "Dhcp4": {
+                "interfaces-config": {"interfaces": [ifname]},
+                "lease-database": {
+                    "type": "memfile",
+                    "persist": True,
+                    "name": f"/run/kea/{ifname}-dhcp4.leases",
+                },
+                "subnet4": [
+                    {
+                        "id": 1,
+                        "subnet": str(subnet),
+                        "pools": [{"pool": pool}],
+                        "option-data": [
+                            {"name": "routers", "data": router},
+                            {
+                                "name": "domain-name-servers",
+                                "data": ", ".join(_dns_servers(scope, 4)),
+                            },
+                            {"name": "domain-name", "data": _domain(scope)},
+                        ],
+                        "reservations": [],
+                    }
+                ],
+            }
+        }
+    subnet6 = _network6(scope.get("subnet"), "subnet")
+    return {
+        "Dhcp6": {
+            "interfaces-config": {"interfaces": [ifname]},
+            "lease-database": {
+                "type": "memfile",
+                "persist": True,
+                "name": f"/run/kea/{ifname}-dhcp6.leases",
+            },
+            "subnet6": [
+                {
+                    "id": 1,
+                    "interface": ifname,
+                    "subnet": str(subnet6),
+                    "pools": [{"pool": pool}],
+                    "option-data": [
+                        {
+                            "name": "dns-servers",
+                            "data": ", ".join(_dns_servers(scope, 6)),
+                        },
+                        {"name": "domain-search", "data": _domain(scope)},
+                    ],
+                    "reservations": [],
+                }
+            ],
+        }
+    }
+
+
+def _kea_command(
+    scope: Dict[str, Any], ifname: str, family: str, source_file: str
+) -> str:
+    suffix = "4" if family == "ipv4" else "6"
+    template_path = f"/run/kea/{ifname}-dhcp{suffix}-template.json"
+    config_path = f"/run/kea/{ifname}-dhcp{suffix}.json"
+    pid_path = f"/run/kea/{ifname}-dhcp{suffix}.pid"
+    log_path = f"/run/kea/{ifname}-dhcp{suffix}.log"
+    template = json.dumps(
+        _kea_template(scope, ifname, family), sort_keys=True, separators=(",", ":")
+    )
+    materializer_args = [
+        "clab-protected-reservation-materializer",
+        "--family",
+        family,
+        "--scope",
+        _scope_id(scope, "v4" if family == "ipv4" else "v6"),
+        "--subnet",
+        str(scope.get("subnet")),
+        "--pool",
+        _pool_string(scope, "v4" if family == "ipv4" else "v6"),
+        "--source",
+        source_file,
+        "--template",
+        template_path,
+        "--output",
+        config_path,
+    ]
+    materialize = " ".join(shlex.quote(value) for value in materializer_args)
+    daemon = f"kea-dhcp{suffix}"
+    return "\n".join(
+        [
+            f"command -v {daemon} >/dev/null || {{ echo 'missing {daemon}' >&2; exit 1; }}",
+            "command -v clab-protected-reservation-materializer >/dev/null || "
+            "{ echo 'missing protected reservation materializer' >&2; exit 1; }",
+            f"test -r {shlex.quote(source_file)} || "
+            "{ echo 'protected reservation source unavailable' >&2; exit 1; }",
+            "install -d -m 0700 /run/kea",
+            f"cat > {template_path} <<'EOF'",
+            template,
+            "EOF",
+            materialize,
+            f"test ! -s {pid_path} || kill $(cat {pid_path}) 2>/dev/null || true",
+            f"{daemon} -d -c {config_path} >{log_path} 2>&1 &",
+            f"echo $! > {pid_path}",
+            "sleep 1",
+            f"kill -0 $(cat {pid_path}) 2>/dev/null || "
+            f"{{ echo '{daemon} failed to start' >&2; exit 1; }}",
+        ]
+    )
+
+
+def _dhcp6_command(scope: Dict[str, Any], ifname: str) -> str:
+    source_file = protected_reservation_source(scope, "ipv6")
+    if source_file is None:
+        raise ValueError(
+            "access DHCPv6 is only supported with a protected reservationSource"
+        )
+    return _kea_command(scope, ifname, "ipv6", source_file)
 
 
 def _ipv6_ra_prefixes(scope: Dict[str, Any]) -> List[str]:
@@ -143,11 +369,27 @@ def _ipv6_ra_command(scope: Dict[str, Any], ifname: str) -> str:
         "-c 'no ipv6 nd suppress-ra' "
         "-c 'ipv6 nd ra-interval 30'",
     ]
+    if scope.get("managed") is True:
+        commands.append(
+            "vtysh -c 'configure terminal' "
+            f"-c 'interface {ifname}' -c 'ipv6 nd managed-config-flag'"
+        )
+    if scope.get("otherConfig") is True:
+        commands.append(
+            "vtysh -c 'configure terminal' "
+            f"-c 'interface {ifname}' -c 'ipv6 nd other-config-flag'"
+        )
+    prefix_flags: List[str] = []
+    if scope.get("onLink") is False:
+        prefix_flags.append("off-link")
+    if scope.get("autonomous") is False:
+        prefix_flags.append("no-autoconfig")
+    suffix = f" {' '.join(prefix_flags)}" if prefix_flags else ""
     for prefix in prefixes:
         commands.append(
             "vtysh -c 'configure terminal' "
             f"-c 'interface {ifname}' "
-            f"-c 'ipv6 nd prefix {prefix}'"
+            f"-c 'ipv6 nd prefix {prefix}{suffix}'"
         )
     return "\n".join(commands)
 
@@ -163,6 +405,14 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
         if ifname is None:
             continue
         cmds.append(_sh(_dhcp4_command(scope, ifname)))
+
+    for scope in _list(advertisements.get("dhcpv6")):
+        if not isinstance(scope, dict) or not _enabled(scope):
+            continue
+        ifname = _interface(scope, eth_map)
+        if ifname is None:
+            continue
+        cmds.append(_sh(_dhcp6_command(scope, ifname)))
 
     for scope in _list(advertisements.get("ipv6Ra")):
         if not isinstance(scope, dict) or not _enabled(scope):
