@@ -31,7 +31,7 @@ if len(rendered) != 2:
 for rule in rendered:
     if "ct state established,related" not in rule:
         raise AssertionError(f"stateful return widened to reverse new-flow authority: {rule}")
-    if f"comment {RELATION}" not in rule:
+    if f'comment "{RELATION}"' not in rule:
         raise AssertionError(f"relation identity was not preserved: {rule}")
 
 distinct_reverse_relation = deepcopy(stateful_return)

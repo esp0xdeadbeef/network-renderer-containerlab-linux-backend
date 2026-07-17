@@ -149,8 +149,8 @@ if fs760.get("trafficType") != "cast-discovery":
 cmds = render_policy_firewall(state)
 text = "\n".join(cmds)
 expected = [
-    'iifname "ens25" oifname "ens23" udp dport 5353 counter accept comment fs760-receiver-discovery-policy',
-    'iifname "ens25" oifname "ens23" udp dport 1900 counter accept comment fs760-receiver-discovery-policy',
+    'iifname "ens25" oifname "ens23" udp dport 5353 counter accept comment "fs760-receiver-discovery-policy"',
+    'iifname "ens25" oifname "ens23" udp dport 1900 counter accept comment "fs760-receiver-discovery-policy"',
     'iifname "ens25" oifname "ens23" udp dport 53 counter drop',
     'iifname "ens25" oifname "ens23" tcp dport 53 counter drop',
 ]
@@ -162,7 +162,7 @@ if "tcp dport 8008" in text or "tcp dport 8009" in text:
     raise AssertionError(f"FS-760 discovery renderer inferred receiver payload ports:\n{text}")
 
 dns_drop_index = text.index('udp dport 53 counter drop')
-fs760_index = text.index('udp dport 5353 counter accept comment fs760-receiver-discovery-policy')
+fs760_index = text.index('udp dport 5353 counter accept comment "fs760-receiver-discovery-policy"')
 if dns_drop_index > fs760_index:
     raise AssertionError(f"raw DNS deny ordering moved behind FS-760 CPM rule:\n{text}")
 

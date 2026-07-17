@@ -68,8 +68,8 @@ def render_text(node_data):
 
 def require_modeled_deny(text, relation_id):
     expected = [
-        f'iifname "ens10" oifname "ens11" udp dport 53 counter drop comment {relation_id}',
-        f'iifname "ens10" oifname "ens11" tcp dport 53 counter drop comment {relation_id}',
+        f'iifname "ens10" oifname "ens11" udp dport 53 counter drop comment "{relation_id}"',
+        f'iifname "ens10" oifname "ens11" tcp dport 53 counter drop comment "{relation_id}"',
     ]
     missing = [needle for needle in expected if needle not in text]
     if missing:
@@ -79,15 +79,15 @@ def require_modeled_deny(text, relation_id):
         )
 
     forbidden = [
-        f"accept comment {relation_id}",
+        f'accept comment "{relation_id}"',
         "counter drop comment",
     ]
     if forbidden[0] in text:
         raise AssertionError(f"deny relation rendered as accept:\n{text}")
-    if text.count(f"comment {relation_id}") != 2:
+    if text.count(f'comment "{relation_id}"') != 2:
         raise AssertionError(
             "expected exactly two typed DNS drop rules for the modeled deny "
-            f"relation, got {text.count(f'comment {relation_id}')}:\n{text}"
+            f"relation, got {text.count(f'comment \"{relation_id}\"')}:\n{text}"
         )
 
 

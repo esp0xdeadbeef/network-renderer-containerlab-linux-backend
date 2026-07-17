@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shlex
 from typing import Any, Dict, List
 
@@ -103,7 +104,7 @@ def _identity_comment(rule_obj: Dict[str, Any]) -> str:
     for field in ("relationId", "policyId", "sourceRelationId", "comment"):
         value = rule_obj.get(field)
         if isinstance(value, str) and value:
-            return f" comment {shlex.quote(value)}"
+            return f" comment {json.dumps(value)}"
     return ""
 
 
@@ -156,9 +157,9 @@ def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
             )
 
         base = (
-            "nft add rule inet fw forward "
-            f'iifname "{from_interface}" '
-            f'oifname "{to_interface}"'
+            "add rule inet fw forward "
+            f"iifname {json.dumps(from_interface)} "
+            f"oifname {json.dumps(to_interface)}"
             f"{connection_state}"
             f"{prefix_part}"
         )
@@ -166,11 +167,15 @@ def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
         match_suffixes = _explicit_match_suffixes(rule_obj, rule_family)
         if match_suffixes:
             for suffix in match_suffixes:
-                rules.append(f"{base}{suffix} counter {action}{comment}")
+                statement = f"{base}{suffix} counter {action}{comment}"
+                rules.append(f"nft {shlex.quote(statement)}")
         elif traffic_type == "dns":
-            rules.append(f"{base} udp dport 53 counter {action}{comment}")
-            rules.append(f"{base} tcp dport 53 counter {action}{comment}")
+            udp_statement = f"{base} udp dport 53 counter {action}{comment}"
+            tcp_statement = f"{base} tcp dport 53 counter {action}{comment}"
+            rules.append(f"nft {shlex.quote(udp_statement)}")
+            rules.append(f"nft {shlex.quote(tcp_statement)}")
         else:
-            rules.append(f"{base} counter {action}{comment}")
+            statement = f"{base} counter {action}{comment}"
+            rules.append(f"nft {shlex.quote(statement)}")
 
     return rules
