@@ -610,6 +610,38 @@ retry_wan_dhcp_clients() {
   done
 }
 
+reconcile_access_advertisements() {
+  local name="$1"
+  local candidates=()
+  local containers=()
+  local scripts=()
+  local candidate container script
+
+  mapfile -t candidates < <(
+    docker ps \
+      --filter 'label=clab.access-advertisements.runtime=kea' \
+      --format '{{.Names}}' | sort
+  )
+  for candidate in "${candidates[@]}"; do
+    [[ "${candidate}" == "clab-${name}-"* ]] || continue
+    containers+=("${candidate}")
+  done
+
+  for container in "${containers[@]}"; do
+    mapfile -t scripts < <(
+      docker exec "${container}" find /run/kea -maxdepth 1 -type f \
+        -name 'reconcile-*-dhcp[46].sh' -print | sort
+    )
+    ((${#scripts[@]} > 0)) \
+      || fail "container ${container} advertises Kea reconciliation without runtime scripts"
+    for script in "${scripts[@]}"; do
+      docker exec "${container}" sh -eu "${script}" \
+        || fail "container ${container} failed post-deploy Kea reconciliation"
+    done
+    log "reconciled post-deploy Kea services in ${container}"
+  done
+}
+
 verify_fabric_containers() {
   local name="$1"
   local containers=()
@@ -655,7 +687,7 @@ if ((dry_run)); then
   log "dry-run: bridge plan=${bridge_plan_file}"
   log "dry-run: renderer deploy provenance=${deploy_provenance_file}"
   log "dry-run: Docker tooling image cache evidence=${tooling_cache_evidence_file}"
-  log "dry-run: would ensure Docker tooling image cache, cleanup ${name}, materialize bridges, deploy, rematerialize bridges, materialize lab emulation, retry WAN DHCP, and verify containers"
+  log "dry-run: would ensure Docker tooling image cache, cleanup ${name}, materialize bridges, deploy, rematerialize bridges, materialize lab emulation, retry WAN DHCP, reconcile access advertisements, and verify containers"
   exit 0
 fi
 
@@ -667,4 +699,5 @@ deploy_lab
 materialize_bridges
 materialize_lab_emulation
 retry_wan_dhcp_clients "${name}"
+reconcile_access_advertisements "${name}"
 verify_fabric_containers "${name}"

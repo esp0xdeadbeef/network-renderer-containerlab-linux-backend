@@ -10,6 +10,7 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 
 PYTHONPATH="${repo_root}" python3 - <<'PY'
 from clabgen.s88.CM.access_advertisements import (
+    _kea_command,
     _kea_template,
     protected_reservation_source,
 )
@@ -98,8 +99,14 @@ for family, advertisement, root in (
         "service-sockets-max-retries": 30,
         "service-sockets-retry-wait-time": 1000,
     }
+    suffix = "4" if family == "ipv4" else "6"
+    command = _kea_command(advertisement, "eth1", family, source_file)
+    reconcile_path = f"/run/kea/reconcile-eth1-dhcp{suffix}.sh"
+    assert f"cat > {reconcile_path} <<'EOF'" in command
+    assert command.endswith(f"chmod 0700 {reconcile_path}")
 
 assert rendered["binds"] == [f"{source_file}:{source_file}:ro"]
+assert rendered["labels"]["clab.access-advertisements.runtime"] == "kea"
 for required in (
     "install -d -m 0700 /run/kea /var/lib/kea",
     "until ip link show up dev eth1",
@@ -109,6 +116,8 @@ for required in (
     "clab-protected-reservation-materializer --family ipv6",
     "kea-dhcp4 -d -c /run/kea/eth1-dhcp4.json",
     "kea-dhcp6 -d -c /run/kea/eth1-dhcp6.json",
+    "reconcile-eth1-dhcp4.sh",
+    "reconcile-eth1-dhcp6.sh",
     "sport = :67",
     "sport = :547",
     "kea-dhcp4 did not open its service socket",
@@ -222,5 +231,12 @@ fi
 
 grep -F 'COPY protected-reservation-materializer.py /usr/local/bin/clab-protected-reservation-materializer' \
   "${repo_root}/docker-clab-frr-plus-tooling/Dockerfile" >/dev/null
+
+grep -F "label=clab.access-advertisements.runtime=kea" \
+  "${repo_root}/deploy-clab.sh" >/dev/null
+grep -F 'reconcile_access_advertisements "${name}"' \
+  "${repo_root}/deploy-clab.sh" >/dev/null
+grep -F "bash '\$work_dir/reconcile-access-advertisements.sh'" \
+  "${repo_root}/host-module.nix" >/dev/null
 
 echo "PASS FS-970-HDS-010-SDS-020-SMS-040: CLAB protected dual-stack reservation runtime"

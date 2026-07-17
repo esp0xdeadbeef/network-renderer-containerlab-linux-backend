@@ -299,6 +299,7 @@ def render_linux_node(
     protected_binds = _protected_reservation_binds(node)
     if protected_binds:
         rendered["binds"] = protected_binds
+        labels["clab.access-advertisements.runtime"] = "kea"
     if selector_relation_audit:
         rendered[INTERNAL_SELECTOR_RELATION_AUDIT_KEY] = selector_relation_audit
     return rendered
