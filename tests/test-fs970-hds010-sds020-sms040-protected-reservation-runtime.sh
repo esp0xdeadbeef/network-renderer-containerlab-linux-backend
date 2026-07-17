@@ -9,7 +9,10 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
 PYTHONPATH="${repo_root}" python3 - <<'PY'
-from clabgen.s88.CM.access_advertisements import protected_reservation_source
+from clabgen.s88.CM.access_advertisements import (
+    _kea_template,
+    protected_reservation_source,
+)
 from clabgen.s88.site.model_builder import build_nodes
 from clabgen.s88.site.node_runtime import render_linux_node
 
@@ -83,6 +86,18 @@ site = {
 node = build_nodes(site, {})["access-client"]
 rendered = render_linux_node("access-client", node, {"tenant-client": "eth1"})
 text = "\n".join(rendered["exec"])
+
+advertisements = site["runtimeTargets"]["access-runtime"]["advertisements"]
+for family, advertisement, root in (
+    ("ipv4", advertisements["dhcp4"][0], "Dhcp4"),
+    ("ipv6", advertisements["dhcpv6"][0], "Dhcp6"),
+):
+    interfaces = _kea_template(advertisement, "eth1", family)[root]["interfaces-config"]
+    assert interfaces == {
+        "interfaces": ["eth1"],
+        "service-sockets-max-retries": 30,
+        "service-sockets-retry-wait-time": 1000,
+    }
 
 assert rendered["binds"] == [f"{source_file}:{source_file}:ro"]
 for required in (
