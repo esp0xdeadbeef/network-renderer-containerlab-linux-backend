@@ -107,6 +107,30 @@ def _identity_comment(rule_obj: Dict[str, Any]) -> str:
     return ""
 
 
+def _connection_state_expr(rule_obj: Dict[str, Any]) -> str:
+    state = rule_obj.get("connectionState")
+    is_return_rule = rule_obj.get("returnRule") is True
+
+    if state in (None, ""):
+        if is_return_rule:
+            relation_id = rule_obj.get("relationId") or "<unknown>"
+            raise ValueError(
+                "FS-230-HDS-010-SDS-010-SMS-030: reverse return rule "
+                f"{relation_id!r} carries no connection-state restriction "
+                "(reverse-new-flow authority invention)"
+            )
+        return ""
+
+    if state != "established,related":
+        relation_id = rule_obj.get("relationId") or "<unknown>"
+        raise ValueError(
+            "FS-230-HDS-010-SDS-010-SMS-030: forwarding rule "
+            f"{relation_id!r} carries unsupported connectionState {state!r}"
+        )
+
+    return " ct state established,related"
+
+
 def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
     from_interface = rule_obj.get("fromInterface")
     to_interface = rule_obj.get("toInterface")
@@ -120,6 +144,7 @@ def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
     family = rule_obj.get("family")
     families = [family] if family in (4, 6) else [4, 6]
     comment = _identity_comment(rule_obj)
+    connection_state = _connection_state_expr(rule_obj)
 
     rules: List[str] = []
     for rule_family in families:
@@ -134,6 +159,7 @@ def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
             "nft add rule inet fw forward "
             f'iifname "{from_interface}" '
             f'oifname "{to_interface}"'
+            f"{connection_state}"
             f"{prefix_part}"
         )
 
