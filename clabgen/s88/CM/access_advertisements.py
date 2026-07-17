@@ -228,7 +228,11 @@ def _kea_template(
         )
         return {
             "Dhcp4": {
-                "interfaces-config": {"interfaces": [ifname]},
+                "interfaces-config": {
+                    "interfaces": [ifname],
+                    "service-sockets-max-retries": 30,
+                    "service-sockets-retry-wait-time": 1000,
+                },
                 "lease-database": {
                     "type": "memfile",
                     "persist": True,
@@ -255,7 +259,11 @@ def _kea_template(
     subnet6 = _network6(scope.get("subnet"), "subnet")
     return {
         "Dhcp6": {
-            "interfaces-config": {"interfaces": [ifname]},
+            "interfaces-config": {
+                "interfaces": [ifname],
+                "service-sockets-max-retries": 30,
+                "service-sockets-retry-wait-time": 1000,
+            },
             "lease-database": {
                 "type": "memfile",
                 "persist": True,
@@ -349,7 +357,7 @@ def _kea_command(
             f"until kill -0 $(cat {pid_path}) 2>/dev/null && "
             f"ss -H -lun {shlex.quote(f'sport = :{socket_port}')} | grep -q .; do",
             "  kea_socket_attempt=$((kea_socket_attempt + 1))",
-            "  test \"${kea_socket_attempt}\" -lt 10 || "
+            "  test \"${kea_socket_attempt}\" -lt 30 || "
             f"{{ echo '{daemon} did not open its service socket' >&2; exit 1; }}",
             "  sleep 1",
             "done",
