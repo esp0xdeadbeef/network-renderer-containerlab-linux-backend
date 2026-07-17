@@ -87,10 +87,17 @@ text = "\n".join(rendered["exec"])
 assert rendered["binds"] == [f"{source_file}:{source_file}:ro"]
 for required in (
     "install -d -m 0700 /run/kea /var/lib/kea",
+    "until ip link show up dev eth1",
+    "ip -4 -o address show dev eth1 scope global",
+    "ip -6 -o address show dev eth1 scope global",
     "clab-protected-reservation-materializer --family ipv4",
     "clab-protected-reservation-materializer --family ipv6",
     "kea-dhcp4 -d -c /run/kea/eth1-dhcp4.json",
     "kea-dhcp6 -d -c /run/kea/eth1-dhcp6.json",
+    "sport = :67",
+    "sport = :547",
+    "kea-dhcp4 did not open its service socket",
+    "kea-dhcp6 did not open its service socket",
     "ipv6 nd managed-config-flag",
     "ipv6 nd other-config-flag",
     "ipv6 nd prefix fd42:dead:beef:20::/64 no-autoconfig",
