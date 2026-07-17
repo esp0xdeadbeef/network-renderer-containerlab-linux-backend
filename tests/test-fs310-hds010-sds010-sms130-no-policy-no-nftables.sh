@@ -437,7 +437,7 @@ print("  inet fw table: PRESENT ✓")
 
 # Verify the specific forwarding rule appears
 fw_rule_found = any(
-    "nft add rule inet fw forward" in cmd and "ens10" in cmd
+    "add rule inet fw forward" in cmd and "ens10" in cmd
     for cmd in seeded_nft_cmds
 )
 if not fw_rule_found:

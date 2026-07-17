@@ -19,6 +19,7 @@ cd "${repo_root}"
 python3 - <<'PY'
 import os
 import re
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -534,6 +535,83 @@ unexpected_eth = [h for h in hardcoded_eth
                   if h not in eth_map_values and h != "eth0"]
 check("No unexpected hardcoded ethX interface names in commands",
       len(unexpected_eth) == 0)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# CHECK 8: nft string literals survive the shell serialization boundary
+# ═══════════════════════════════════════════════════════════════════════
+print("\n=== Check 8: nft string literal shell serialization ===")
+
+keyword_rule = {
+    "action": "accept",
+    "connectionState": "established,related",
+    "fromInterface": "core",
+    "relationId": "runtime-origin-egress",
+    "returnRule": True,
+    "toInterface": "policy",
+    "trafficType": "any",
+}
+keyword_commands = render_policy_firewall({
+    "interface_tags": {},
+    "rules": [keyword_rule],
+})
+keyword_command = next(
+    command for command in keyword_commands
+    if "runtime-origin-egress" in command
+)
+
+with tempfile.TemporaryDirectory() as fake_bin_dir:
+    fake_bin = Path(fake_bin_dir)
+    capture = fake_bin / "nft-argv"
+    fake_nft = fake_bin / "nft"
+    fake_nft.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' \"$#\" \"$1\" >\"$NFT_ARGV_CAPTURE\"\n",
+        encoding="utf-8",
+    )
+    fake_nft.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+    env["NFT_ARGV_CAPTURE"] = str(capture)
+    subprocess.run(["sh", "-c", keyword_command], check=True, env=env)
+    captured = capture.read_text(encoding="utf-8").splitlines()
+
+check(
+    "nft receives one complete grammar argument",
+    captured[0] == "1",
+)
+check(
+    "runtime interface named policy remains an nft string literal",
+    'iifname "core"' in captured[1] and 'oifname "policy"' in captured[1],
+)
+
+# Active seeded negative: the former shell form consumes the nft quotes and
+# passes `policy` as a keyword token. The argument-boundary predicate must
+# reject that representation even though the modeled interface is valid.
+legacy_command = (
+    'nft add rule inet fw forward iifname "core" oifname "policy" '
+    'ct state established,related counter accept comment runtime-origin-egress'
+)
+with tempfile.TemporaryDirectory() as fake_bin_dir:
+    fake_bin = Path(fake_bin_dir)
+    capture = fake_bin / "nft-argv"
+    fake_nft = fake_bin / "nft"
+    fake_nft.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' \"$#\" \"$*\" >\"$NFT_ARGV_CAPTURE\"\n",
+        encoding="utf-8",
+    )
+    fake_nft.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+    env["NFT_ARGV_CAPTURE"] = str(capture)
+    subprocess.run(["sh", "-c", legacy_command], check=True, env=env)
+    legacy_capture = capture.read_text(encoding="utf-8").splitlines()
+
+check(
+    "seeded legacy shell form is rejected by the nft literal boundary",
+    legacy_capture[0] != "1" and 'oifname "policy"' not in legacy_capture[1],
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════
