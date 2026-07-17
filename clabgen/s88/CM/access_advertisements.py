@@ -97,8 +97,16 @@ def protected_reservation_source(
         raise ValueError(
             "access reservationSource must be an opaque protected-source record"
         )
-    if set(source) - {"schema", "sourceClass", "sourceFile", "family"}:
-        raise ValueError("access reservationSource carries unsupported public fields")
+    allowed_fields = {
+        "schema",
+        "sourceClass",
+        "sourceFile",
+        "family",
+        "binderSourceAudit",
+        "upstreamBehaviorRef",
+    }
+    if set(source) - allowed_fields:
+        raise ValueError("diagnostic.protected-reservation-identity-leaked")
     if source.get("schema") != "gamp-protected-reservation-set-v1":
         raise ValueError("diagnostic.runtime-reservation-source-schema-invalid")
     if source.get("sourceClass") != "protected":
