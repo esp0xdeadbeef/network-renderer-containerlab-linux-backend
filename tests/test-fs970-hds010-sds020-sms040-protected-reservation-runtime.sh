@@ -9,6 +9,7 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
 PYTHONPATH="${repo_root}" python3 - <<'PY'
+from clabgen.s88.CM.access_advertisements import protected_reservation_source
 from clabgen.s88.site.model_builder import build_nodes
 from clabgen.s88.site.node_runtime import render_linux_node
 
@@ -29,6 +30,12 @@ site = {
                         "schema": "gamp-protected-reservation-set-v1",
                         "sourceClass": "protected", "sourceFile": source_file,
                         "family": "ipv4",
+                        "upstreamBehaviorRef": "inventory.realization.nodes.access-client",
+                        "binderSourceAudit": {
+                            "authority": "realization-binding",
+                            "sourceClass": "protected-inventory",
+                            "stage": "control-plane-model",
+                        },
                     },
                 }],
                 "dhcpv6": [{
@@ -41,6 +48,12 @@ site = {
                         "schema": "gamp-protected-reservation-set-v1",
                         "sourceClass": "protected", "sourceFile": source_file,
                         "family": "ipv6",
+                        "upstreamBehaviorRef": "inventory.realization.nodes.access-client",
+                        "binderSourceAudit": {
+                            "authority": "realization-binding",
+                            "sourceClass": "protected-inventory",
+                            "stage": "control-plane-model",
+                        },
                     },
                 }],
                 "ipv6Ra": [{
@@ -85,6 +98,24 @@ for required in (
 assert "udhcpd /run/udhcpd.eth1.conf" not in text
 assert "protected-client-serial" not in text
 assert "02:00:00:00:00:70" not in text
+
+try:
+    protected_reservation_source(
+        {
+            "reservations": [],
+            "reservationSource": {
+                "schema": "gamp-protected-reservation-set-v1",
+                "sourceClass": "protected",
+                "sourceFile": source_file,
+                "records": [{"hostname": "must-not-be-public"}],
+            },
+        },
+        "ipv4",
+    )
+except ValueError as error:
+    assert str(error) == "diagnostic.protected-reservation-identity-leaked"
+else:
+    raise AssertionError("public protected reservation records were accepted")
 
 bad = site["runtimeTargets"]["access-runtime"]["advertisements"]["dhcp4"][0]
 bad["reservationSource"] = dict(bad["reservationSource"], sourceFile="/tmp/plain.json")
