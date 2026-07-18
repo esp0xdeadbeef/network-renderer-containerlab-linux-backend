@@ -152,6 +152,7 @@ assert "tentative|dadfailed" in core_script
 assert "DNS resolver did not remain available" in core_script
 assert core_reconcile_script.count("for attempt in $(seq 1 3000)") == 1
 assert core_reconcile_script.count("for attempt in $(seq 1 600)") == 1
+assert '$4 == address || index($4, address "/") == 1' in core_reconcile_script
 assert "for attempt in $(seq 1 100)" not in core_script
 assert core_script.rstrip().endswith("chmod 0700 /tmp/clabgen-reconcile-unbound.sh")
 
