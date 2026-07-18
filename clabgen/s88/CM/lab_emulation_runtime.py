@@ -277,6 +277,22 @@ def _controlled_authority_commands(
         f'  - domain: "{delegation_zone}"',
         '    file: "/run/clabgen-delegation.zone"',
     ]
+    authority_addresses = [root4, root6, delegation4, delegation6]
+    authority_address_ready = " && ".join(
+        "ip -o address show dev "
+        + shlex.quote(iface_name)
+        + " | "
+        + f"awk -v address={shlex.quote(value)} "
+        + '\'($4 == address || index($4, address "/") == 1) && '
+        + "$0 !~ / (tentative|dadfailed)( |$)/ { found=1 } "
+        + "END { exit !found }'"
+        for value in authority_addresses
+    )
+    authority_socket_ready = " && ".join(
+        "ss -H -lnut 'sport = :53' | "
+        + f"grep -F -- {shlex.quote(value)} >/dev/null"
+        for value in authority_addresses
+    )
 
     def here_document(path: str, marker: str, lines: List[str]) -> List[str]:
         return [f"cat >{path} <<'{marker}'", *lines, marker]
@@ -291,6 +307,12 @@ def _controlled_authority_commands(
         f"ip addr replace {delegation4}/32 dev {iface_name}",
         f"ip -6 addr replace {delegation6}/128 dev {iface_name}",
         f"ip link set {iface_name} up",
+        "authority_addresses_ready=0",
+        "for attempt in $(seq 1 3000); do",
+        f"  if {authority_address_ready}; then authority_addresses_ready=1; break; fi",
+        "  sleep 0.1",
+        "done",
+        "[ \"$authority_addresses_ready\" -eq 1 ] || { printf '%s\\n' 'DNS authority addresses did not become usable; address material is intentionally omitted' >&2; exit 1; }",
         *here_document(
             "/run/clabgen-dnsmasq.conf",
             "CLABGEN_DNSMASQ",
@@ -310,7 +332,17 @@ def _controlled_authority_commands(
         f"knotc --config=/run/clabgen-knot.conf zone-check . {delegation_zone}",
         "pkill -x knotd >/dev/null 2>&1 || true",
         "install -d -o knot -g knot /run/knot",
-        "knotd --config=/run/clabgen-knot.conf --daemonize",
+        "rm -f /run/clabgen-knot.pid",
+        "nohup knotd --config=/run/clabgen-knot.conf >/tmp/clabgen-knot.log 2>&1 &",
+        "knot_pid=$!",
+        "echo \"$knot_pid\" >/run/clabgen-knot.pid",
+        "authority_listeners_ready=0",
+        "for attempt in $(seq 1 600); do",
+        '  if kill -0 "$knot_pid"; then :; else break; fi',
+        f"  if {authority_socket_ready}; then authority_listeners_ready=1; break; fi",
+        "  sleep 0.1",
+        "done",
+        "if [ \"$authority_listeners_ready\" -ne 1 ]; then if kill -0 \"$knot_pid\"; then kill \"$knot_pid\"; fi; printf '%s\\n' 'DNS authority listeners did not remain available; address material is intentionally omitted' >&2; exit 1; fi",
     ]
     return [_sh("\n".join(script))]
 
