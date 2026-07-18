@@ -113,7 +113,7 @@ core_config = unbound_config(core_script)
 def check_config(config):
     rendered = config.replace(
         "/tmp/clabgen-unbound-root.key", os.environ["UNBOUND_ROOT_KEY"]
-    )
+    ).replace('username: "unbound"', 'username: ""')
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as handle:
         handle.write(rendered)
         handle.flush()
@@ -132,6 +132,10 @@ for config in (recursive_config, local_config, core_config):
 assert "clabgen-dns-proxy.py" not in recursive_script + local_script + core_script
 assert "unbound-checkconf /tmp/clabgen-unbound.conf" in recursive_script
 assert "nohup unbound -d -c /tmp/clabgen-unbound.conf" in core_script
+assert 'username: "unbound"' in core_config
+assert 'username: ""' not in core_config
+assert "DNS listener endpoints did not become available" in core_script
+assert "DNS resolver did not remain available" in core_script
 
 recursive_dns = recursive["services"]["dns"]
 core_dns = core["services"]["dns"]
@@ -172,7 +176,7 @@ assert 'local-zone: "lab." static' not in local_config
 
 assert "forward-zone:" not in core_config
 assert 'auto-trust-anchor-file: "/tmp/clabgen-unbound-root.key"' in core_config
-assert "install -m 0600 /usr/share/dns/root.key" in core_script
+assert "install -o unbound -g unbound -m 0600 /usr/share/dns/root.key" in core_script
 
 core_origin = core["runtimeOriginEgress"]
 core_policy = core_origin["policyRouting"]
@@ -189,6 +193,9 @@ for fragment in (
     f"tcp dport 53 meta mark set {mark}",
     f"ip rule add fwmark {mark} priority {priority} table {table}",
     f"ip -6 rule add fwmark {mark} priority {priority} table {table}",
+    'dns_service_uid="$(id -u unbound)"',
+    f'ip rule add uidrange "${{dns_service_uid}}-${{dns_service_uid}}" priority {priority} table {table}',
+    f'ip -6 rule add uidrange "${{dns_service_uid}}-${{dns_service_uid}}" priority {priority} table {table}',
 ):
     assert fragment in core_script
 assert core_script.index("nft add table inet s88_dns_egress") < core_script.index(
@@ -199,8 +206,10 @@ for fragment in (
     'ip -4 route replace table 1002 default via "$router" dev "$interface"',
     "/run/s88-ra-route-wan0-table-1002.sh",
     "route=\"$(ip -6 route show table main default dev wan0 | sed -n '1s/^default //; s/ expires [^ ]*//; p')\"",
+    "selected_route=\"$(ip -6 route show table 1002 default dev wan0 | sed -n '1s/ expires [^ ]*//; p')\"",
+    'if [ "default $route" != "$selected_route" ]; then',
     "ip -6 route replace table 1002 default $route dev wan0",
-    "ip -6 monitor route",
+    "ip -6 monitor route dev wan0",
 ):
     assert fragment in core_dynamic_script, (fragment, core_dynamic_script)
 assert "${route#" not in core_dynamic_script

@@ -49,12 +49,18 @@ RULES = [
         r"ip -6 route replace",
         r"ip rule add",
         r"ip -6 rule add",
+        r"ip rule del",
+        r"ip -6 rule del",
         r"\{ip_cmd\} rule add",
         r"sh -c .*route.*2>/dev/null \|\| true",
         r" via .*dev .*onlink 2>/dev/null",
     ]),
     ("CODEGEN_TEMPLATE", "Code-generation template — produces shell commands, not a direct fallback", [
         r"nft '\{rule\}'",
+    ]),
+    ("SERVICE_READINESS", "Resolver readiness probes and failure-only cleanup — absence remains terminal", [
+        r'kill -0 .*unbound_pid',
+        r'kill .*unbound_pid',
     ]),
     ("KERNEL_TUNING", "Kernel tuning — non-behavioral, best-effort", [
         r"rp_filter",
