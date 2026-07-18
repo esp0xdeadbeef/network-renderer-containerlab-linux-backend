@@ -268,6 +268,7 @@ def _controlled_authority_commands(
     ]
     knot_lines = [
         "server:",
+        '  pidfile: "/tmp/clabgen-knot.pid"',
         f'  listen: [ "{root4}@53", "{root6}@53", "{delegation4}@53", "{delegation6}@53" ]',
         "",
         "zone:",
