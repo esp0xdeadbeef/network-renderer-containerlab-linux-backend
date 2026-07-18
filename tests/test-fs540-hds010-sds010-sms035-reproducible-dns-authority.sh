@@ -252,11 +252,10 @@ for fragment in (
     f"tcp dport 53 meta mark set {mark}",
     f"ip rule add fwmark {mark} priority {priority} table {table}",
     f"ip -6 rule add fwmark {mark} priority {priority} table {table}",
-    'dns_service_uid="$(id -u unbound)"',
-    f'ip rule add uidrange "${{dns_service_uid}}-${{dns_service_uid}}" priority {priority} table {table}',
-    f'ip -6 rule add uidrange "${{dns_service_uid}}-${{dns_service_uid}}" priority {priority} table {table}',
 ):
     assert fragment in core_script
+assert "dns_service_uid" not in core_script
+assert "uidrange" not in core_script
 assert core_script.index("nft add table inet s88_dns_egress") < core_script.index(
     "cat >/tmp/clabgen-reconcile-unbound.sh"
 )
