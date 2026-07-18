@@ -29,6 +29,10 @@ def _family_complete(values: List[str]) -> bool:
     )
 
 
+def _non_empty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value)
+
+
 def _fail(code: str, reason: str) -> None:
     raise ValueError(
         f"CLAB DNS {code}: {reason}; address material is intentionally omitted"
@@ -73,6 +77,14 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
         for resolver in upstream_resolvers
         if resolver.get("kind") == "named-core-resolver"
     ]
+    valid_named_core_resolvers = all(
+        isinstance(resolver.get("endpointAuthority"), dict)
+        and _non_empty_string(resolver["endpointAuthority"].get("relationId"))
+        and _non_empty_string(
+            resolver["endpointAuthority"].get("terminalAttachmentId")
+        )
+        for resolver in named_core_resolvers
+    )
     named_core_addresses = _sorted_unique(
         [
             address
@@ -86,6 +98,37 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
         if resolver.get("kind") == "local-namespace-authority"
     ]
 
+    service_endpoint_bindings = _dict_list(
+        dns.get("serviceEndpointBindings", [])
+    )
+    valid_service_endpoint_bindings = all(
+        _non_empty_string(binding.get("service"))
+        and _non_empty_string(binding.get("requesterService"))
+        and _non_empty_string(binding.get("providerNode"))
+        and _non_empty_string(binding.get("relationId"))
+        and _non_empty_string(binding.get("terminalAttachmentId"))
+        and _family_complete(_string_list(binding.get("addresses", [])))
+        for binding in service_endpoint_bindings
+    )
+    service_endpoint_addresses = _sorted_unique(
+        [
+            address
+            for binding in service_endpoint_bindings
+            for address in _string_list(binding.get("addresses", []))
+        ]
+    )
+    configured_listen_addresses = _sorted_unique(
+        _string_list(dns.get("listen", []))
+    )
+    if service_endpoint_bindings and not (
+        valid_service_endpoint_bindings
+        and service_endpoint_addresses == configured_listen_addresses
+    ):
+        _fail(
+            "DNS_RENDERER_CONTRACT_DIVERGENCE",
+            "provider listener addresses or terminal authority disagree with the CPM service endpoint binding",
+        )
+
     local_forward_zones = _dict_list(dns.get("localForwardZones", []))
     valid_local_forward_zones = all(
         isinstance(zone.get("name"), str)
@@ -96,6 +139,23 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
         and _family_complete(_string_list(zone.get("forwardTo", [])))
         for zone in local_forward_zones
     )
+    forwarded_namespaces = {
+        zone["name"]
+        for zone in local_forward_zones
+        if _non_empty_string(zone.get("name"))
+    }
+    shadowed_local_namespaces = [
+        zone["name"]
+        for zone in _dict_list(dns.get("localZones", []))
+        if _non_empty_string(zone.get("name"))
+        and zone["name"] in forwarded_namespaces
+        and zone.get("type", "static") != "transparent"
+    ]
+    if shadowed_local_namespaces:
+        _fail(
+            "DNS_LOCAL_NAMESPACE_SHADOWED",
+            "a local zone would terminate a namespace before its modeled forwarding authority",
+        )
 
     requester_policies = _dict_list(dns.get("requesterPolicies", []))
     valid_requester_policies = all(
@@ -131,6 +191,7 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
     if recursion_mode == "forwarding":
         if not (
             len(named_core_resolvers) == 1
+            and valid_named_core_resolvers
             and _family_complete(named_core_addresses)
             and (
                 not legacy_forwarders
