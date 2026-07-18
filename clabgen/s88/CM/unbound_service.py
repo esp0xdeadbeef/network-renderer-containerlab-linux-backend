@@ -183,12 +183,6 @@ def render_unbound_dns_service(
         config.append(f"  forward-first: {'yes' if forward_first else 'no'}")
 
     script_lines = list(pre_start_commands or []) + warning_commands
-    script_lines.extend(
-        [
-            'if [ -s /tmp/clabgen-unbound.pid ]; then kill "$(cat /tmp/clabgen-unbound.pid)" >/dev/null 2>&1 || true; fi',
-            "rm -f /tmp/clabgen-unbound.pid",
-        ]
-    )
     if authority["recursionMode"] == "iterative":
         script_lines.append(
             "install -o unbound -g unbound -m 0600 /usr/share/dns/root.key /tmp/clabgen-unbound-root.key"
@@ -209,27 +203,37 @@ def render_unbound_dns_service(
         "ss -H -lnut 'sport = :53' | " + f"grep -F -- {shlex.quote(value)} >/dev/null"
         for value in non_loopback_listen
     )
+    reconcile_lines = [
+        "#!/bin/sh",
+        "set -eu",
+        'if [ -s /tmp/clabgen-unbound.pid ]; then kill "$(cat /tmp/clabgen-unbound.pid)" >/dev/null 2>&1 || true; fi',
+        "rm -f /tmp/clabgen-unbound.pid",
+        "dns_listener_ready=0",
+        "for attempt in $(seq 1 3000); do",
+        f"  if {address_ready}; then dns_listener_ready=1; break; fi",
+        "  sleep 0.1",
+        "done",
+        "[ \"$dns_listener_ready\" -eq 1 ] || { printf '%s\\n' 'DNS listener endpoints did not become available; address material is intentionally omitted' >&2; exit 1; }",
+        "nohup unbound -d -c /tmp/clabgen-unbound.conf >/tmp/clabgen-unbound.log 2>&1 &",
+        "unbound_pid=$!",
+        "dns_resolver_ready=0",
+        "for attempt in $(seq 1 600); do",
+        '  kill -0 "$unbound_pid" 2>/dev/null || break',
+        f"  if {socket_ready}; then dns_resolver_ready=1; break; fi",
+        "  sleep 0.1",
+        "done",
+        "[ \"$dns_resolver_ready\" -eq 1 ] || { kill \"$unbound_pid\" 2>/dev/null || true; printf '%s\\n' 'DNS resolver did not remain available; address material is intentionally omitted' >&2; exit 1; }",
+    ]
     script_lines.extend(
         [
             "cat >/tmp/clabgen-unbound.conf <<'UNBOUND'",
             *config,
             "UNBOUND",
             "unbound-checkconf /tmp/clabgen-unbound.conf >/dev/null",
-            "dns_listener_ready=0",
-            "for attempt in $(seq 1 3000); do",
-            f"  if {address_ready}; then dns_listener_ready=1; break; fi",
-            "  sleep 0.1",
-            "done",
-            "[ \"$dns_listener_ready\" -eq 1 ] || { printf '%s\\n' 'DNS listener endpoints did not become available; address material is intentionally omitted' >&2; exit 1; }",
-            "nohup unbound -d -c /tmp/clabgen-unbound.conf >/tmp/clabgen-unbound.log 2>&1 &",
-            "unbound_pid=$!",
-            "dns_resolver_ready=0",
-            "for attempt in $(seq 1 600); do",
-            '  kill -0 "$unbound_pid" 2>/dev/null || break',
-            f"  if {socket_ready}; then dns_resolver_ready=1; break; fi",
-            "  sleep 0.1",
-            "done",
-            "[ \"$dns_resolver_ready\" -eq 1 ] || { kill \"$unbound_pid\" 2>/dev/null || true; printf '%s\\n' 'DNS resolver did not remain available; address material is intentionally omitted' >&2; exit 1; }",
+            "cat >/tmp/clabgen-reconcile-unbound.sh <<'RECONCILE_UNBOUND'",
+            *reconcile_lines,
+            "RECONCILE_UNBOUND",
+            "chmod 0700 /tmp/clabgen-reconcile-unbound.sh",
         ]
     )
     return [_sh("\n".join(script_lines) + "\n")]

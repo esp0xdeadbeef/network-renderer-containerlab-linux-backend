@@ -642,6 +642,32 @@ reconcile_access_advertisements() {
   done
 }
 
+reconcile_dns_services() {
+  local name="$1"
+  local candidates=()
+  local containers=()
+  local candidate container
+  local script=/tmp/clabgen-reconcile-unbound.sh
+
+  mapfile -t candidates < <(
+    docker ps \
+      --filter 'label=clab.dns.runtime=unbound' \
+      --format '{{.Names}}' | sort
+  )
+  for candidate in "${candidates[@]}"; do
+    [[ "${candidate}" == "clab-${name}-"* ]] || continue
+    containers+=("${candidate}")
+  done
+
+  for container in "${containers[@]}"; do
+    docker exec "${container}" test -x "${script}" \
+      || fail "container ${container} advertises DNS reconciliation without a runtime script"
+    docker exec "${container}" sh -eu "${script}" \
+      || fail "container ${container} failed post-deploy DNS reconciliation"
+    log "reconciled post-deploy DNS service in ${container}"
+  done
+}
+
 verify_fabric_containers() {
   local name="$1"
   local containers=()
@@ -687,7 +713,7 @@ if ((dry_run)); then
   log "dry-run: bridge plan=${bridge_plan_file}"
   log "dry-run: renderer deploy provenance=${deploy_provenance_file}"
   log "dry-run: Docker tooling image cache evidence=${tooling_cache_evidence_file}"
-  log "dry-run: would ensure Docker tooling image cache, cleanup ${name}, materialize bridges, deploy, rematerialize bridges, materialize lab emulation, retry WAN DHCP, reconcile access advertisements, and verify containers"
+  log "dry-run: would ensure Docker tooling image cache, cleanup ${name}, materialize bridges, deploy, rematerialize bridges, materialize lab emulation, retry WAN DHCP, reconcile DNS services and access advertisements, and verify containers"
   exit 0
 fi
 
@@ -699,5 +725,6 @@ deploy_lab
 materialize_bridges
 materialize_lab_emulation
 retry_wan_dhcp_clients "${name}"
+reconcile_dns_services "${name}"
 reconcile_access_advertisements "${name}"
 verify_fabric_containers "${name}"
