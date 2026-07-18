@@ -40,6 +40,7 @@ class InterfaceModel:
     dns_resolver: Dict[str, Any] = field(default_factory=dict)
     runtime_if_name: Optional[str] = None
     explicit_role: Dict[str, Any] = field(default_factory=dict)
+    backing_ref: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

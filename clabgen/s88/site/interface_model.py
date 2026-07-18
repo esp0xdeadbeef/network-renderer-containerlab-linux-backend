@@ -144,6 +144,7 @@ def build_interfaces(
             if isinstance(iface.get("runtimeIfName"), str)
             else None,
             explicit_role=dict(fb.get("explicit_role", {}) or {}),
+            backing_ref=dict(iface.get("backingRef", {}) or {}),
         )
 
     return interfaces

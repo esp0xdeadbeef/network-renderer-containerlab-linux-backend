@@ -100,6 +100,7 @@ def _interface_output(
         )
 
     return {
+        "backingRef": backing_ref,
         "addr4": addr4,
         "addr6": _address_value(iface, "addr6", "ipv6"),
         "ll6": iface.get("ll6"),
