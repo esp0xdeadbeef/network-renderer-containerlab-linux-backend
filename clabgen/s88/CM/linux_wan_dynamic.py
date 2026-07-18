@@ -94,9 +94,12 @@ cat >{sync_file} <<'S88_RA_ROUTE'
 #!/bin/sh
 sync_selected_ra_route() {{
   route="$(ip -6 route show table main default dev {interface_name} | sed -n '1s/^default //; s/ expires [^ ]*//; p')"
+  selected_route="$(ip -6 route show table {route_table} default dev {interface_name} | sed -n '1s/ expires [^ ]*//; p')"
   if [ -n "$route" ]; then
-    ip -6 route replace table {route_table} default $route dev {interface_name}
-  elif ip -6 route show table {route_table} default dev {interface_name} 2>&1 | grep -q '^default '; then
+    if [ "default $route" != "$selected_route" ]; then
+      ip -6 route replace table {route_table} default $route dev {interface_name}
+    fi
+  elif [ -n "$selected_route" ]; then
     ip -6 route del table {route_table} default dev {interface_name}
   fi
 }}
@@ -105,7 +108,7 @@ for attempt in $(seq 1 50); do
   ip -6 route show table {route_table} default dev {interface_name} | grep -q . && break
   sleep 0.2
 done
-ip -6 monitor route | while read -r _event; do
+ip -6 monitor route dev {interface_name} | while read -r _event; do
   sync_selected_ra_route
 done
 S88_RA_ROUTE

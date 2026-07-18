@@ -151,7 +151,7 @@ def render_unbound_dns_service(
 
     config = [
         "server:",
-        '  username: ""',
+        '  username: "unbound"',
         '  chroot: ""',
         '  directory: "/tmp"',
         '  pidfile: "/tmp/clabgen-unbound.pid"',
@@ -191,15 +191,42 @@ def render_unbound_dns_service(
     )
     if authority["recursionMode"] == "iterative":
         script_lines.append(
-            "install -m 0600 /usr/share/dns/root.key /tmp/clabgen-unbound-root.key"
+            "install -o unbound -g unbound -m 0600 /usr/share/dns/root.key /tmp/clabgen-unbound-root.key"
         )
+
+    non_loopback_listen = [
+        value for value in listen if value not in {"127.0.0.1", "::1"}
+    ]
+    address_ready = " && ".join(
+        "ip -o address show | awk '{print $4}' | cut -d/ -f1 | "
+        + f"grep -Fx -- {shlex.quote(value)} >/dev/null"
+        for value in non_loopback_listen
+    )
+    socket_ready = " && ".join(
+        "ss -H -lnut 'sport = :53' | " + f"grep -F -- {shlex.quote(value)} >/dev/null"
+        for value in non_loopback_listen
+    )
     script_lines.extend(
         [
             "cat >/tmp/clabgen-unbound.conf <<'UNBOUND'",
             *config,
             "UNBOUND",
             "unbound-checkconf /tmp/clabgen-unbound.conf >/dev/null",
+            "dns_listener_ready=0",
+            "for attempt in $(seq 1 100); do",
+            f"  if {address_ready}; then dns_listener_ready=1; break; fi",
+            "  sleep 0.1",
+            "done",
+            "[ \"$dns_listener_ready\" -eq 1 ] || { printf '%s\\n' 'DNS listener endpoints did not become available; address material is intentionally omitted' >&2; exit 1; }",
             "nohup unbound -d -c /tmp/clabgen-unbound.conf >/tmp/clabgen-unbound.log 2>&1 &",
+            "unbound_pid=$!",
+            "dns_resolver_ready=0",
+            "for attempt in $(seq 1 100); do",
+            '  kill -0 "$unbound_pid" 2>/dev/null || break',
+            f"  if {socket_ready}; then dns_resolver_ready=1; break; fi",
+            "  sleep 0.1",
+            "done",
+            "[ \"$dns_resolver_ready\" -eq 1 ] || { kill \"$unbound_pid\" 2>/dev/null || true; printf '%s\\n' 'DNS resolver did not remain available; address material is intentionally omitted' >&2; exit 1; }",
         ]
     )
     return [_sh("\n".join(script_lines) + "\n")]
