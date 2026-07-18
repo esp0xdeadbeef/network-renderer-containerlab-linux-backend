@@ -89,6 +89,7 @@ for required in (
     "dnsmasq --test",
     "enable-ra",
     "constructor:",
+    "ra-only,slaac,64",
     "knotc --config=/run/clabgen-knot.conf conf-check",
     "knotc --config=/run/clabgen-knot.conf zone-check . dns-validation.test.",
     "knotd --config=/run/clabgen-knot.conf --daemonize",

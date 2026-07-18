@@ -241,7 +241,7 @@ def _controlled_authority_commands(
         "enable-ra",
         f"dhcp-range={range_start},{range_end},{required(provider4, 'leaseTime')}",
         f"dhcp-option=option:router,{router4}",
-        f"dhcp-range=::,constructor:{iface_name},ra-only,64,{required(provider6, 'leaseTime')}",
+        f"dhcp-range=::,constructor:{iface_name},ra-only,slaac,64,{required(provider6, 'leaseTime')}",
         "dhcp-leasefile=/run/clabgen-dnsmasq.leases",
         "pid-file=/run/clabgen-dnsmasq.pid",
     ]
