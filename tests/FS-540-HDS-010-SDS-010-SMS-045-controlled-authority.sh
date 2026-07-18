@@ -93,6 +93,7 @@ for required in (
     "ra-only,slaac,64",
     "knotc --config=/run/clabgen-knot.conf conf-check",
     "knotc --config=/run/clabgen-knot.conf zone-check . dns-validation.gamp.",
+    'pidfile: "/tmp/clabgen-knot.pid"',
     "authority_addresses_ready=0",
     "authority_listeners_ready=0",
     "nohup knotd --config=/run/clabgen-knot.conf",
