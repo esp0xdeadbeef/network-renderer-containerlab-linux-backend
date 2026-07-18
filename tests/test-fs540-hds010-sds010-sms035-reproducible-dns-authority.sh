@@ -35,7 +35,7 @@ python3 - <<'PY'
 from __future__ import annotations
 
 import copy
-from ipaddress import ip_address, ip_network
+from ipaddress import ip_address, ip_interface, ip_network
 import json
 import os
 import re
@@ -137,6 +137,8 @@ assert 'username: ""' not in core_config
 assert "DNS listener endpoints did not become available" in core_script
 assert "tentative|dadfailed" in core_script
 assert "DNS resolver did not remain available" in core_script
+assert core_script.count("for attempt in $(seq 1 600)") == 2
+assert "for attempt in $(seq 1 100)" not in core_script
 
 recursive_dns = recursive["services"]["dns"]
 core_dns = core["services"]["dns"]
@@ -160,13 +162,36 @@ terminal_interfaces = [
 ]
 assert len(terminal_interfaces) == 1
 terminal_ifname = terminal_interfaces[0]["runtimeIfName"]
+terminal_addresses = {
+    ip_interface(terminal_interfaces[0][key]).ip
+    for key in ("addr4", "addr6")
+    if terminal_interfaces[0].get(key)
+}
+assert {ip_address(address) for address in core_endpoint_binding["addresses"]} == terminal_addresses
 for address in core_endpoint_binding["addresses"]:
     parsed = ip_address(address)
     prefix = 128 if parsed.version == 6 else 32
     family = "ip -6" if parsed.version == 6 else "ip"
     fragment = f"{family} addr replace {parsed}/{prefix} dev {terminal_ifname}"
-    assert fragment in core_script
-    assert core_script.index(fragment) < core_script.index(
+    assert fragment not in core_script
+
+distinct_endpoint = copy.deepcopy(core)
+distinct_addresses = [
+    str(ip_address(int(ip_address(address)) + 1024))
+    for address in core_endpoint_binding["addresses"]
+]
+distinct_endpoint["services"]["dns"]["listen"] = distinct_addresses
+distinct_endpoint["services"]["dns"]["serviceEndpointBindings"][0][
+    "addresses"
+] = distinct_addresses
+distinct_script = rendered_script(distinct_endpoint)
+for address in distinct_addresses:
+    parsed = ip_address(address)
+    prefix = 128 if parsed.version == 6 else 32
+    family = "ip -6" if parsed.version == 6 else "ip"
+    fragment = f"{family} addr replace {parsed}/{prefix} dev {terminal_ifname}"
+    assert fragment in distinct_script
+    assert distinct_script.index(fragment) < distinct_script.index(
         "nohup unbound -d -c /tmp/clabgen-unbound.conf"
     )
 assert 'forward-zone:\n  name: "."' in recursive_config
