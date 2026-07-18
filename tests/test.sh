@@ -59,6 +59,7 @@ tests=(
   test-FS-540-HDS-010-SDS-010-SMS-020-clab-dns-resolver-materialization.sh
   test-FS-540-HDS-010-SDS-010-SMS-020-clab-dns-proxy-runtime-resilience.sh
   test-fs540-hds010-sds010-sms035-dns-self-referential-guard.sh
+  FS-540-HDS-010-SDS-010-SMS-045-controlled-authority.sh
   test-fs540-hds020-sds010-sms010-clab-recursive-dns-requester-fixture.sh
   test-fs520-hds010-sds010-sms040-policy-no-main-defaults.sh
   test-fs500-hds010-sds010-sms040-clab-route-materialization-artifact.sh

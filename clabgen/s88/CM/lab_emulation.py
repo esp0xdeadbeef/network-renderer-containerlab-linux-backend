@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import copy
+import ipaddress
 from typing import Any, Dict, List
 
 from clabgen.models import SiteModel
+from clabgen.s88.CM.dns_authority import normalize_dns_authority
 from clabgen.s88.CM.lab_emulation_provider import provider_emulation_artifact
 from clabgen.s88.CM.lab_emulation_schema import provider_emulation_mode
 
@@ -62,6 +65,67 @@ def _lab_emulation_requests(containerlab: Dict[str, Any]) -> List[Dict[str, Any]
     return requests
 
 
+def _controlled_dns_authority_artifact(site: SiteModel) -> Dict[str, Any] | None:
+    authorities: List[tuple[str, Any, Dict[str, Any]]] = []
+    for node_name, node in sorted(site.nodes.items()):
+        services = node.services if isinstance(node.services, dict) else {}
+        dns = services.get("dns")
+        if not isinstance(dns, dict) or "validationAuthority" not in dns:
+            continue
+        authority = normalize_dns_authority(dns)["validationAuthority"]
+        if authority is not None:
+            authorities.append((node_name, node, authority))
+
+    if not authorities:
+        return None
+    if len(authorities) != 1:
+        raise ValueError(
+            "CLAB DNS DNS_VALIDATION_AUTHORITY_EXTERNAL: the rendered site must "
+            "own exactly one controlled authority; address material is "
+            "intentionally omitted"
+        )
+
+    _node_name, node, authority = authorities[0]
+    runtime_origin = (
+        node.runtime_origin_egress
+        if isinstance(node.runtime_origin_egress, dict)
+        else {}
+    )
+    policy = runtime_origin.get("policyRouting")
+    selected = authority["selectedUplink"]
+    if not (
+        runtime_origin.get("enabled") is True
+        and runtime_origin.get("source") == "dns-service"
+        and isinstance(policy, dict)
+        and policy.get("source") == "control-plane-model"
+        and policy.get("selectedUplink") == selected
+        and runtime_origin.get("uplinks") == [selected]
+    ):
+        raise ValueError(
+            "CLAB DNS DNS_VALIDATION_AUTHORITY_EXTERNAL: the controlled authority "
+            "does not match the model-owned DNS egress selection; address "
+            "material is intentionally omitted"
+        )
+
+    provider4 = copy.deepcopy(authority["provider"]["ipv4"])
+    provider4["sourcePrefix"] = str(
+        ipaddress.ip_interface(provider4["address"]).network
+    )
+    return {
+        "name": f"{authority['traceId']}-controlled-dns-authority",
+        "providerEmulationMode": "fake-provider",
+        "scope": "harness",
+        "harnessScoped": True,
+        "ordinaryTargetOutput": False,
+        "providerBridge": authority["provider"]["bridge"],
+        "selectedUplink": selected,
+        "alternateUplinks": copy.deepcopy(authority["alternateUplinks"]),
+        "dhcp4": provider4,
+        "ipv6": copy.deepcopy(authority["provider"]["ipv6"]),
+        "dnsValidationAuthority": copy.deepcopy(authority),
+    }
+
+
 def render_lab_emulation_artifacts(site: SiteModel) -> List[Dict[str, Any]]:
     containerlab = _containerlab_inventory(site)
     requests = _lab_emulation_requests(containerlab)
@@ -79,6 +143,16 @@ def render_lab_emulation_artifacts(site: SiteModel) -> List[Dict[str, Any]]:
         artifact = provider_emulation_artifact(request, mode)
         _validate_limitation_record(artifact, mode)
         artifacts.append(artifact)
+
+    controlled_authority = _controlled_dns_authority_artifact(site)
+    if controlled_authority is not None:
+        if artifacts:
+            raise ValueError(
+                "CLAB DNS DNS_VALIDATION_AUTHORITY_EXTERNAL: the controlled "
+                "authority cannot share a site with another lab-emulation "
+                "provider; address material is intentionally omitted"
+            )
+        artifacts.append(controlled_authority)
 
     return artifacts
 

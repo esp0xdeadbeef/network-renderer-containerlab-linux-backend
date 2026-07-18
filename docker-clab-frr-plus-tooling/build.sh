@@ -88,7 +88,7 @@ image_is_usable() {
 
 verify_tooling_image() {
     docker run --rm --entrypoint /bin/sh "$IMAGE" -ec '
-        for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do
+        for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd dnsmasq knotd knotc kzonecheck unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do
             command -v "$cmd" >/dev/null || {
                 echo "missing FRR tooling package command: $cmd" >&2
                 exit 1

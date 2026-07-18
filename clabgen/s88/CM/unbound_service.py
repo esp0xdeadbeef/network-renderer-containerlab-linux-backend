@@ -174,8 +174,17 @@ def render_unbound_dns_service(
         config.append(f"  local-zone: {_quote(name)} {zone_type}")
     for record in local_data:
         config.append(f"  local-data: {_quote(record)}")
+    validation_authority = authority.get("validationAuthority")
     if authority["recursionMode"] == "iterative":
-        config.append('  auto-trust-anchor-file: "/tmp/clabgen-unbound-root.key"')
+        if isinstance(validation_authority, dict):
+            config.extend(
+                [
+                    '  root-hints: "/tmp/clabgen-controlled-root.hints"',
+                    '  domain-insecure: "."',
+                ]
+            )
+        else:
+            config.append('  auto-trust-anchor-file: "/tmp/clabgen-unbound-root.key"')
     for name, forwarders, forward_first in forward_zones:
         config.extend(["forward-zone:", f"  name: {_quote(name)}"])
         for value in forwarders:
@@ -184,9 +193,24 @@ def render_unbound_dns_service(
 
     script_lines = list(pre_start_commands or []) + warning_commands
     if authority["recursionMode"] == "iterative":
-        script_lines.append(
-            "install -o unbound -g unbound -m 0600 /usr/share/dns/root.key /tmp/clabgen-unbound-root.key"
-        )
+        if isinstance(validation_authority, dict):
+            root = validation_authority["root"]
+            root_hints = [
+                f". 60 IN NS {root['nameServer']}",
+                *[f"{root['nameServer']} 60 IN A {value}" for value in root["ipv4"]],
+                *[f"{root['nameServer']} 60 IN AAAA {value}" for value in root["ipv6"]],
+            ]
+            script_lines.extend(
+                [
+                    "cat >/tmp/clabgen-controlled-root.hints <<'CONTROLLED_ROOT_HINTS'",
+                    *root_hints,
+                    "CONTROLLED_ROOT_HINTS",
+                ]
+            )
+        else:
+            script_lines.append(
+                "install -o unbound -g unbound -m 0600 /usr/share/dns/root.key /tmp/clabgen-unbound-root.key"
+            )
 
     non_loopback_listen = [
         value for value in listen if value not in {"127.0.0.1", "::1"}
