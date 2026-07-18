@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Any, Dict, List
 import json
@@ -22,6 +23,76 @@ def _sh(script: str) -> str:
 
 def _nft_literal(value: str) -> str:
     return shlex.quote(value)
+
+
+def _dns_renderer_fail(reason: str) -> None:
+    raise ValueError(
+        "CLAB DNS DNS_RENDERER_CONTRACT_DIVERGENCE: "
+        + reason
+        + "; address material is intentionally omitted"
+    )
+
+
+def _service_endpoint_address_commands(
+    node: Dict[str, Any], dns: Dict[str, Any]
+) -> List[str]:
+    bindings = dns.get("serviceEndpointBindings", [])
+    if not isinstance(bindings, list) or not bindings:
+        return []
+
+    interfaces = node.get("interfaces", {})
+    if not isinstance(interfaces, dict):
+        _dns_renderer_fail("service endpoint binding has no explicit interface set")
+
+    commands: List[str] = []
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            _dns_renderer_fail("service endpoint binding is malformed")
+        terminal_attachment = binding.get("terminalAttachmentId")
+        if not isinstance(terminal_attachment, str) or not terminal_attachment:
+            _dns_renderer_fail("service endpoint binding has no terminal attachment")
+
+        matching_interfaces: List[Dict[str, Any]] = []
+        for interface in interfaces.values():
+            if not isinstance(interface, dict):
+                continue
+            backing_ref = interface.get("backingRef")
+            if (
+                isinstance(backing_ref, dict)
+                and backing_ref.get("id") == terminal_attachment
+            ):
+                matching_interfaces.append(interface)
+        if len(matching_interfaces) != 1:
+            _dns_renderer_fail(
+                "service endpoint terminal attachment does not resolve to one runtime interface"
+            )
+
+        runtime_ifname = matching_interfaces[0].get("runtimeIfName")
+        if not isinstance(runtime_ifname, str) or not runtime_ifname:
+            _dns_renderer_fail(
+                "service endpoint terminal attachment has no runtime interface"
+            )
+
+        addresses = binding.get("addresses", [])
+        if not isinstance(addresses, list):
+            _dns_renderer_fail("service endpoint binding has malformed addresses")
+        for value in addresses:
+            if not isinstance(value, str) or not value:
+                _dns_renderer_fail("service endpoint binding has malformed addresses")
+            try:
+                parsed = ip_address(value)
+            except ValueError:
+                _dns_renderer_fail("service endpoint binding has malformed addresses")
+            family = "ip -6" if parsed.version == 6 else "ip"
+            prefix = 128 if parsed.version == 6 else 32
+            command = (
+                f"{family} addr replace {shlex.quote(f'{parsed}/{prefix}')} "
+                f"dev {shlex.quote(runtime_ifname)}"
+            )
+            if command not in commands:
+                commands.append(command)
+
+    return commands
 
 
 def _public_resolver_drop_commands(
@@ -137,7 +208,8 @@ def render_dns_service(
         return render_unbound_dns_service(
             dns,
             authority,
-            _public_resolver_drop_commands(dns, authority["rootForwarders"])
+            _service_endpoint_address_commands(node, dns)
+            + _public_resolver_drop_commands(dns, authority["rootForwarders"])
             + _dns_egress_policy_commands(node),
         )
 

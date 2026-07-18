@@ -138,6 +138,7 @@ def build_node_data(
             "addr6": iface.addr6,
             "ll6": iface.ll6,
             "runtimeIfName": iface.runtime_if_name,
+            "backingRef": copy.deepcopy(iface.backing_ref),
             "kind": iface.kind,
             "hostUplink": copy.deepcopy(iface.host_uplink),
             "tenant": iface.tenant,

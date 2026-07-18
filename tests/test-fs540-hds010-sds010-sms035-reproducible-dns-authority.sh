@@ -152,6 +152,23 @@ assert (
     == core_endpoint_binding["terminalAttachmentId"]
 )
 assert core_endpoint_binding["addresses"] == core_dns["listen"]
+terminal_interfaces = [
+    interface
+    for interface in core["interfaces"].values()
+    if interface.get("backingRef", {}).get("id")
+    == core_endpoint_binding["terminalAttachmentId"]
+]
+assert len(terminal_interfaces) == 1
+terminal_ifname = terminal_interfaces[0]["runtimeIfName"]
+for address in core_endpoint_binding["addresses"]:
+    parsed = ip_address(address)
+    prefix = 128 if parsed.version == 6 else 32
+    family = "ip -6" if parsed.version == 6 else "ip"
+    fragment = f"{family} addr replace {parsed}/{prefix} dev {terminal_ifname}"
+    assert fragment in core_script
+    assert core_script.index(fragment) < core_script.index(
+        "nohup unbound -d -c /tmp/clabgen-unbound.conf"
+    )
 assert 'forward-zone:\n  name: "."' in recursive_config
 for address in named_core["addresses"]:
     assert f'forward-addr: "{ip_address(address)}"' in recursive_config
@@ -263,6 +280,12 @@ divergent_core_endpoint["services"]["dns"]["serviceEndpointBindings"][0]["addres
     "seeded:v6",
 ]
 rejected(divergent_core_endpoint, "DNS_RENDERER_CONTRACT_DIVERGENCE")
+
+unbound_core_endpoint = copy.deepcopy(core)
+unbound_core_endpoint["services"]["dns"]["serviceEndpointBindings"][0][
+    "terminalAttachmentId"
+] = "link::seeded-missing-terminal"
+rejected(unbound_core_endpoint, "DNS_RENDERER_CONTRACT_DIVERGENCE")
 
 missing_egress_policy = copy.deepcopy(core)
 missing_egress_policy["runtimeOriginEgress"].pop("policyRouting")
