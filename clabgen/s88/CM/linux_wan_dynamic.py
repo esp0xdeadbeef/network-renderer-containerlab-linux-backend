@@ -95,7 +95,7 @@ cat >{sync_file} <<'S88_RA_ROUTE'
 sync_selected_ra_route() {{
   route="$(ip -6 route show table main default dev {interface_name} | sed -n '1s/^default //; s/ expires [^ ]*//; p')"
   if [ -n "$route" ]; then
-    ip -6 route replace table {route_table} default $route
+    ip -6 route replace table {route_table} default $route dev {interface_name}
   elif ip -6 route show table {route_table} default dev {interface_name} 2>&1 | grep -q '^default '; then
     ip -6 route del table {route_table} default dev {interface_name}
   fi
