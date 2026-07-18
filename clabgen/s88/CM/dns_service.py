@@ -33,6 +33,14 @@ def _dns_renderer_fail(reason: str) -> None:
     )
 
 
+def _dns_validation_fail(reason: str) -> None:
+    raise ValueError(
+        "CLAB DNS DNS_VALIDATION_AUTHORITY_EXTERNAL: "
+        + reason
+        + "; address material is intentionally omitted"
+    )
+
+
 def _service_endpoint_address_commands(
     node: Dict[str, Any], dns: Dict[str, Any]
 ) -> List[str]:
@@ -229,6 +237,15 @@ def render_dns_service(
 
     authority = normalize_dns_authority(dns)
     if authority["recursionMode"] is not None:
+        validation_authority = authority["validationAuthority"]
+        if validation_authority is not None:
+            egress_policy = normalize_dns_egress_policy(node)
+            if egress_policy is None or egress_policy.get(
+                "selectedUplink"
+            ) != validation_authority.get("selectedUplink"):
+                _dns_validation_fail(
+                    "the controlled authority does not match the model-owned DNS egress selection"
+                )
         return render_unbound_dns_service(
             dns,
             authority,

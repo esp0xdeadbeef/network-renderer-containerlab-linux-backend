@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import copy
+import ipaddress
+import re
 from typing import Any, Dict, List
 
 
 _ALLOWED_RECURSION_MODES = {"iterative", "forwarding", "local-only"}
 _NON_FATAL_WARNING_CODES = {"DNS_CORE_UPSTREAM_HARDCODED"}
+_FQDN_PATTERN = r"^[A-Za-z0-9_.-]+\.$"
 
 
 def _string_list(value: Any) -> List[str]:
@@ -37,6 +41,158 @@ def _fail(code: str, reason: str) -> None:
     raise ValueError(
         f"CLAB DNS {code}: {reason}; address material is intentionally omitted"
     )
+
+
+def _controlled_validation_authority(
+    dns: Dict[str, Any], recursion_mode: str | None
+) -> Dict[str, Any] | None:
+    authority = dns.get("validationAuthority")
+    if authority is None:
+        return None
+    if not isinstance(authority, dict):
+        _fail(
+            "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+            "the controlled validation authority is malformed",
+        )
+
+    def required_string(mapping: Any, key: str) -> str:
+        if not isinstance(mapping, dict):
+            _fail(
+                "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+                "the controlled validation authority is incomplete",
+            )
+        value = mapping.get(key)
+        if not isinstance(value, str) or not value:
+            _fail(
+                "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+                "the controlled validation authority is incomplete",
+            )
+        return value
+
+    def address_list(mapping: Any, key: str, family: int) -> List[str]:
+        values = mapping.get(key) if isinstance(mapping, dict) else None
+        if not isinstance(values, list) or len(values) != 1:
+            _fail(
+                "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+                "the controlled validation authority must have one address per family",
+            )
+        try:
+            parsed = [ipaddress.ip_address(value) for value in values]
+        except (TypeError, ValueError):
+            _fail(
+                "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+                "the controlled validation authority contains malformed addressing",
+            )
+        if any(value.version != family for value in parsed):
+            _fail(
+                "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+                "the controlled validation authority has a family mismatch",
+            )
+        return [str(value) for value in parsed]
+
+    selected = required_string(authority, "selectedUplink")
+    alternate = authority.get("alternateUplinks")
+    if not (
+        authority.get("kind") == "controlled-iterative-hierarchy"
+        and authority.get("scope") == "harness"
+        and recursion_mode == "iterative"
+        and isinstance(alternate, list)
+        and alternate
+        and all(isinstance(value, str) and value for value in alternate)
+        and len(set(alternate)) == len(alternate)
+        and selected not in alternate
+        and required_string(authority, "traceId")
+    ):
+        _fail(
+            "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+            "the controlled validation authority is outside the harness contract",
+        )
+
+    provider = authority.get("provider")
+    bridge = required_string(provider, "bridge")
+    if bridge != selected:
+        _fail(
+            "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+            "the controlled authority bridge disagrees with the selected uplink",
+        )
+
+    provider4 = provider.get("ipv4") if isinstance(provider, dict) else None
+    provider6 = provider.get("ipv6") if isinstance(provider, dict) else None
+    try:
+        interface4 = ipaddress.ip_interface(required_string(provider4, "address"))
+        network4 = interface4.network
+        router4 = ipaddress.ip_address(required_string(provider4, "router"))
+        client4 = ipaddress.ip_address(required_string(provider4, "clientAddress"))
+        range_start = ipaddress.ip_address(required_string(provider4, "rangeStart"))
+        range_end = ipaddress.ip_address(required_string(provider4, "rangeEnd"))
+        interface6 = ipaddress.ip_interface(required_string(provider6, "address"))
+        network6 = ipaddress.ip_network(
+            required_string(provider6, "prefix"), strict=False
+        )
+        router6 = ipaddress.ip_address(required_string(provider6, "router"))
+    except ValueError:
+        _fail(
+            "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+            "the controlled validation authority contains malformed provider addressing",
+        )
+    if not (
+        interface4.version == 4
+        and all(
+            value.version == 4 and value in network4
+            for value in (router4, client4, range_start, range_end)
+        )
+        and int(range_start) <= int(range_end)
+        and interface6.version == 6
+        and network6.version == 6
+        and interface6.network == network6
+        and router6.version == 6
+        and router6 in network6
+        and required_string(provider4, "leaseTime")
+        and required_string(provider6, "leaseTime")
+    ):
+        _fail(
+            "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+            "the controlled validation authority provider addressing is inconsistent",
+        )
+
+    root = authority.get("root")
+    delegation = authority.get("delegation")
+    terminal = authority.get("terminal")
+    delegation_zone = required_string(delegation, "zone")
+    names = [
+        required_string(root, "nameServer"),
+        required_string(delegation, "nameServer"),
+        required_string(terminal, "name"),
+    ]
+    if not (
+        required_string(root, "zone") == "."
+        and delegation_zone != "."
+        and re.fullmatch(_FQDN_PATTERN, delegation_zone)
+        and all(re.fullmatch(_FQDN_PATTERN, name) for name in names)
+        and all(name.endswith(delegation_zone) for name in names)
+        and isinstance(authority.get("trust"), dict)
+        and authority["trust"].get("mode") == "insecure-controlled-root"
+    ):
+        _fail(
+            "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+            "the controlled validation authority hierarchy is inconsistent",
+        )
+
+    all4: List[str] = []
+    all6: List[str] = []
+    for record in (root, delegation, terminal):
+        all4.extend(address_list(record, "ipv4", 4))
+        all6.extend(address_list(record, "ipv6", 6))
+    if not (
+        all(ipaddress.ip_address(value) in network4 for value in all4)
+        and all(ipaddress.ip_address(value) in network6 for value in all6)
+    ):
+        _fail(
+            "DNS_VALIDATION_AUTHORITY_EXTERNAL",
+            "the controlled validation authority records are outside the provider network",
+        )
+
+    return copy.deepcopy(authority)
 
 
 def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
@@ -80,9 +236,7 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
     valid_named_core_resolvers = all(
         isinstance(resolver.get("endpointAuthority"), dict)
         and _non_empty_string(resolver["endpointAuthority"].get("relationId"))
-        and _non_empty_string(
-            resolver["endpointAuthority"].get("terminalAttachmentId")
-        )
+        and _non_empty_string(resolver["endpointAuthority"].get("terminalAttachmentId"))
         for resolver in named_core_resolvers
     )
     named_core_addresses = _sorted_unique(
@@ -98,9 +252,7 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
         if resolver.get("kind") == "local-namespace-authority"
     ]
 
-    service_endpoint_bindings = _dict_list(
-        dns.get("serviceEndpointBindings", [])
-    )
+    service_endpoint_bindings = _dict_list(dns.get("serviceEndpointBindings", []))
     valid_service_endpoint_bindings = all(
         _non_empty_string(binding.get("service"))
         and _non_empty_string(binding.get("requesterService"))
@@ -117,9 +269,7 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
             for address in _string_list(binding.get("addresses", []))
         ]
     )
-    configured_listen_addresses = _sorted_unique(
-        _string_list(dns.get("listen", []))
-    )
+    configured_listen_addresses = _sorted_unique(_string_list(dns.get("listen", [])))
     if service_endpoint_bindings and not (
         valid_service_endpoint_bindings
         and service_endpoint_addresses == configured_listen_addresses
@@ -226,6 +376,8 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
     else:
         root_forwarders = legacy_forwarders
 
+    validation_authority = _controlled_validation_authority(dns, recursion_mode)
+
     return {
         "recursionMode": recursion_mode,
         "reproducibilityWarnings": reproducibility_warnings,
@@ -236,6 +388,7 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
         "localOnlyPolicy": local_only_policy
         if isinstance(local_only_policy, dict)
         else {},
+        "validationAuthority": validation_authority,
     }
 
 
