@@ -44,6 +44,7 @@ from clabgen.cpm_solver import control_plane_model_to_solver_json
 from clabgen.s88.enterprise.enterprise import Enterprise
 from clabgen.s88.CM.dns_service import render_dns_service
 from clabgen.s88.site.model_builder import build_nodes, tenant_prefix_owners
+from clabgen.s88.site.naming import realized_bridge_name
 from clabgen.s88.site.node_runtime import build_node_data
 
 
@@ -109,6 +110,41 @@ assert all(
     link["labels"].get("clab.link.bridge") != "overlay-secondary"
     for link in provider_links
 )
+
+
+def core_provider_link(interface: str, bridge: str) -> dict:
+    matches = [
+        link
+        for link in rendered["topology"]["links"]
+        if link["labels"].get("clab.link.bridge") == bridge
+        and any(
+            "core-primary" in endpoint.split(":", 1)[0]
+            and endpoint.endswith(f":{interface}")
+            for endpoint in link["endpoints"]
+        )
+    ]
+    core_links = [
+        link
+        for link in rendered["topology"]["links"]
+        if any("core-primary" in endpoint for endpoint in link["endpoints"])
+    ]
+    assert len(matches) == 1, (interface, bridge, core_links)
+    return matches[0]
+
+
+for interface, source_bridge in (
+    ("wan0", "isp-primary"),
+    ("wan1", "overlay-secondary"),
+):
+    bridge = realized_bridge_name(source_bridge)
+    core_link = core_provider_link(interface, bridge)
+    bridge_endpoints = [
+        endpoint
+        for endpoint in core_link["endpoints"]
+        if endpoint.startswith(f"{bridge}:")
+    ]
+    assert len(bridge_endpoints) == 1, core_link
+    assert all(not endpoint.startswith("host:") for endpoint in core_link["endpoints"])
 
 site_data = next(
     site
