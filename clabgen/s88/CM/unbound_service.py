@@ -194,7 +194,7 @@ def render_unbound_dns_service(
     address_ready = " && ".join(
         "ip -o address show | "
         + f"awk -v address={shlex.quote(value)} "
-        + '\'index($4, address "/") == 1 && '
+        + '\'($4 == address || index($4, address "/") == 1) && '
         + "$0 !~ / (tentative|dadfailed)( |$)/ { found=1 } "
         + "END { exit !found }'"
         for value in non_loopback_listen
