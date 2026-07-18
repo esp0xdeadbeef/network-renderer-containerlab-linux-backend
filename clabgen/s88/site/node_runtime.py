@@ -122,6 +122,7 @@ def build_node_data(
         "egressIntent": copy.deepcopy(node.egress_intent),
         "natIntent": copy.deepcopy(node.nat_intent),
         "forwardingIntent": copy.deepcopy(node.forwarding_intent),
+        "runtimeOriginEgress": copy.deepcopy(node.runtime_origin_egress),
         "loopback": {
             "ipv4": node.loopback4,
             "ipv6": node.loopback6,

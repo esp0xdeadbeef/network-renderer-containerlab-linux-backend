@@ -83,6 +83,16 @@ REGISTRY: Dict[str, Dict[str, Dict[str, Any]]] = {
             ),
             "used_by": ["dns_service.py"],
         },
+        "inet s88_dns_egress": {
+            "source": "platform-registry",
+            "description": (
+                "DNS-only output routing table. Its route-hook rules are emitted only "
+                "when CPM runtimeOriginEgress.policyRouting supplies the exact mark, "
+                "table, priority, selected uplink, and selected interface. The table "
+                "name is a renderer implementation detail shared with the NixOS backend."
+            ),
+            "used_by": ["dns_service.py"],
+        },
         "inet clab_guard": {
             "source": "platform-registry",
             "description": (
@@ -182,6 +192,15 @@ REGISTRY: Dict[str, Dict[str, Dict[str, Any]]] = {
                 "(postrouting)."
             ),
             "used_by": ["nat.py", "firewall_wan.py"],
+        },
+        "route": {
+            "source": "platform-registry",
+            "description": (
+                "Standard nftables route hook type. Used on output so a CPM-owned "
+                "DNS firewall mark triggers route lookup before locally originated "
+                "Unbound traffic leaves the node."
+            ),
+            "used_by": ["dns_service.py"],
         },
     },
     "hook_types": {
@@ -395,7 +414,7 @@ REGISTRY: Dict[str, Dict[str, Dict[str, Any]]] = {
                 "nftables constant 'mangle' (resolves to -150). Used for TCP MSS clamping "
                 "in inet mangle forward chain. Standard nftables priority keyword."
             ),
-            "used_by": ["firewall_wan.py"],
+            "used_by": ["firewall_wan.py", "dns_service.py"],
         },
     },
 }

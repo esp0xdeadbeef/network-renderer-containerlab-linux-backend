@@ -5,7 +5,10 @@ from typing import Any, Dict, List
 import json
 import shlex
 
-from clabgen.s88.CM.dns_authority import normalize_dns_authority
+from clabgen.s88.CM.dns_authority import (
+    normalize_dns_authority,
+    normalize_dns_egress_policy,
+)
 from clabgen.s88.CM.unbound_service import render_unbound_dns_service
 
 
@@ -87,6 +90,25 @@ def _public_resolver_drop_commands(
     return commands
 
 
+def _dns_egress_policy_commands(node: Dict[str, Any]) -> List[str]:
+    policy = normalize_dns_egress_policy(node)
+    if policy is None:
+        return []
+
+    mark = policy["firewallMark"]
+    priority = policy["rulePriority"]
+    table = policy["tableId"]
+    return [
+        "if nft list table inet s88_dns_egress >/dev/null 2>&1; then nft delete table inet s88_dns_egress; fi",
+        "nft add table inet s88_dns_egress",
+        "nft 'add chain inet s88_dns_egress output { type route hook output priority mangle; policy accept; }'",
+        f"nft add rule inet s88_dns_egress output meta l4proto udp udp dport 53 meta mark set {mark} comment 'select-modeled-dns-egress'",
+        f"nft add rule inet s88_dns_egress output meta l4proto tcp tcp dport 53 meta mark set {mark} comment 'select-modeled-dns-egress'",
+        f"ip rule add fwmark {mark} priority {priority} table {table} 2>/dev/null || true",
+        f"ip -6 rule add fwmark {mark} priority {priority} table {table} 2>/dev/null || true",
+    ]
+
+
 def render_dns_service(
     node: Dict[str, Any],
     node_name: str = "container",
@@ -108,7 +130,8 @@ def render_dns_service(
         return render_unbound_dns_service(
             dns,
             authority,
-            _public_resolver_drop_commands(dns, authority["rootForwarders"]),
+            _public_resolver_drop_commands(dns, authority["rootForwarders"])
+            + _dns_egress_policy_commands(node),
         )
 
     payload = {

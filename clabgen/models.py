@@ -64,6 +64,7 @@ class NodeModel:
     egress_intent: Dict[str, Any] = field(default_factory=dict)
     nat_intent: Dict[str, Any] = field(default_factory=dict)
     forwarding_intent: Dict[str, Any] = field(default_factory=dict)
+    runtime_origin_egress: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
