@@ -198,8 +198,11 @@ def render_unbound_dns_service(
         value for value in listen if value not in {"127.0.0.1", "::1"}
     ]
     address_ready = " && ".join(
-        "ip -o address show | awk '{print $4}' | cut -d/ -f1 | "
-        + f"grep -Fx -- {shlex.quote(value)} >/dev/null"
+        "ip -o address show | "
+        + f"awk -v address={shlex.quote(value)} "
+        + '\'index($4, address "/") == 1 && '
+        + "$0 !~ / (tentative|dadfailed)( |$)/ { found=1 } "
+        + "END { exit !found }'"
         for value in non_loopback_listen
     )
     socket_ready = " && ".join(

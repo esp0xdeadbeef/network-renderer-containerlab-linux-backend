@@ -135,6 +135,7 @@ assert "nohup unbound -d -c /tmp/clabgen-unbound.conf" in core_script
 assert 'username: "unbound"' in core_config
 assert 'username: ""' not in core_config
 assert "DNS listener endpoints did not become available" in core_script
+assert "tentative|dadfailed" in core_script
 assert "DNS resolver did not remain available" in core_script
 
 recursive_dns = recursive["services"]["dns"]
