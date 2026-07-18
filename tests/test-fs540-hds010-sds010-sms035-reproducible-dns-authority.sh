@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# GAMP-ID: FS-540-HDS-010-SDS-010-SMS-035
+# GAMP-SCOPE: software-module-test
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "${tmp_dir}"' EXIT
+
+REPO_ROOT="${repo_root}" nix eval --json --impure --expr '
+let
+  repoRoot = builtins.getEnv "REPO_ROOT";
+  flake = builtins.getFlake ("path:" + repoRoot);
+  system = builtins.currentSystem;
+  labs = flake.inputs.network-labs.outPath;
+  traceId = "FS-540-HDS-010-SDS-010-SMS-030";
+  source = import (labs + "/GAMP/SMT/FS-540-HDS-010-SDS-010-SMS-030/intent.nix");
+  inventory = import (labs + "/GAMP/SMT/FS-540-HDS-010-SDS-010-SMS-030/inventory-clab.nix");
+  built = flake.inputs.network-control-plane-model.libBySystem.${system}.compileAndBuild {
+    input = source;
+    inherit inventory;
+  };
+  targets = built.control_plane_model.data.mini-smt.${traceId}.runtimeTargets;
+in
+builtins.mapAttrs
+  (_name: target: {
+    inherit (target) logicalNode;
+    services = target.services or { };
+  })
+  targets
+' >"${tmp_dir}/targets.json"
+
+unbound_out="$(nix eval --raw nixpkgs#unbound.outPath)"
+dns_root_out="$(nix eval --raw nixpkgs#dns-root-data.outPath)"
+
+TARGETS_JSON="${tmp_dir}/targets.json" \
+UNBOUND_CHECKCONF="${unbound_out}/bin/unbound-checkconf" \
+UNBOUND_ROOT_KEY="${dns_root_out}/root.key" \
+PYTHONPATH="${repo_root}" \
+python3 - <<'PY'
+from __future__ import annotations
+
+import copy
+from ipaddress import ip_address, ip_network
+import json
+import os
+import re
+import shlex
+import subprocess
+import tempfile
+
+from clabgen.s88.CM.dns_service import render_dns_service
+
+
+with open(os.environ["TARGETS_JSON"], encoding="utf-8") as handle:
+    targets = json.load(handle)
+
+
+def target_for(logical_name):
+    matches = [
+        target
+        for target in targets.values()
+        if (target.get("logicalNode") or {}).get("name") == logical_name
+    ]
+    assert len(matches) == 1
+    return matches[0]
+
+
+def rendered_script(target):
+    commands = render_dns_service(target, (target.get("logicalNode") or {}).get("name", "node"))
+    assert len(commands) == 1
+    argv = shlex.split(commands[0])
+    assert argv[:2] == ["sh", "-c"]
+    return argv[2]
+
+
+def unbound_config(script):
+    match = re.search(
+        r"cat >/tmp/clabgen-unbound[.]conf <<'UNBOUND'\n(.*?)\nUNBOUND\n",
+        script,
+        re.DOTALL,
+    )
+    assert match is not None
+    return match.group(1)
+
+
+recursive = target_for("access-recursive")
+local = target_for("access-local")
+core = target_for("core-primary")
+
+recursive_script = rendered_script(recursive)
+local_script = rendered_script(local)
+core_script = rendered_script(core)
+recursive_config = unbound_config(recursive_script)
+local_config = unbound_config(local_script)
+core_config = unbound_config(core_script)
+
+
+def check_config(config):
+    rendered = config.replace(
+        "/tmp/clabgen-unbound-root.key", os.environ["UNBOUND_ROOT_KEY"]
+    )
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as handle:
+        handle.write(rendered)
+        handle.flush()
+        result = subprocess.run(
+            [os.environ["UNBOUND_CHECKCONF"], handle.name],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    assert result.returncode == 0
+
+
+for config in (recursive_config, local_config, core_config):
+    check_config(config)
+
+assert "clabgen-dns-proxy.py" not in recursive_script + local_script + core_script
+assert "unbound-checkconf /tmp/clabgen-unbound.conf" in recursive_script
+assert "nohup unbound -d -c /tmp/clabgen-unbound.conf" in core_script
+
+recursive_dns = recursive["services"]["dns"]
+named_core = next(
+    resolver
+    for resolver in recursive_dns["upstreamResolvers"]
+    if resolver.get("kind") == "named-core-resolver"
+)
+assert 'forward-zone:\n  name: "."' in recursive_config
+for address in named_core["addresses"]:
+    assert f'forward-addr: "{ip_address(address)}"' in recursive_config
+for policy in recursive_dns["requesterPolicies"]:
+    assert policy["action"] == "refuse_non_local"
+    for prefix in policy["sourcePrefixes"]:
+        assert f'access-control: "{ip_network(prefix, strict=False)}" refuse_non_local' in recursive_config
+
+local_dns = local["services"]["dns"]
+assert 'local-zone: "." static' in local_config
+assert 'forward-zone:\n  name: "."' not in local_config
+for zone in local_dns["localForwardZones"]:
+    assert f'forward-zone:\n  name: "{zone["name"]}"' in local_config
+    assert "forward-first: no" in local_config
+    for address in zone["forwardTo"]:
+        assert f'forward-addr: "{ip_address(address)}"' in local_config
+
+assert "forward-zone:" not in core_config
+assert 'auto-trust-anchor-file: "/tmp/clabgen-unbound-root.key"' in core_config
+assert "install -m 0600 /usr/share/dns/root.key" in core_script
+
+
+def rejected(target, code):
+    try:
+        rendered_script(target)
+    except ValueError as error:
+        diagnostic = str(error)
+        assert code in diagnostic
+        assert not re.search(r"(?:[0-9]{1,3}\.){3}[0-9]{1,3}", diagnostic)
+        assert not re.search(r"(?:[0-9A-Fa-f]{0,4}:){2,}", diagnostic)
+        return
+    raise AssertionError(f"seeded negative did not raise {code}")
+
+
+leaking = copy.deepcopy(local)
+leaking["services"]["dns"]["localOnlyPolicy"]["recursion"] = True
+rejected(leaking, "DNS_LOCAL_ONLY_AUTHORITY_LEAK")
+
+divergent = copy.deepcopy(recursive)
+divergent["services"]["dns"]["forwarders"] = ["seeded-mismatch"]
+rejected(divergent, "DNS_RENDERER_CONTRACT_DIVERGENCE")
+
+fatal = copy.deepcopy(recursive)
+fatal["services"]["dns"]["reproducibilityWarnings"] = [
+    {"code": "DNS_EGRESS_SELECTION_AMBIGUOUS", "disposition": "fail-closed"}
+]
+rejected(fatal, "DNS_EGRESS_SELECTION_AMBIGUOUS")
+
+warned = copy.deepcopy(recursive)
+warned["services"]["dns"]["reproducibilityWarnings"] = [
+    {"code": "DNS_CORE_UPSTREAM_HARDCODED", "disposition": "warn"}
+]
+warning_script = rendered_script(warned)
+assert "DNS_CORE_UPSTREAM_HARDCODED" in warning_script
+assert "address material is intentionally omitted" in warning_script
+
+print("PASS FS-540 CLAB reproducible DNS authority materialization")
+PY

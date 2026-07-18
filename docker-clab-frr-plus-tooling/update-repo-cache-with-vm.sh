@@ -126,7 +126,7 @@ test -s "${cache_tar}"
 test -s "${cache_id}"
 
 docker run --rm --entrypoint /bin/sh clab-frr-plus-tooling:latest -ec '
-    for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do
+    for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do
         command -v "$cmd" >/dev/null || exit 1
     done
     grep -q "^bgpd=yes" /etc/frr/daemons
