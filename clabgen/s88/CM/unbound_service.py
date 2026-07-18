@@ -216,7 +216,7 @@ def render_unbound_dns_service(
             "UNBOUND",
             "unbound-checkconf /tmp/clabgen-unbound.conf >/dev/null",
             "dns_listener_ready=0",
-            "for attempt in $(seq 1 600); do",
+            "for attempt in $(seq 1 3000); do",
             f"  if {address_ready}; then dns_listener_ready=1; break; fi",
             "  sleep 0.1",
             "done",

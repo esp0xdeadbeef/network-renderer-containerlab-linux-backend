@@ -137,7 +137,8 @@ assert 'username: ""' not in core_config
 assert "DNS listener endpoints did not become available" in core_script
 assert "tentative|dadfailed" in core_script
 assert "DNS resolver did not remain available" in core_script
-assert core_script.count("for attempt in $(seq 1 600)") == 2
+assert core_script.count("for attempt in $(seq 1 3000)") == 1
+assert core_script.count("for attempt in $(seq 1 600)") == 1
 assert "for attempt in $(seq 1 100)" not in core_script
 
 recursive_dns = recursive["services"]["dns"]
