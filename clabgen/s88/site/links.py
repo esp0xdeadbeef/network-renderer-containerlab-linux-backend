@@ -4,7 +4,6 @@ from typing import Any, Dict, List
 
 from clabgen.models import SiteModel
 from clabgen.s88.site.naming import (
-    bridge_name,
     host_ifname,
     host_uplink_interface,
     link_bridge,
@@ -35,6 +34,7 @@ def _link_endpoint(
     return f"{node_name}:{eth_maps[node_name][iface]}"
 
 
+# Physical host-uplink compatibility stays separate from isolated bridge endpoints.
 def _host_bridge_link(
     endpoint: str, bridge: str, link_name: str, host_uplink: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -71,6 +71,20 @@ def _render_model_links(
 
         if len(endpoints) == 1:
             bridge = link_bridge(site, link, link_name)
+            if link.host_uplink.get("mode") == "isolated":
+                explicit_bridge = link.host_uplink.get("bridge")
+                if explicit_bridge != bridge:
+                    raise ValueError(
+                        f"isolated link {link_name!r} bridge {bridge!r} diverges "
+                        f"from explicit hostUplink.bridge {explicit_bridge!r}"
+                    )
+                bridges.append(bridge)
+                endpoints.append(
+                    f"{bridge}:{host_ifname(f'{bridge}-{link_name}-{endpoints[0]}')}"
+                )
+                links.append(_bridge_link(endpoints, bridge, link_name))
+                continue
+
             if host_uplink_interface(link.host_uplink):
                 bridges.append(bridge)
                 links.append(
