@@ -219,8 +219,14 @@ for policy in recursive_dns["requesterPolicies"]:
         assert f'access-control: "{ip_network(prefix, strict=False)}" refuse_non_local' in recursive_config
 
 local_dns = local["services"]["dns"]
-assert 'local-zone: "." static' in local_config
+assert 'local-zone: "." static' not in local_config
 assert 'forward-zone:\n  name: "."' not in local_config
+for prefix in local_dns["allowFrom"]:
+    rendered_prefix = ip_network(prefix, strict=False)
+    assert f'access-control: "{rendered_prefix}" refuse_non_local' in local_config
+    assert f'access-control: "{rendered_prefix}" allow' not in local_config
+assert 'access-control: "127.0.0.0/8" refuse_non_local' in local_config
+assert 'access-control: "::1/128" refuse_non_local' in local_config
 for zone in local_dns["localForwardZones"]:
     assert f'forward-zone:\n  name: "{zone["name"]}"' in local_config
     assert "forward-first: no" in local_config

@@ -112,8 +112,6 @@ def render_unbound_dns_service(
                 "publicRecursionFallback", False
             ):
                 local_zones.append((_zone_name(decision.get("namespace")), "static"))
-    if authority["recursionMode"] == "local-only":
-        local_zones.append((".", "static"))
     local_zones = list(dict.fromkeys(local_zones))
 
     local_data: List[str] = []
@@ -164,8 +162,11 @@ def render_unbound_dns_service(
     ]
     for value in listen:
         config.append(f"  interface: {_quote(value)}")
+    requester_default_action = (
+        "refuse_non_local" if authority["recursionMode"] == "local-only" else "allow"
+    )
     for value in allow_from:
-        config.append(f"  access-control: {_quote(value)} allow")
+        config.append(f"  access-control: {_quote(value)} {requester_default_action}")
     for prefix, action in requester_actions:
         config.append(f"  access-control: {_quote(prefix)} {action}")
     for value in outgoing_interfaces:
