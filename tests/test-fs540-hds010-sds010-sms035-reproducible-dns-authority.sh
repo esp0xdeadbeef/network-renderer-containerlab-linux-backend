@@ -198,12 +198,20 @@ for fragment in (
     "/run/udhcpc.wan0.s88-table-1002",
     'ip -4 route replace table 1002 default via "$router" dev "$interface"',
     "/run/s88-ra-route-wan0-table-1002.sh",
-    "route=\"$(ip -6 route show table main default dev wan0 | sed -n '1s/^default //p')\"",
+    "route=\"$(ip -6 route show table main default dev wan0 | sed -n '1s/^default //; s/ expires [^ ]*//; p')\"",
     "ip -6 route replace table 1002 default $route",
     "ip -6 monitor route",
 ):
     assert fragment in core_dynamic_script, (fragment, core_dynamic_script)
 assert "${route#" not in core_dynamic_script
+ra_route_sample = subprocess.run(
+    ["sed", "-n", "1s/^default //; s/ expires [^ ]*//; p"],
+    input="default via fe80::1 dev wan0 proto ra metric 1024 expires 75sec pref medium\n",
+    text=True,
+    capture_output=True,
+    check=True,
+).stdout.strip()
+assert ra_route_sample == "via fe80::1 dev wan0 proto ra metric 1024 pref medium"
 for command, payload in zip(core_dynamic_commands, core_dynamic_payloads, strict=True):
     argv = shlex.split(command)
     assert argv[:2] == ["sh", "-c"]
