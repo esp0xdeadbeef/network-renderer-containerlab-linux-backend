@@ -210,6 +210,14 @@ if len(bundled) != 3:
     raise AssertionError(f"exec-bundling-count: expected 3 bundles, got {len(bundled)}")
 if "command-0" not in bundled[0] or "command-204" not in bundled[-1]:
     raise AssertionError(f"exec-bundling-content: commands were not preserved: {bundled!r}")
+if "touch /tmp/clabgen-exec-bundle-${clab_bundle_generation}-1.ready" not in bundled[0]:
+    raise AssertionError(f"exec-bundling-order-marker: first bundle has no completion marker: {bundled[0]!r}")
+if "test -e /tmp/clabgen-exec-bundle-${clab_bundle_generation}-1.ready" not in bundled[1]:
+    raise AssertionError(f"exec-bundling-order-wait: second bundle does not wait for the first: {bundled[1]!r}")
+if bundled[1].index("test -e /tmp/clabgen-exec-bundle-${clab_bundle_generation}-1.ready") > bundled[1].index("command-100"):
+    raise AssertionError(f"exec-bundling-order-position: second bundle starts before its predecessor gate: {bundled[1]!r}")
+if "predecessor bundle did not complete" not in bundled[1]:
+    raise AssertionError(f"exec-bundling-order-diagnostic: predecessor timeout is not fail-closed: {bundled[1]!r}")
 if len(cm_rendered.get("exec", [])) >= len(render_em("core", "router", cm_node_data, {"inside": "lan-target0", "outside": "wan-target0"})):
     raise AssertionError(f"exec-bundling-rendered: rendered node did not reduce Containerlab exec fan-out: {cm_rendered!r}")
 for label in ("clab.exec.command.count", "clab.exec.bundle.count", "clab.exec.bundle.size"):
