@@ -178,6 +178,22 @@ def _protected_reservation_binds(node: NodeModel) -> List[str]:
     return [f"{path}:{path}:ro" for path in sorted(source_files)]
 
 
+def _has_unbound_runtime(node: NodeModel) -> bool:
+    services = node.services
+    if not isinstance(services, dict):
+        return False
+    dns = services.get("dns")
+    if not isinstance(dns, dict):
+        return False
+    listen = dns.get("listen")
+    if not isinstance(listen, list):
+        return False
+    return any(
+        isinstance(value, str) and value not in {"127.0.0.1", "::1"}
+        for value in listen
+    )
+
+
 def _selector_relation_audit(
     node: NodeModel, eth_map: Dict[str, str]
 ) -> Dict[str, List[Dict[str, Any]]]:
@@ -324,6 +340,8 @@ def render_linux_node(
     if protected_binds:
         rendered["binds"] = protected_binds
         labels["clab.access-advertisements.runtime"] = "kea"
+    if _has_unbound_runtime(node):
+        labels["clab.dns.runtime"] = "unbound"
     if selector_relation_audit:
         rendered[INTERNAL_SELECTOR_RELATION_AUDIT_KEY] = selector_relation_audit
     return rendered

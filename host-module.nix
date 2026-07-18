@@ -335,6 +335,34 @@ let
         RECONCILE_ACCESS_ADVERTISEMENTS
         chmod +x "$work_dir/reconcile-access-advertisements.sh"
 
+        cat > "$work_dir/reconcile-dns-services.sh" <<'RECONCILE_DNS_SERVICES'
+        set -euo pipefail
+
+        containers="$(
+          docker ps \
+            --filter 'label=clab.dns.runtime=unbound' \
+            --format '{{.Names}}' | sort
+        )"
+        test -n "$containers" || exit 0
+
+        while IFS= read -r container; do
+          test -n "$container" || continue
+          script=/tmp/clabgen-reconcile-unbound.sh
+          docker exec "$container" test -x "$script" || {
+            echo "container $container advertises DNS reconciliation without a runtime script" >&2
+            exit 1
+          }
+          docker exec "$container" sh -eu "$script" || {
+            echo "container $container failed post-deploy DNS reconciliation" >&2
+            exit 1
+          }
+          echo "reconciled post-deploy DNS service in $container"
+        done <<EOF
+        $containers
+        EOF
+        RECONCILE_DNS_SERVICES
+        chmod +x "$work_dir/reconcile-dns-services.sh"
+
         cat > "$work_dir/ensure-clab-tooling-image.sh" <<'ENSURE_CLAB_TOOLING'
         set -euo pipefail
 
@@ -473,6 +501,7 @@ let
             bash '$work_dir/deploy-containerlab-on-host.sh'
           bash '$work_dir/setup-bridge-links.sh'
           bash '$work_dir/retry-wan-dhcp.sh'
+          bash '$work_dir/reconcile-dns-services.sh'
           bash '$work_dir/reconcile-access-advertisements.sh'
           bash '$work_dir/verify-containerlab-deploy.sh' '$work_dir/fabric.clab.yml'
         "

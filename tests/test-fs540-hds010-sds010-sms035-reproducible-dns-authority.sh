@@ -30,6 +30,7 @@ dns_root_out="$(nix eval --raw nixpkgs#dns-root-data.outPath)"
 CPM_JSON="${tmp_dir}/cpm.json" \
 UNBOUND_CHECKCONF="${unbound_out}/bin/unbound-checkconf" \
 UNBOUND_ROOT_KEY="${dns_root_out}/root.key" \
+REPO_ROOT="${repo_root}" \
 PYTHONPATH="${repo_root}" \
 python3 - <<'PY'
 from __future__ import annotations
@@ -38,6 +39,7 @@ import copy
 from ipaddress import ip_address, ip_interface, ip_network
 import json
 import os
+from pathlib import Path
 import re
 import shlex
 import subprocess
@@ -47,7 +49,7 @@ from clabgen.s88.CM.dns_service import render_dns_service
 from clabgen.s88.CM.linux_wan_dynamic import render as render_dynamic_wan
 from clabgen.cpm_solver import control_plane_model_to_solver_json
 from clabgen.s88.site.model_builder import build_nodes, tenant_prefix_owners
-from clabgen.s88.site.node_runtime import build_node_data
+from clabgen.s88.site.node_runtime import build_node_data, render_linux_node
 
 
 with open(os.environ["CPM_JSON"], encoding="utf-8") as handle:
@@ -95,6 +97,16 @@ def unbound_config(script):
     return match.group(1)
 
 
+def unbound_reconcile_script(script):
+    match = re.search(
+        r"cat >/tmp/clabgen-reconcile-unbound[.]sh <<'RECONCILE_UNBOUND'\n(.*?)\nRECONCILE_UNBOUND\n",
+        script,
+        re.DOTALL,
+    )
+    assert match is not None
+    return match.group(1)
+
+
 recursive = target_for("access-recursive")
 local = target_for("access-local")
 core = target_for("core-primary")
@@ -108,6 +120,7 @@ core_dynamic_script = "\n".join(core_dynamic_payloads)
 recursive_config = unbound_config(recursive_script)
 local_config = unbound_config(local_script)
 core_config = unbound_config(core_script)
+core_reconcile_script = unbound_reconcile_script(core_script)
 
 
 def check_config(config):
@@ -137,9 +150,10 @@ assert 'username: ""' not in core_config
 assert "DNS listener endpoints did not become available" in core_script
 assert "tentative|dadfailed" in core_script
 assert "DNS resolver did not remain available" in core_script
-assert core_script.count("for attempt in $(seq 1 3000)") == 1
-assert core_script.count("for attempt in $(seq 1 600)") == 1
+assert core_reconcile_script.count("for attempt in $(seq 1 3000)") == 1
+assert core_reconcile_script.count("for attempt in $(seq 1 600)") == 1
 assert "for attempt in $(seq 1 100)" not in core_script
+assert core_script.rstrip().endswith("chmod 0700 /tmp/clabgen-reconcile-unbound.sh")
 
 recursive_dns = recursive["services"]["dns"]
 core_dns = core["services"]["dns"]
@@ -243,7 +257,7 @@ for fragment in (
 ):
     assert fragment in core_script
 assert core_script.index("nft add table inet s88_dns_egress") < core_script.index(
-    "nohup unbound -d -c /tmp/clabgen-unbound.conf"
+    "cat >/tmp/clabgen-reconcile-unbound.sh"
 )
 for fragment in (
     "/run/udhcpc.wan0.s88-table-1002",
@@ -347,6 +361,29 @@ warned["services"]["dns"]["reproducibilityWarnings"] = [
 warning_script = rendered_script(warned)
 assert "DNS_CORE_UPSTREAM_HARDCODED" in warning_script
 assert "address material is intentionally omitted" in warning_script
+
+for name in ("access-recursive", "access-local", "core-primary"):
+    rendered_node = render_linux_node(name, models[name], eth_maps[name])
+    assert rendered_node["labels"]["clab.dns.runtime"] == "unbound"
+policy_node = render_linux_node("policy", models["policy"], eth_maps["policy"])
+assert "clab.dns.runtime" not in policy_node["labels"]
+
+repo_root = Path(os.environ["REPO_ROOT"])
+host_module = (repo_root / "host-module.nix").read_text(encoding="utf-8")
+deploy_clab = (repo_root / "deploy-clab.sh").read_text(encoding="utf-8")
+for content in (host_module, deploy_clab):
+    assert "label=clab.dns.runtime=unbound" in content
+    assert "/tmp/clabgen-reconcile-unbound.sh" in content
+assert "reconcile-dns-services.sh" in host_module
+deploy_pos = host_module.index("bash '$work_dir/deploy-containerlab-on-host.sh'")
+post_bridge_pos = host_module.index("bash '$work_dir/setup-bridge-links.sh'", deploy_pos)
+dns_reconcile_pos = host_module.index("bash '$work_dir/reconcile-dns-services.sh'", deploy_pos)
+verify_pos = host_module.index("bash '$work_dir/verify-containerlab-deploy.sh'", deploy_pos)
+assert deploy_pos < post_bridge_pos < dns_reconcile_pos < verify_pos
+assert "reconcile_dns_services \"${name}\"" in deploy_clab
+assert deploy_clab.index('reconcile_dns_services "${name}"') < deploy_clab.index(
+    'verify_fabric_containers "${name}"'
+)
 
 print("PASS FS-540 CLAB reproducible DNS authority materialization")
 PY
