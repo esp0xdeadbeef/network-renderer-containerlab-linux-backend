@@ -120,11 +120,19 @@ assert "unbound-checkconf /tmp/clabgen-unbound.conf" in recursive_script
 assert "nohup unbound -d -c /tmp/clabgen-unbound.conf" in core_script
 
 recursive_dns = recursive["services"]["dns"]
+core_dns = core["services"]["dns"]
 named_core = next(
     resolver
     for resolver in recursive_dns["upstreamResolvers"]
     if resolver.get("kind") == "named-core-resolver"
 )
+core_endpoint_binding = core_dns["serviceEndpointBindings"][0]
+assert named_core["endpointAuthority"]["relationId"] == core_endpoint_binding["relationId"]
+assert (
+    named_core["endpointAuthority"]["terminalAttachmentId"]
+    == core_endpoint_binding["terminalAttachmentId"]
+)
+assert core_endpoint_binding["addresses"] == core_dns["listen"]
 assert 'forward-zone:\n  name: "."' in recursive_config
 for address in named_core["addresses"]:
     assert f'forward-addr: "{ip_address(address)}"' in recursive_config
@@ -141,6 +149,12 @@ for zone in local_dns["localForwardZones"]:
     assert "forward-first: no" in local_config
     for address in zone["forwardTo"]:
         assert f'forward-addr: "{ip_address(address)}"' in local_config
+for policy in local_dns["requesterPolicies"]:
+    assert policy["action"] == "refuse_non_local"
+    for prefix in policy["sourcePrefixes"]:
+        assert f'access-control: "{ip_network(prefix, strict=False)}" refuse_non_local' in local_config
+assert 'local-zone: "lab." transparent' in local_config
+assert 'local-zone: "lab." static' not in local_config
 
 assert "forward-zone:" not in core_config
 assert 'auto-trust-anchor-file: "/tmp/clabgen-unbound-root.key"' in core_config
@@ -166,6 +180,29 @@ rejected(leaking, "DNS_LOCAL_ONLY_AUTHORITY_LEAK")
 divergent = copy.deepcopy(recursive)
 divergent["services"]["dns"]["forwarders"] = ["seeded-mismatch"]
 rejected(divergent, "DNS_RENDERER_CONTRACT_DIVERGENCE")
+
+missing_endpoint_authority = copy.deepcopy(recursive)
+next(
+    resolver
+    for resolver in missing_endpoint_authority["services"]["dns"]["upstreamResolvers"]
+    if resolver.get("kind") == "named-core-resolver"
+).pop("endpointAuthority")
+rejected(missing_endpoint_authority, "DNS_RENDERER_CONTRACT_DIVERGENCE")
+
+divergent_core_endpoint = copy.deepcopy(core)
+divergent_core_endpoint["services"]["dns"]["serviceEndpointBindings"][0]["addresses"] = [
+    "seeded.v4",
+    "seeded:v6",
+]
+rejected(divergent_core_endpoint, "DNS_RENDERER_CONTRACT_DIVERGENCE")
+
+shadowed_namespace = copy.deepcopy(local)
+next(
+    zone
+    for zone in shadowed_namespace["services"]["dns"]["localZones"]
+    if zone.get("name") == "lab."
+)["type"] = "static"
+rejected(shadowed_namespace, "DNS_LOCAL_NAMESPACE_SHADOWED")
 
 fatal = copy.deepcopy(recursive)
 fatal["services"]["dns"]["reproducibilityWarnings"] = [
