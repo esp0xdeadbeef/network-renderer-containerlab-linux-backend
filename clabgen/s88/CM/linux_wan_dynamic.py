@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 from typing import Any, Dict, List
 
+from clabgen.s88.CM.dns_authority import normalize_dns_egress_policy
 from clabgen.s88.CM.linux_shell import _sh
 
 
@@ -47,20 +48,71 @@ def _wan_interfaces(
     return wan_interfaces
 
 
-def _dhcp4_command(interface_name: str) -> str:
+def _dhcp4_command(interface_name: str, route_table: int | None = None) -> str:
     pid_file = f"/run/udhcpc.{interface_name}.pid"
+    if route_table is not None:
+        hook_file = f"/run/udhcpc.{interface_name}.s88-table-{route_table}"
+        return f"""cat >{hook_file} <<'S88_UDHCPC'
+#!/bin/sh
+/etc/udhcpc/default.script "$@"
+case "$1" in
+  bound|renew)
+    router="${{router%% *}}"
+    if [ -n "$router" ]; then
+      [ "$subnet" = "255.255.255.255" ] && onlink=onlink || onlink=
+      ip -4 route replace table {route_table} default via "$router" dev "$interface" $onlink
+    fi
+    ;;
+  deconfig)
+    if ip -4 route show table {route_table} default dev "$interface" 2>&1 | grep -q '^default '; then
+      ip -4 route del table {route_table} default dev "$interface"
+    fi
+    ;;
+esac
+S88_UDHCPC
+chmod 0700 {hook_file}
+test -x /sbin/udhcpc && udhcpc -b -i {interface_name} -s {hook_file} -p {pid_file} || true"""
     return (
         f"test -x /sbin/udhcpc && udhcpc -b -i {interface_name} -p {pid_file} || true"
     )
 
 
-def _slaac_command(interface_name: str) -> str:
-    return (
+def _slaac_command(interface_name: str, route_table: int | None = None) -> str:
+    setup = (
         f"sysctl -qw net.ipv6.conf.{interface_name}.accept_ra=2 "
         f"net.ipv6.conf.{interface_name}.autoconf=1 "
         f"net.ipv6.conf.{interface_name}.disable_ipv6=0 "
         "|| true"
     )
+    if route_table is None:
+        return setup
+
+    sync_file = f"/run/s88-ra-route-{interface_name}-table-{route_table}.sh"
+    pid_file = f"/run/s88-ra-route-{interface_name}-table-{route_table}.pid"
+    return f"""{setup}
+cat >{sync_file} <<'S88_RA_ROUTE'
+#!/bin/sh
+sync_selected_ra_route() {{
+  route="$(ip -6 route show table main default dev {interface_name} | head -n 1)"
+  if [ -n "$route" ]; then
+    ip -6 route replace table {route_table} ${{route#default }}
+  elif ip -6 route show table {route_table} default dev {interface_name} 2>&1 | grep -q '^default '; then
+    ip -6 route del table {route_table} default dev {interface_name}
+  fi
+}}
+for attempt in $(seq 1 50); do
+  sync_selected_ra_route
+  ip -6 route show table {route_table} default dev {interface_name} | grep -q . && break
+  sleep 0.2
+done
+ip -6 monitor route | while read -r _event; do
+  sync_selected_ra_route
+done
+S88_RA_ROUTE
+chmod 0700 {sync_file}
+if [ -s {pid_file} ]; then kill "$(cat {pid_file})" 2>/dev/null || true; fi
+nohup sh {sync_file} >/dev/null 2>&1 &
+echo $! >{pid_file}"""
 
 
 def _nat4_commands(interface_name: str, host_uplink: Dict[str, Any]) -> List[str]:
@@ -130,13 +182,15 @@ def _fake_provider_commands(
         dhcp4 = artifact.get("dhcp4")
         if not isinstance(dhcp4, dict):
             raise ValueError(
-                "fake-provider WAN binding requires dhcp4 data for "
-                f"VLAN {vlan}"
+                f"fake-provider WAN binding requires dhcp4 data for VLAN {vlan}"
             )
         address = dhcp4.get("address")
         router = dhcp4.get("router")
         client_address = dhcp4.get("clientAddress")
-        if not all(isinstance(value, str) and value for value in (address, router, client_address)):
+        if not all(
+            isinstance(value, str) and value
+            for value in (address, router, client_address)
+        ):
             raise ValueError(
                 "fake-provider WAN binding requires dhcp4.address, "
                 f"dhcp4.router, and dhcp4.clientAddress for VLAN {vlan}"
@@ -171,12 +225,37 @@ def _fake_provider_commands(
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     cmds: List[str] = []
     lab_emulation_artifacts = node.get("labEmulationArtifacts")
+    dns_egress_policy = normalize_dns_egress_policy(node)
+    selected_logical = (
+        dns_egress_policy.get("selectedInterface")
+        if dns_egress_policy is not None
+        else None
+    )
+    selected_runtime = (
+        dns_egress_policy.get("runtimeIfName")
+        if dns_egress_policy is not None
+        else None
+    )
+    selected_table = (
+        dns_egress_policy.get("tableId") if dns_egress_policy is not None else None
+    )
+    if (
+        selected_logical is not None
+        and eth_map.get(selected_logical) != selected_runtime
+    ):
+        raise ValueError(
+            "CLAB DNS renderer DNS_RENDERER_CONTRACT_DIVERGENCE: "
+            "selected dynamic egress interface does not match CPM runtime identity; "
+            "address material is intentionally omitted"
+        )
 
     wan_ifaces = _wan_interfaces(node, eth_map)
     for interface_data in wan_ifaces:
+        logical_name = interface_data["logical_name"]
         interface_name = interface_data["name"]
         host_uplink = interface_data["host_uplink"]
-        cmds.append(_sh(_slaac_command(interface_name)))
+        route_table = selected_table if logical_name == selected_logical else None
+        cmds.append(_sh(_slaac_command(interface_name, route_table)))
         if isinstance(host_uplink, dict) and host_uplink:
             # CPM provided hostUplink data. Address assignment mode comes from
             # ipv4.method/ipv6.method; NAT remains an explicit top-level mode.
@@ -201,14 +280,14 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
             elif host_mode == "static":
                 pass
             elif host_mode in ("dhcp", None):
-                cmds.append(_sh(_dhcp4_command(interface_name)))
+                cmds.append(_sh(_dhcp4_command(interface_name, route_table)))
             else:
                 # Unknown method — treat as DHCP (legacy)
-                cmds.append(_sh(_dhcp4_command(interface_name)))
+                cmds.append(_sh(_dhcp4_command(interface_name, route_table)))
         else:
             # CPM_GAP: no hostUplink data — fall back to DHCP (legacy behavior,
             # pending CPM hostUplink contract completion).
             # Trace: FS-380-HDS-010-SDS-010-SMS-060 (core WAN IP assignment).
-            cmds.append(_sh(_dhcp4_command(interface_name)))
+            cmds.append(_sh(_dhcp4_command(interface_name, route_table)))
 
     return cmds

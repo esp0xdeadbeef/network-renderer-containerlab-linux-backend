@@ -44,6 +44,7 @@ import subprocess
 import tempfile
 
 from clabgen.s88.CM.dns_service import render_dns_service
+from clabgen.s88.CM.linux_wan_dynamic import render as render_dynamic_wan
 from clabgen.cpm_solver import control_plane_model_to_solver_json
 from clabgen.s88.site.model_builder import build_nodes, tenant_prefix_owners
 from clabgen.s88.site.node_runtime import build_node_data
@@ -62,8 +63,13 @@ assert len(sites) == 1
 site = sites[0]
 models = build_nodes(site, tenant_prefix_owners(site))
 targets = {}
+eth_maps = {}
 for name, model in models.items():
-    eth_map = {ifname: f"eth{index}" for index, ifname in enumerate(model.interfaces, 1)}
+    eth_map = {
+        ifname: (iface.runtime_if_name or f"eth{index}")
+        for index, (ifname, iface) in enumerate(model.interfaces.items(), 1)
+    }
+    eth_maps[name] = eth_map
     targets[name] = build_node_data(name, model, eth_map)
 
 
@@ -96,6 +102,8 @@ core = target_for("core-primary")
 recursive_script = rendered_script(recursive)
 local_script = rendered_script(local)
 core_script = rendered_script(core)
+core_dynamic_commands = render_dynamic_wan(core, eth_maps["core-primary"])
+core_dynamic_script = "\n".join(core_dynamic_commands)
 recursive_config = unbound_config(recursive_script)
 local_config = unbound_config(local_script)
 core_config = unbound_config(core_script)
@@ -185,6 +193,18 @@ for fragment in (
 assert core_script.index("nft add table inet s88_dns_egress") < core_script.index(
     "nohup unbound -d -c /tmp/clabgen-unbound.conf"
 )
+for fragment in (
+    "/run/udhcpc.wan0.s88-table-1002",
+    'ip -4 route replace table 1002 default via "$router" dev "$interface"',
+    "/run/s88-ra-route-wan0-table-1002.sh",
+    'ip -6 route replace table 1002 ${route#default }',
+    "ip -6 monitor route",
+):
+    assert fragment in core_dynamic_script
+for command in core_dynamic_commands:
+    argv = shlex.split(command)
+    assert argv[:2] == ["sh", "-c"]
+    assert subprocess.run(["sh", "-n", "-c", argv[2]], check=False).returncode == 0
 
 
 def rejected(target, code):
