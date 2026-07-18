@@ -20,20 +20,14 @@ let
     input = source;
     inherit inventory;
   };
-  targets = built.control_plane_model.data.mini-smt.${traceId}.runtimeTargets;
 in
-builtins.mapAttrs
-  (_name: target: {
-    inherit (target) logicalNode;
-    services = target.services or { };
-  })
-  targets
-' >"${tmp_dir}/targets.json"
+built.control_plane_model
+' >"${tmp_dir}/cpm.json"
 
 unbound_out="$(nix eval --raw nixpkgs#unbound.outPath)"
 dns_root_out="$(nix eval --raw nixpkgs#dns-root-data.outPath)"
 
-TARGETS_JSON="${tmp_dir}/targets.json" \
+CPM_JSON="${tmp_dir}/cpm.json" \
 UNBOUND_CHECKCONF="${unbound_out}/bin/unbound-checkconf" \
 UNBOUND_ROOT_KEY="${dns_root_out}/root.key" \
 PYTHONPATH="${repo_root}" \
@@ -50,24 +44,35 @@ import subprocess
 import tempfile
 
 from clabgen.s88.CM.dns_service import render_dns_service
+from clabgen.cpm_solver import control_plane_model_to_solver_json
+from clabgen.s88.site.model_builder import build_nodes, tenant_prefix_owners
+from clabgen.s88.site.node_runtime import build_node_data
 
 
-with open(os.environ["TARGETS_JSON"], encoding="utf-8") as handle:
-    targets = json.load(handle)
+with open(os.environ["CPM_JSON"], encoding="utf-8") as handle:
+    cpm = json.load(handle)
+
+solver = control_plane_model_to_solver_json({"control_plane_model": cpm})
+sites = [
+    site
+    for enterprise in solver["enterprise"].values()
+    for site in enterprise["site"].values()
+]
+assert len(sites) == 1
+site = sites[0]
+models = build_nodes(site, tenant_prefix_owners(site))
+targets = {}
+for name, model in models.items():
+    eth_map = {ifname: f"eth{index}" for index, ifname in enumerate(model.interfaces, 1)}
+    targets[name] = build_node_data(name, model, eth_map)
 
 
 def target_for(logical_name):
-    matches = [
-        target
-        for target in targets.values()
-        if (target.get("logicalNode") or {}).get("name") == logical_name
-    ]
-    assert len(matches) == 1
-    return matches[0]
+    return targets[logical_name]
 
 
 def rendered_script(target):
-    commands = render_dns_service(target, (target.get("logicalNode") or {}).get("name", "node"))
+    commands = render_dns_service(target, target["name"])
     assert len(commands) == 1
     argv = shlex.split(commands[0])
     assert argv[:2] == ["sh", "-c"]
@@ -160,6 +165,27 @@ assert "forward-zone:" not in core_config
 assert 'auto-trust-anchor-file: "/tmp/clabgen-unbound-root.key"' in core_config
 assert "install -m 0600 /usr/share/dns/root.key" in core_script
 
+core_origin = core["runtimeOriginEgress"]
+core_policy = core_origin["policyRouting"]
+assert core_origin["policyRoutingRequired"] is True
+assert core_origin["uplinks"] == [core_policy["selectedUplink"]]
+assert core_policy["source"] == "control-plane-model"
+mark = core_policy["firewallMark"]
+priority = core_policy["rulePriority"]
+table = core_policy["tableId"]
+for fragment in (
+    "nft add table inet s88_dns_egress",
+    "type route hook output priority mangle; policy accept;",
+    f"udp dport 53 meta mark set {mark}",
+    f"tcp dport 53 meta mark set {mark}",
+    f"ip rule add fwmark {mark} priority {priority} table {table}",
+    f"ip -6 rule add fwmark {mark} priority {priority} table {table}",
+):
+    assert fragment in core_script
+assert core_script.index("nft add table inet s88_dns_egress") < core_script.index(
+    "nohup unbound -d -c /tmp/clabgen-unbound.conf"
+)
+
 
 def rejected(target, code):
     try:
@@ -195,6 +221,19 @@ divergent_core_endpoint["services"]["dns"]["serviceEndpointBindings"][0]["addres
     "seeded:v6",
 ]
 rejected(divergent_core_endpoint, "DNS_RENDERER_CONTRACT_DIVERGENCE")
+
+missing_egress_policy = copy.deepcopy(core)
+missing_egress_policy["runtimeOriginEgress"].pop("policyRouting")
+rejected(missing_egress_policy, "DNS_RENDERER_CONTRACT_DIVERGENCE")
+
+divergent_egress_allocation = copy.deepcopy(core)
+selected_name = divergent_egress_allocation["runtimeOriginEgress"]["policyRouting"][
+    "selectedInterface"
+]
+divergent_egress_allocation["interfaces"][selected_name][
+    "policyRoutingAllocation"
+]["tableId"] += 1
+rejected(divergent_egress_allocation, "DNS_RENDERER_CONTRACT_DIVERGENCE")
 
 shadowed_namespace = copy.deepcopy(local)
 next(

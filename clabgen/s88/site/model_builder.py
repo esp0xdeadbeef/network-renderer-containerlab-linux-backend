@@ -36,6 +36,7 @@ def build_nodes(
     nodes: Dict[str, NodeModel] = {}
     runtime_services: Dict[str, Dict[str, Any]] = {}
     runtime_advertisements: Dict[str, Dict[str, Any]] = {}
+    runtime_origin_egress: Dict[str, Dict[str, Any]] = {}
 
     for rt in (site.get("runtimeTargets", {}) or {}).values():
         if not isinstance(rt, dict):
@@ -43,12 +44,15 @@ def build_nodes(
         logical = rt.get("logicalNode")
         services = rt.get("services")
         advertisements = rt.get("advertisements")
+        origin_egress = rt.get("runtimeOriginEgress")
         logical_name = logical.get("name") if isinstance(logical, dict) else None
         if isinstance(logical_name, str) and logical_name:
             if isinstance(services, dict):
                 runtime_services[logical_name] = dict(services)
             if isinstance(advertisements, dict):
                 runtime_advertisements[logical_name] = dict(advertisements)
+            if isinstance(origin_egress, dict):
+                runtime_origin_egress[logical_name] = dict(origin_egress)
 
     for unit, node_obj in site.get("nodes", {}).items():
         routing_mode = node_obj.get("routing_mode")
@@ -82,6 +86,11 @@ def build_nodes(
             egress_intent=dict(node_obj.get("egressIntent", {}) or {}),
             nat_intent=dict(node_obj.get("natIntent", {}) or {}),
             forwarding_intent=dict(node_obj.get("forwardingIntent", {}) or {}),
+            runtime_origin_egress=dict(
+                node_obj.get("runtimeOriginEgress", {})
+                or runtime_origin_egress.get(unit, {})
+                or {}
+            ),
         )
 
     return nodes

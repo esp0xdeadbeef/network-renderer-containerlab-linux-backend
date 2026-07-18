@@ -237,3 +237,74 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(local_only_policy, dict)
         else {},
     }
+
+
+def normalize_dns_egress_policy(node: Dict[str, Any]) -> Dict[str, Any] | None:
+    runtime_origin = node.get("runtimeOriginEgress")
+    if not isinstance(runtime_origin, dict):
+        return None
+
+    raw_policy = runtime_origin.get("policyRouting")
+    policy_required = runtime_origin.get("policyRoutingRequired") is True
+    if not policy_required and not isinstance(raw_policy, dict):
+        return None
+
+    if not (
+        runtime_origin.get("enabled") is True
+        and runtime_origin.get("source") == "dns-service"
+        and isinstance(raw_policy, dict)
+    ):
+        _fail(
+            "DNS_RENDERER_CONTRACT_DIVERGENCE",
+            "CPM DNS runtime-origin egress lacks one complete model-owned policy-routing selection",
+        )
+
+    interfaces = node.get("interfaces")
+    if not isinstance(interfaces, dict):
+        interfaces = {}
+
+    selected_interface_name = raw_policy.get("selectedInterface")
+    selected_interface = interfaces.get(selected_interface_name)
+    if not isinstance(selected_interface, dict):
+        selected_interface = {}
+    allocation = selected_interface.get("policyRoutingAllocation")
+    if not isinstance(allocation, dict):
+        allocation = {}
+
+    selected_uplink = raw_policy.get("selectedUplink")
+    runtime_if_name = raw_policy.get("runtimeIfName")
+    table_id = raw_policy.get("tableId")
+    rule_priority = raw_policy.get("rulePriority")
+    firewall_mark = raw_policy.get("firewallMark")
+    complete = (
+        raw_policy.get("source") == "control-plane-model"
+        and _non_empty_string(selected_uplink)
+        and runtime_origin.get("uplinks") == [selected_uplink]
+        and _non_empty_string(selected_interface_name)
+        and selected_interface.get("kind", selected_interface.get("sourceKind"))
+        == "wan"
+        and _non_empty_string(runtime_if_name)
+        and selected_interface.get(
+            "runtimeIfName", selected_interface.get("renderedIfName")
+        )
+        == runtime_if_name
+        and allocation.get("source") == "control-plane-model"
+        and isinstance(table_id, int)
+        and not isinstance(table_id, bool)
+        and table_id > 0
+        and allocation.get("tableId") == table_id
+        and isinstance(rule_priority, int)
+        and not isinstance(rule_priority, bool)
+        and rule_priority > 0
+        and allocation.get("tableRulePriority") == rule_priority
+        and isinstance(firewall_mark, int)
+        and not isinstance(firewall_mark, bool)
+        and firewall_mark > 0
+    )
+    if not complete:
+        _fail(
+            "DNS_RENDERER_CONTRACT_DIVERGENCE",
+            "CPM DNS runtime-origin egress lacks one complete model-owned policy-routing selection",
+        )
+
+    return dict(raw_policy)
