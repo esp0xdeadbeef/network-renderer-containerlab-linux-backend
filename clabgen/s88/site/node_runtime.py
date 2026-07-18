@@ -123,6 +123,7 @@ def build_node_data(
         "natIntent": copy.deepcopy(node.nat_intent),
         "forwardingIntent": copy.deepcopy(node.forwarding_intent),
         "runtimeOriginEgress": copy.deepcopy(node.runtime_origin_egress),
+        "routeSelectionRules": copy.deepcopy(node.route_selection_rules),
         "loopback": {
             "ipv4": node.loopback4,
             "ipv6": node.loopback6,
