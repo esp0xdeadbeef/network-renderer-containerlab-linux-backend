@@ -103,7 +103,8 @@ recursive_script = rendered_script(recursive)
 local_script = rendered_script(local)
 core_script = rendered_script(core)
 core_dynamic_commands = render_dynamic_wan(core, eth_maps["core-primary"])
-core_dynamic_script = "\n".join(core_dynamic_commands)
+core_dynamic_payloads = [shlex.split(command)[2] for command in core_dynamic_commands]
+core_dynamic_script = "\n".join(core_dynamic_payloads)
 recursive_config = unbound_config(recursive_script)
 local_config = unbound_config(local_script)
 core_config = unbound_config(core_script)
@@ -197,14 +198,16 @@ for fragment in (
     "/run/udhcpc.wan0.s88-table-1002",
     'ip -4 route replace table 1002 default via "$router" dev "$interface"',
     "/run/s88-ra-route-wan0-table-1002.sh",
-    'ip -6 route replace table 1002 ${route#default }',
+    "route=\"$(ip -6 route show table main default dev wan0 | sed -n '1s/^default //p')\"",
+    "ip -6 route replace table 1002 default $route",
     "ip -6 monitor route",
 ):
-    assert fragment in core_dynamic_script
-for command in core_dynamic_commands:
+    assert fragment in core_dynamic_script, (fragment, core_dynamic_script)
+assert "${route#" not in core_dynamic_script
+for command, payload in zip(core_dynamic_commands, core_dynamic_payloads, strict=True):
     argv = shlex.split(command)
     assert argv[:2] == ["sh", "-c"]
-    assert subprocess.run(["sh", "-n", "-c", argv[2]], check=False).returncode == 0
+    assert subprocess.run(["sh", "-n", "-c", payload], check=False).returncode == 0
 
 
 def rejected(target, code):
