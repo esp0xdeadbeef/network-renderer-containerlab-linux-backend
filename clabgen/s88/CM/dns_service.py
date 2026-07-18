@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ipaddress import ip_address
+from ipaddress import ip_address, ip_interface
 from pathlib import Path
 from typing import Any, Dict, List
 import json
@@ -73,6 +73,22 @@ def _service_endpoint_address_commands(
                 "service endpoint terminal attachment has no runtime interface"
             )
 
+        materialized_addresses = set()
+        for key in ("addr4", "addr6"):
+            value = matching_interfaces[0].get(key)
+            if value is None:
+                continue
+            if not isinstance(value, str) or not value:
+                _dns_renderer_fail(
+                    "service endpoint terminal attachment has malformed interface addressing"
+                )
+            try:
+                materialized_addresses.add(ip_interface(value).ip)
+            except ValueError:
+                _dns_renderer_fail(
+                    "service endpoint terminal attachment has malformed interface addressing"
+                )
+
         addresses = binding.get("addresses", [])
         if not isinstance(addresses, list):
             _dns_renderer_fail("service endpoint binding has malformed addresses")
@@ -83,6 +99,8 @@ def _service_endpoint_address_commands(
                 parsed = ip_address(value)
             except ValueError:
                 _dns_renderer_fail("service endpoint binding has malformed addresses")
+            if parsed in materialized_addresses:
+                continue
             family = "ip -6" if parsed.version == 6 else "ip"
             prefix = 128 if parsed.version == 6 else 32
             command = (
