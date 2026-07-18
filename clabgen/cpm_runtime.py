@@ -169,6 +169,24 @@ def _loopback(runtime_target: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _route_selection_rules(
+    rt_name: str, runtime_target: Dict[str, Any]
+) -> list[Dict[str, Any]]:
+    realized = _dict_value(runtime_target.get("effectiveRuntimeRealization"))
+    rules = realized.get("routeSelectionRules", [])
+    if not isinstance(rules, list):
+        raise ValueError(
+            f"control_plane_model runtime target {rt_name!r} "
+            "effectiveRuntimeRealization.routeSelectionRules must be an array"
+        )
+    if not all(isinstance(rule, dict) for rule in rules):
+        raise ValueError(
+            f"control_plane_model runtime target {rt_name!r} "
+            "effectiveRuntimeRealization.routeSelectionRules entries must be objects"
+        )
+    return [dict(rule) for rule in rules]
+
+
 def add_runtime_target(
     rt_name: str,
     runtime_target: Dict[str, Any],
@@ -196,6 +214,7 @@ def add_runtime_target(
         "containers": runtime_target.get("containers") or [],
         "isolated": runtime_target.get("isolated") or False,
         "loopback": _loopback(runtime_target),
+        "routeSelectionRules": _route_selection_rules(rt_name, runtime_target),
         "forwardingIntent": runtime_target.get("forwardingIntent") or {},
         "natIntent": runtime_target.get("natIntent") or {},
     }

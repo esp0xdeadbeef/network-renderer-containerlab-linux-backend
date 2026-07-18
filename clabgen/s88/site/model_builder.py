@@ -91,6 +91,11 @@ def build_nodes(
                 or runtime_origin_egress.get(unit, {})
                 or {}
             ),
+            route_selection_rules=[
+                dict(rule)
+                for rule in node_obj.get("routeSelectionRules", [])
+                if isinstance(rule, dict)
+            ],
         )
 
     return nodes

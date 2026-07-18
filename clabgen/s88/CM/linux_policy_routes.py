@@ -12,6 +12,7 @@ from clabgen.s88.CM.linux_route_values import (
     _via6,
 )
 from clabgen.s88.CM.linux_route_via import _effective_via4, _effective_via6, _same_subnet
+from clabgen.s88.CM.relation_selection_rules import render_relation_selection_rules
 
 
 def _dict(value: Any) -> Dict[str, Any]:
@@ -682,7 +683,7 @@ def _explicit_downstream_route_groups(
 
 
 def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
-    cmds: List[str] = []
+    cmds: List[str] = render_relation_selection_rules(node, eth_map)
 
     # Phase 1: collect lane data for all lanes that have policy routes.
     # Each entry: (slot, table_id, priority, main_suppress_priority,

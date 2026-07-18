@@ -66,6 +66,7 @@ class NodeModel:
     nat_intent: Dict[str, Any] = field(default_factory=dict)
     forwarding_intent: Dict[str, Any] = field(default_factory=dict)
     runtime_origin_egress: Dict[str, Any] = field(default_factory=dict)
+    route_selection_rules: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
