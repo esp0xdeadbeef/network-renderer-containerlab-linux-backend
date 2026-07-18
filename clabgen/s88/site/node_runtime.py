@@ -249,11 +249,33 @@ def bundle_exec_commands(
     for start in range(0, total, bundle_size):
         chunk = commands[start : start + bundle_size]
         end = start + len(chunk)
+        bundle_number = (start // bundle_size) + 1
         script_lines = [
             "set -e",
             f"echo '[clab-node-init] commands {start + 1}-{end}/{total}' >&2",
-            *chunk,
+            'clab_bundle_generation="$(awk \'{print $22}\' /proc/1/stat)"',
         ]
+        if bundle_number > 1:
+            previous_bundle = bundle_number - 1
+            predecessor_marker = (
+                "/tmp/clabgen-exec-bundle-${clab_bundle_generation}-"
+                f"{previous_bundle}.ready"
+            )
+            script_lines.extend(
+                [
+                    "clab_predecessor_ready=0",
+                    "for attempt in $(seq 1 600); do",
+                    f"  if test -e {predecessor_marker}; then clab_predecessor_ready=1; break; fi",
+                    "  sleep 0.1",
+                    "done",
+                    "[ \"$clab_predecessor_ready\" -eq 1 ] || { printf '%s\\n' 'CLAB predecessor bundle did not complete' >&2; exit 1; }",
+                ]
+            )
+        script_lines.extend(chunk)
+        script_lines.append(
+            "touch /tmp/clabgen-exec-bundle-${clab_bundle_generation}-"
+            f"{bundle_number}.ready"
+        )
         bundled.append(f"sh -e -c {shlex.quote(chr(10).join(script_lines))}")
     return bundled
 
