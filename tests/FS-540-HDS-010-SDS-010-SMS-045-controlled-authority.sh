@@ -90,7 +90,7 @@ for required in (
     "enable-ra",
     "constructor:",
     "knotc --config=/run/clabgen-knot.conf conf-check",
-    "kzonecheck",
+    "knotc --config=/run/clabgen-knot.conf zone-check . dns-validation.test.",
     "knotd --config=/run/clabgen-knot.conf --daemonize",
     "dns-validation.test.",
     "answer.dns-validation.test.",
