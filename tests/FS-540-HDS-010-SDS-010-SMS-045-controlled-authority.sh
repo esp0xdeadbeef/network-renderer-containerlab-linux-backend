@@ -93,11 +93,25 @@ for required in (
     "ra-only,slaac,64",
     "knotc --config=/run/clabgen-knot.conf conf-check",
     "knotc --config=/run/clabgen-knot.conf zone-check . dns-validation.gamp.",
-    "knotd --config=/run/clabgen-knot.conf --daemonize",
+    "authority_addresses_ready=0",
+    "authority_listeners_ready=0",
+    "nohup knotd --config=/run/clabgen-knot.conf",
+    "knot_pid=$!",
+    'kill -0 "$knot_pid"',
+    "DNS authority listeners did not remain available; address material is intentionally omitted",
     "dns-validation.gamp.",
     "answer.dns-validation.gamp.",
 ):
     assert required in provider_script, required
+assert "knotd --config=/run/clabgen-knot.conf --daemonize" not in provider_script
+for address in (
+    *authority["root"]["ipv4"],
+    *authority["root"]["ipv6"],
+    *authority["delegation"]["ipv4"],
+    *authority["delegation"]["ipv6"],
+):
+    assert f"awk -v address={address}" in provider_script
+    assert f"grep -F -- {address}" in provider_script
 
 provider_links = [
     link
