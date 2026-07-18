@@ -58,16 +58,13 @@ except ValueError as e:
         print(f"SEEDED NEGATIVE (v4) FAIL: missing GAMP trace ID in error message")
         print(f"  Got: {msg}")
         sys.exit(1)
-    if "10.20.0.1" not in msg:
-        print(f"SEEDED NEGATIVE (v4) FAIL: missing self-referential address in error message")
-        print(f"  Got: {msg}")
+    if "DNS_RENDERER_CONTRACT_DIVERGENCE" not in msg:
+        print("SEEDED NEGATIVE (v4) FAIL: missing stable warning code")
         sys.exit(1)
-    if "test-v4-container" not in msg:
-        print(f"SEEDED NEGATIVE (v4) FAIL: missing container name in error message")
-        print(f"  Got: {msg}")
+    if "10.20.0.1" in msg or "test-v4-container" in msg:
+        print("SEEDED NEGATIVE (v4) FAIL: diagnostic leaked address or runtime identity")
         sys.exit(1)
-    print(f"SEEDED NEGATIVE (v4) PASS: ValueError raised correctly")
-    print(f"  Message: {msg}")
+    print("SEEDED NEGATIVE (v4) PASS: redacted ValueError raised correctly")
 except Exception as e:
     print(f"SEEDED NEGATIVE (v4) FAIL: wrong exception type: {type(e).__name__}: {e}")
     sys.exit(1)
@@ -92,16 +89,13 @@ except ValueError as e:
         print(f"SEEDED NEGATIVE (v6) FAIL: missing GAMP trace ID in error message")
         print(f"  Got: {msg}")
         sys.exit(1)
-    if "fd00:20::1" not in msg:
-        print(f"SEEDED NEGATIVE (v6) FAIL: missing self-referential address in error message")
-        print(f"  Got: {msg}")
+    if "DNS_RENDERER_CONTRACT_DIVERGENCE" not in msg:
+        print("SEEDED NEGATIVE (v6) FAIL: missing stable warning code")
         sys.exit(1)
-    if "test-v6-container" not in msg:
-        print(f"SEEDED NEGATIVE (v6) FAIL: missing container name in error message")
-        print(f"  Got: {msg}")
+    if "fd00:20::1" in msg or "test-v6-container" in msg:
+        print("SEEDED NEGATIVE (v6) FAIL: diagnostic leaked address or runtime identity")
         sys.exit(1)
-    print(f"SEEDED NEGATIVE (v6) PASS: ValueError raised correctly")
-    print(f"  Message: {msg}")
+    print("SEEDED NEGATIVE (v6) PASS: redacted ValueError raised correctly")
 except Exception as e:
     print(f"SEEDED NEGATIVE (v6) FAIL: wrong exception type: {type(e).__name__}: {e}")
     sys.exit(1)
@@ -140,12 +134,13 @@ try:
     sys.exit(1)
 except ValueError as e:
     msg = str(e)
-    if "10.20.0.1" not in msg or "10.30.0.1" not in msg:
-        print(f"MULTI SELF-REF FAIL: missing one or both self-referential addresses")
-        print(f"  Got: {msg}")
+    if "DNS_RENDERER_CONTRACT_DIVERGENCE" not in msg:
+        print("MULTI SELF-REF FAIL: missing stable warning code")
         sys.exit(1)
-    print(f"MULTI SELF-REF PASS: both self-referential addresses reported")
-    print(f"  Message: {msg}")
+    if "10.20.0.1" in msg or "10.30.0.1" in msg or "multi-test" in msg:
+        print("MULTI SELF-REF FAIL: diagnostic leaked address or runtime identity")
+        sys.exit(1)
+    print("MULTI SELF-REF PASS: redacted aggregate diagnostic reported")
 except Exception as e:
     print(f"MULTI SELF-REF FAIL: wrong exception type: {type(e).__name__}: {e}")
     sys.exit(1)

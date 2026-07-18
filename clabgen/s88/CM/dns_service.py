@@ -5,6 +5,9 @@ from typing import Any, Dict, List
 import json
 import shlex
 
+from clabgen.s88.CM.dns_authority import normalize_dns_authority
+from clabgen.s88.CM.unbound_service import render_unbound_dns_service
+
 
 RUNTIME_SCRIPT = Path(__file__).with_name("dns_proxy_runtime.py")
 PROTOCOL_SCRIPT = Path(__file__).with_name("dns_proxy_protocol.py")
@@ -18,7 +21,9 @@ def _nft_literal(value: str) -> str:
     return shlex.quote(value)
 
 
-def _public_resolver_drop_commands(dns: Dict[str, Any]) -> List[str]:
+def _public_resolver_drop_commands(
+    dns: Dict[str, Any], forwarders: List[str] | None = None
+) -> List[str]:
     kill_switch = dns.get("killSwitch")
     if not isinstance(kill_switch, dict) or not kill_switch.get("blockPublicResolvers"):
         return []
@@ -40,11 +45,15 @@ def _public_resolver_drop_commands(dns: Dict[str, Any]) -> List[str]:
         "nft flush chain inet clab_dns_guard output",
     ]
 
-    forwarders = _string_list(dns.get("forwarders") or dns.get("upstreams") or [])
+    effective_forwarders = (
+        forwarders
+        if forwarders is not None
+        else _string_list(dns.get("forwarders") or dns.get("upstreams") or [])
+    )
     outgoing_interfaces = _string_list(dns.get("outgoingInterfaces", []))
     for source in outgoing_interfaces:
         source_family = "ip6" if ":" in source else "ip"
-        for forwarder in forwarders:
+        for forwarder in effective_forwarders:
             forwarder_family = "ip6" if ":" in forwarder else "ip"
             if source_family != forwarder_family:
                 continue
@@ -94,6 +103,14 @@ def render_dns_service(
     if not listen:
         return []
 
+    authority = normalize_dns_authority(dns)
+    if authority["recursionMode"] is not None:
+        return render_unbound_dns_service(
+            dns,
+            authority,
+            _public_resolver_drop_commands(dns, authority["rootForwarders"]),
+        )
+
     payload = {
         "listen": ["127.0.0.1", "::1"] + listen,
         "forwarders": _string_list(dns.get("forwarders") or dns.get("upstreams") or []),
@@ -108,12 +125,9 @@ def render_dns_service(
     _selfRef = [f for f in payload["forwarders"] if f in _nonLoopback]
     if _selfRef:
         raise ValueError(
-            "CLAB DNS renderer rejects self-referential forwarder: "
-            + "; ".join(
-                f"forward-addr {f} matches listen address on {node_name}"
-                for f in _selfRef
-            )
-            + ". GAMP: FS-540-HDS-010-SDS-010-SMS-035"
+            "CLAB DNS renderer DNS_RENDERER_CONTRACT_DIVERGENCE: "
+            "self-referential forwarder rejected without logging address material; "
+            "GAMP: FS-540-HDS-010-SDS-010-SMS-035"
         )
     namespace_fallback = _namespace_fallback(dns.get("namespaceFallback", {}))
     if namespace_fallback:
@@ -177,7 +191,9 @@ def render_dns_resolver_config(
         "public-fallback",
         "none",
     }
-    if not nameservers and not any(source in materialized_sources for source in sources):
+    if not nameservers and not any(
+        source in materialized_sources for source in sources
+    ):
         return []
 
     lines = [
@@ -190,13 +206,7 @@ def render_dns_resolver_config(
         lines.append("# No nameserver emitted by CPM dnsResolver authority.")
     lines.append("options timeout:1 attempts:1")
 
-    return [
-        _sh(
-            "cat >/etc/resolv.conf <<'RESOLV'\n"
-            + "\n".join(lines)
-            + "\nRESOLV\n"
-        )
-    ]
+    return [_sh("cat >/etc/resolv.conf <<'RESOLV'\n" + "\n".join(lines) + "\nRESOLV\n")]
 
 
 def _dns_resolvers(node: Dict[str, Any]) -> List[Dict[str, Any]]:

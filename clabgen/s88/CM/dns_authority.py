@@ -1,0 +1,178 @@
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
+
+_ALLOWED_RECURSION_MODES = {"iterative", "forwarding", "local-only"}
+_NON_FATAL_WARNING_CODES = {"DNS_CORE_UPSTREAM_HARDCODED"}
+
+
+def _string_list(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item]
+
+
+def _dict_list(value: Any) -> List[Dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _sorted_unique(values: List[str]) -> List[str]:
+    return sorted(set(values))
+
+
+def _family_complete(values: List[str]) -> bool:
+    return any("." in value for value in values) and any(
+        ":" in value for value in values
+    )
+
+
+def _fail(code: str, reason: str) -> None:
+    raise ValueError(
+        f"CLAB DNS {code}: {reason}; address material is intentionally omitted"
+    )
+
+
+def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
+    raw_mode = dns.get("recursionMode")
+    if raw_mode is None:
+        recursion_mode = None
+    elif isinstance(raw_mode, str) and raw_mode in _ALLOWED_RECURSION_MODES:
+        recursion_mode = raw_mode
+    else:
+        _fail(
+            "DNS_RECURSION_MODE_INVALID",
+            "CPM emitted an unsupported recursion mode",
+        )
+
+    reproducibility_warnings = _dict_list(dns.get("reproducibilityWarnings", []))
+    warning_codes = _sorted_unique(
+        [
+            warning["code"]
+            for warning in reproducibility_warnings
+            if isinstance(warning.get("code"), str) and warning["code"]
+        ]
+    )
+    fatal_warning_codes = [
+        code for code in warning_codes if code not in _NON_FATAL_WARNING_CODES
+    ]
+    if fatal_warning_codes:
+        _fail(
+            ",".join(fatal_warning_codes),
+            "CPM marked this resolver contract non-reproducible",
+        )
+
+    legacy_forwarders = _string_list(
+        dns.get("forwarders") or dns.get("upstreams") or []
+    )
+    upstream_resolvers = _dict_list(dns.get("upstreamResolvers", []))
+    named_core_resolvers = [
+        resolver
+        for resolver in upstream_resolvers
+        if resolver.get("kind") == "named-core-resolver"
+    ]
+    named_core_addresses = _sorted_unique(
+        [
+            address
+            for resolver in named_core_resolvers
+            for address in _string_list(resolver.get("addresses", []))
+        ]
+    )
+    local_authority_resolvers = [
+        resolver
+        for resolver in upstream_resolvers
+        if resolver.get("kind") == "local-namespace-authority"
+    ]
+
+    local_forward_zones = _dict_list(dns.get("localForwardZones", []))
+    valid_local_forward_zones = all(
+        isinstance(zone.get("name"), str)
+        and bool(zone["name"])
+        and isinstance(zone.get("relationId"), str)
+        and bool(zone["relationId"])
+        and zone.get("forwardFirst") is False
+        and _family_complete(_string_list(zone.get("forwardTo", [])))
+        for zone in local_forward_zones
+    )
+
+    requester_policies = _dict_list(dns.get("requesterPolicies", []))
+    valid_requester_policies = all(
+        policy.get("action") == "refuse_non_local"
+        and isinstance(policy.get("requesterService"), str)
+        and bool(policy["requesterService"])
+        and isinstance(policy.get("relationId"), str)
+        and bool(policy["relationId"])
+        and bool(_string_list(policy.get("sourcePrefixes", [])))
+        and bool(_string_list(policy.get("namespaces", [])))
+        for policy in requester_policies
+    )
+    if not valid_requester_policies:
+        _fail(
+            "DNS_LOCAL_ONLY_AUTHORITY_LEAK",
+            "a provider requester policy is not source-scoped refuse_non_local",
+        )
+
+    local_only_policy = dns.get("localOnlyPolicy")
+    valid_local_only_policy = (
+        isinstance(local_only_policy, dict)
+        and isinstance(local_only_policy.get("providerService"), str)
+        and bool(local_only_policy["providerService"])
+        and isinstance(local_only_policy.get("relationId"), str)
+        and bool(local_only_policy["relationId"])
+        and bool(_string_list(local_only_policy.get("namespaces", [])))
+        and local_only_policy.get("recursion") is False
+        and local_only_policy.get("publicFallback") is False
+        and local_only_policy.get("transitiveEgress") is False
+        and local_only_policy.get("missAction") == "refuse"
+    )
+
+    if recursion_mode == "forwarding":
+        if not (
+            len(named_core_resolvers) == 1
+            and _family_complete(named_core_addresses)
+            and (
+                not legacy_forwarders
+                or _sorted_unique(legacy_forwarders) == named_core_addresses
+            )
+        ):
+            _fail(
+                "DNS_RENDERER_CONTRACT_DIVERGENCE",
+                "forwarding mode lacks one dual-stack named-core resolver or disagrees with the legacy projection",
+            )
+        root_forwarders = named_core_addresses
+    elif recursion_mode == "iterative":
+        if legacy_forwarders or named_core_resolvers:
+            _fail(
+                "DNS_RECURSION_MODE_INVALID",
+                "iterative mode contains a forwarding or fallback source",
+            )
+        root_forwarders = []
+    elif recursion_mode == "local-only":
+        if not (
+            not legacy_forwarders
+            and len(local_authority_resolvers) == 1
+            and bool(local_forward_zones)
+            and valid_local_forward_zones
+            and valid_local_only_policy
+        ):
+            _fail(
+                "DNS_LOCAL_ONLY_AUTHORITY_LEAK",
+                "local-only mode is incomplete or would permit recursion, fallback, or transitive egress",
+            )
+        root_forwarders = []
+    else:
+        root_forwarders = legacy_forwarders
+
+    return {
+        "recursionMode": recursion_mode,
+        "reproducibilityWarnings": reproducibility_warnings,
+        "warningCodes": warning_codes,
+        "rootForwarders": root_forwarders,
+        "localForwardZones": local_forward_zones,
+        "requesterPolicies": requester_policies,
+        "localOnlyPolicy": local_only_policy
+        if isinstance(local_only_policy, dict)
+        else {},
+    }
