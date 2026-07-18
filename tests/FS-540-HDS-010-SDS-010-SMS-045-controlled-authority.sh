@@ -92,10 +92,10 @@ for required in (
     "constructor:",
     "ra-only,slaac,64",
     "knotc --config=/run/clabgen-knot.conf conf-check",
-    "knotc --config=/run/clabgen-knot.conf zone-check . dns-validation.test.",
+    "knotc --config=/run/clabgen-knot.conf zone-check . dns-validation.gamp.",
     "knotd --config=/run/clabgen-knot.conf --daemonize",
-    "dns-validation.test.",
-    "answer.dns-validation.test.",
+    "dns-validation.gamp.",
+    "answer.dns-validation.gamp.",
 ):
     assert required in provider_script, required
 
