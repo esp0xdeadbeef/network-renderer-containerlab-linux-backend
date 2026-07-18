@@ -93,7 +93,7 @@ def _slaac_command(interface_name: str, route_table: int | None = None) -> str:
 cat >{sync_file} <<'S88_RA_ROUTE'
 #!/bin/sh
 sync_selected_ra_route() {{
-  route="$(ip -6 route show table main default dev {interface_name} | sed -n '1s/^default //p')"
+  route="$(ip -6 route show table main default dev {interface_name} | sed -n '1s/^default //; s/ expires [^ ]*//; p')"
   if [ -n "$route" ]; then
     ip -6 route replace table {route_table} default $route
   elif ip -6 route show table {route_table} default dev {interface_name} 2>&1 | grep -q '^default '; then
