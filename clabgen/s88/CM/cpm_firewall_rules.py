@@ -160,6 +160,16 @@ def _runtime_destination_rule(
             "FS-230-HDS-010-SDS-010-SMS-040: protected runtime and static "
             "destinations cannot coexist"
         )
+    if (
+        rule_obj.get("returnBehavior") != "stateful-return"
+        or rule_obj.get("translationMode") != "none"
+        or rule_obj.get("sourcePreservation") != "preserve-source"
+        or rule_obj.get("destinationTranslation") is not False
+    ):
+        raise ValueError(
+            "FS-230-HDS-010-SDS-010-SMS-040: runtime IPv6 destination lacks "
+            "no-translation preserve-source stateful-return authority"
+        )
 
     destination = raw_destinations[0]
     if not isinstance(destination, dict):

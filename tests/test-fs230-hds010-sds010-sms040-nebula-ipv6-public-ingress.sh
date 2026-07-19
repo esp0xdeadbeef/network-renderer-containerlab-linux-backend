@@ -40,6 +40,10 @@ RULE = {
     "fromInterface": "ppp0",
     "toInterface": "core",
     "trafficType": "public-ingress",
+    "returnBehavior": "stateful-return",
+    "translationMode": "none",
+    "sourcePreservation": "preserve-source",
+    "destinationTranslation": False,
     "matches": [{"family": "ipv6", "proto": "udp", "dports": [4242]}],
     "destinationPrefixes": [],
     "destinationRuntimeAddresses": [RUNTIME_DESTINATION],
@@ -78,6 +82,7 @@ for mutation in (
     lambda value: value["destinationRuntimeAddresses"][0].pop("sourceFile"),
     lambda value: value.update(destinationPrefixes=static["destinationPrefixes"]),
     lambda value: value["matches"][0].update(proto="icmpv6"),
+    lambda value: value.update(translationMode="nat66"),
 ):
     invalid = copy.deepcopy(RULE)
     mutation(invalid)
