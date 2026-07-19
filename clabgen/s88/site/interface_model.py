@@ -86,7 +86,9 @@ def _infer_interface_tenant(
 
     for addr in (fb.get("addr4"), fb.get("addr6")):
         network = _network_of(addr)
-        tenant = tenant_prefix_owners.get(network or "")
+        if network is None:
+            continue
+        tenant = tenant_prefix_owners.get(network)
         if isinstance(tenant, str) and tenant:
             return tenant
 

@@ -84,11 +84,17 @@ classify_failure_record() {
         return 1
       fi
       ;;
+    host-prerequisite-missing)
+      if [[ "${reported_category}" != "host_prerequisite_failure" ]]; then
+        echo "diagnostic.clab-host-prerequisite-misclassified: missing direct-host prerequisite reported as ${reported_category}" >&2
+        return 1
+      fi
+      ;;
     *)
       echo "diagnostic.clab-unknown-failure-category: ${signal}" >&2
       return 1
       ;;
-  esac
+esac
 }
 
 # ===========================================================================
@@ -517,6 +523,38 @@ if grep -q 'CLAB_DEPLOY_MAX_WORKERS' "${deploy_script}" &&
 else
   echo "FAIL test13: Containerlab deploy retry/ERRO diagnostics can be masked" >&2
   failures=$((failures + 1))
+fi
+
+# ---------------------------------------------------------------------------
+# Test 14 (seeded negative): a missing direct-host prerequisite must not be
+# reported as topology/inventory/runtime absence and the host renderer must
+# retain both its explicit diagnostic and fail-closed ERRO handling.
+# ---------------------------------------------------------------------------
+if classify_failure_record \
+    host-prerequisite-missing \
+    runtime_absence \
+    direct-host-clab \
+    locked-hat-source \
+    2>"${tmp_dir}/test14.stderr"; then
+  echo "FAIL test14: seeded negative — host prerequisite misclassification unexpectedly accepted" >&2
+  failures=$((failures + 1))
+elif ! grep -q 'diagnostic.clab-host-prerequisite-misclassified' "${tmp_dir}/test14.stderr"; then
+  echo "FAIL test14: wrong diagnostic for host prerequisite misclassification" >&2
+  cat "${tmp_dir}/test14.stderr" >&2
+  failures=$((failures + 1))
+elif ! classify_failure_record \
+    host-prerequisite-missing \
+    host_prerequisite_failure \
+    direct-host-clab \
+    locked-hat-source; then
+  echo "FAIL test14: corrected host prerequisite category rejected" >&2
+  failures=$((failures + 1))
+elif ! grep -q 'diagnostic.clab-host-prerequisite-missing' "${host_module}" ||
+     ! grep -q 'containerlab deploy emitted ERRO lines; refusing readiness marker' "${host_module}"; then
+  echo "FAIL test14: renderer diagnostic or fail-closed ERRO predicate missing" >&2
+  failures=$((failures + 1))
+else
+  echo "PASS test14: missing /etc/hosts is classified separately and ERRO handling stays fail-closed"
 fi
 
 # ===========================================================================

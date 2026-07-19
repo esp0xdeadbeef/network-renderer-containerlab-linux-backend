@@ -54,12 +54,15 @@ for fragment in (
     "ia_pd 11",
     "ip link show dev ppp-test",
     "dhcpcd -6 -d -B -f /etc/s88-pppoe-ipv6-pd.conf ppp-test",
-    "iifname ppp-test ip6 saddr fe80::/10 udp sport 547 udp dport 546",
+    "nft add rule inet filter input iifname ppp-test ip6 saddr fe80::/10 udp sport 547 udp dport 546",
     'comment "s88-pppoe-dhcpv6-pd-replies"',
     "while :; do",
+    "PPPoE DHCPv6-PD client exited; retrying",
 ):
     assert fragment in output, fragment
 assert "udp dport 547" not in output
+assert "ppp-test || true" not in output
+assert "inet router" not in output
 assert output.index("nohup pppd") < output.index("ip link show dev ppp-test")
 assert output.index('comment "s88-pppoe-dhcpv6-pd-replies"') < output.index(
     "dhcpcd -6 -d -B"

@@ -13,6 +13,8 @@
 #  3. One container exited → readiness marker NOT success, diagnostic emitted
 #  4. Seeded negative: empty/nonexistent topology source → REJECT
 #  5. Seeded negative: containers running but unhealthy → readiness marker NOT emitted
+#  6. Host realization restores declarative /etc/hosts when a thin consumer disables it
+#  7. Seeded negative: a stronger removal of /etc/hosts fails NixOS evaluation
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -744,10 +746,86 @@ if grep -q 'CLAB_DEPLOY_MAX_WORKERS' "${host_module}" &&
    grep -q -- '--timeout "$containerlab_api_timeout"' "${host_module}" &&
    grep -q -- '--max-workers' "${host_module}" &&
    grep -q 'containerlab deploy produced no output' "${host_module}" &&
-   grep -q 'containerlab deploy emitted ERRO lines; refusing readiness marker' "${host_module}"; then
+   grep -q 'containerlab deploy emitted ERRO lines; refusing readiness marker' "${host_module}" &&
+   grep -q 'diagnostic.clab-host-prerequisite-missing' "${host_module}"; then
   echo "PASS test11: host autostart deploy is bounded and refuses ERRO readiness"
 else
   echo "FAIL test11: host autostart deploy can race or accept Containerlab ERRO output" >&2
+  failures=$((failures + 1))
+fi
+
+# ===========================================================================
+# Test 12: the rendered NixOS host restores /etc/hosts for Containerlab.
+# The consumer-side `false` mirrors a thin VM profile that disables the normal
+# hosts link; the renderer-owned mkForce must make the effective value true.
+# ===========================================================================
+positive_expr="${tmp_dir}/hosts-positive.nix"
+cat >"${positive_expr}" <<NIX
+let
+  source = builtins.toPath "${repo_root}";
+  flake = builtins.getFlake (toString source);
+  evaluated = flake.inputs.nixpkgs.lib.nixosSystem {
+    system = builtins.currentSystem;
+    modules = [
+      (source + "/host-module.nix")
+      ({ pkgs, ... }: {
+        _module.args.clabDeploymentHost = "s-router-clab";
+        _module.args.clabCpmJsonPath = builtins.toFile "cpm.json" "{}";
+        _module.args.clabRendererInventoryJsonPath = builtins.toFile "inventory.json" "{}";
+        _module.args.containerlabLinuxRendererSelf = source;
+        _module.args.containerlabLinuxGenerateClabConfig = pkgs.writeShellScriptBin "generate-clab-config" "exit 0";
+        _module.args.containerlabLinuxRendererInput = {};
+        environment.etc.hosts.enable = false;
+        system.stateVersion = "26.05";
+      })
+    ];
+  };
+in if evaluated.config.environment.etc.hosts.enable then "enabled" else "disabled"
+NIX
+
+if [[ "$(nix eval --impure --raw --file "${positive_expr}")" == "enabled" ]]; then
+  echo "PASS test12: CLAB host realization restores declarative /etc/hosts"
+else
+  echo "FAIL test12: CLAB host realization left /etc/hosts disabled" >&2
+  failures=$((failures + 1))
+fi
+
+# ===========================================================================
+# Test 13 (seeded negative): a stronger consumer removal of /etc/hosts must
+# trip the host prerequisite assertion before any deploy can start.
+# ===========================================================================
+negative_expr="${tmp_dir}/hosts-negative.nix"
+cat >"${negative_expr}" <<NIX
+let
+  source = builtins.toPath "${repo_root}";
+  flake = builtins.getFlake (toString source);
+  evaluated = flake.inputs.nixpkgs.lib.nixosSystem {
+    system = builtins.currentSystem;
+    modules = [
+      (source + "/host-module.nix")
+      ({ pkgs, lib, ... }: {
+        _module.args.clabDeploymentHost = "s-router-clab";
+        _module.args.clabCpmJsonPath = builtins.toFile "cpm.json" "{}";
+        _module.args.clabRendererInventoryJsonPath = builtins.toFile "inventory.json" "{}";
+        _module.args.containerlabLinuxRendererSelf = source;
+        _module.args.containerlabLinuxGenerateClabConfig = pkgs.writeShellScriptBin "generate-clab-config" "exit 0";
+        _module.args.containerlabLinuxRendererInput = {};
+        environment.etc.hosts.enable = lib.mkOverride 0 false;
+        system.stateVersion = "26.05";
+      })
+    ];
+  };
+in evaluated.config.system.build.toplevel.drvPath
+NIX
+
+if nix eval --impure --raw --file "${negative_expr}" >"${tmp_dir}/hosts-negative.stdout" 2>"${tmp_dir}/hosts-negative.stderr"; then
+  echo "FAIL test13: seeded negative removed /etc/hosts without evaluation failure" >&2
+  failures=$((failures + 1))
+elif grep -q 'diagnostic.clab-host-prerequisite-missing' "${tmp_dir}/hosts-negative.stderr"; then
+  echo "PASS test13: seeded negative rejects a missing /etc/hosts prerequisite"
+else
+  echo "FAIL test13: seeded negative failed without the prerequisite diagnostic" >&2
+  cat "${tmp_dir}/hosts-negative.stderr" >&2
   failures=$((failures + 1))
 fi
 

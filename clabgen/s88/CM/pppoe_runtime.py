@@ -143,9 +143,11 @@ def _client_command(config: Dict[str, Any], eth_map: Dict[str, str]) -> str:
                 "while :; do",
                 f"  while ! ip link show dev {shlex.quote(ppp_name)} >/dev/null 2>&1; do sleep 2; done",
                 (
-                    "  dhcpcd -6 -d -B -f /etc/s88-pppoe-ipv6-pd.conf "
-                    f"{shlex.quote(ppp_name)} || true"
+                    "  if ! dhcpcd -6 -d -B -f /etc/s88-pppoe-ipv6-pd.conf "
+                    f"{shlex.quote(ppp_name)}; then"
                 ),
+                "    echo 'PPPoE DHCPv6-PD client exited; retrying' >&2",
+                "  fi",
                 "  sleep 2",
                 "done",
             ]
@@ -166,7 +168,7 @@ def _client_command(config: Dict[str, Any], eth_map: Dict[str, str]) -> str:
                 f"  ia_pd {ipv6['prefixDelegationRequestId']}",
                 "EOF",
                 (
-                    "nft add rule inet router input "
+                    "nft add rule inet filter input "
                     f"iifname {shlex.quote(ppp_name)} ip6 saddr fe80::/10 "
                     "udp sport 547 udp dport 546 counter accept "
                     'comment "s88-pppoe-dhcpv6-pd-replies"'
