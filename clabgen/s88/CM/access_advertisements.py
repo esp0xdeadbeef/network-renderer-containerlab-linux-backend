@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import re
 import shlex
 from typing import Any, Dict, List
 
@@ -102,6 +103,7 @@ def protected_reservation_source(
         "sourceClass",
         "sourceFile",
         "family",
+        "namePublication",
         "binderSourceAudit",
         "upstreamBehaviorRef",
     }
@@ -124,7 +126,71 @@ def protected_reservation_source(
     reservations = scope.get("reservations", [])
     if not isinstance(reservations, list) or reservations:
         raise ValueError("diagnostic.runtime-reservation-source-conflict")
+    _protected_name_publication(
+        source,
+        family,
+        _scope_id(scope, "v4" if family == "ipv4" else "v6"),
+    )
     return source_file
+
+
+def _protected_name_publication(
+    source: Dict[str, Any], family: str, scope_id: str
+) -> Dict[str, Any] | None:
+    publication = source.get("namePublication")
+    if publication is None:
+        return None
+    if not isinstance(publication, dict):
+        raise ValueError("diagnostic.protected-reservation-name-publication-invalid")
+    allowed_fields = {
+        "namespace",
+        "ownerScope",
+        "requesterScopes",
+        "recordClasses",
+        "fallbackBehavior",
+        "publicationDenialDiagnostic",
+        "source",
+        "sourceFamily",
+    }
+    if set(publication) - allowed_fields:
+        raise ValueError(
+            "diagnostic.protected-reservation-name-publication-field-invalid"
+        )
+    namespace = publication.get("namespace")
+    owner_scope = publication.get("ownerScope")
+    requester_scopes = publication.get("requesterScopes")
+    record_classes = publication.get("recordClasses")
+    if (
+        not isinstance(namespace, str)
+        or not re.fullmatch(r"(?:[A-Za-z0-9][A-Za-z0-9_-]*\.)+", namespace)
+        or owner_scope != scope_id
+        or not isinstance(requester_scopes, list)
+        or not requester_scopes
+        or not all(isinstance(item, str) and item for item in requester_scopes)
+        or owner_scope not in requester_scopes
+        or "*" in requester_scopes
+    ):
+        raise ValueError("diagnostic.protected-reservation-name-scope-invalid")
+    if (
+        not isinstance(record_classes, list)
+        or not record_classes
+        or len(record_classes) != len(set(record_classes))
+        or not set(record_classes).issubset({"A", "AAAA", "PTR"})
+    ):
+        raise ValueError("diagnostic.protected-reservation-name-record-class-invalid")
+    if (
+        publication.get("source") != "protected-reservation-set"
+        or publication.get("sourceFamily") != family
+        or publication.get("fallbackBehavior") != "local-only"
+        or not isinstance(publication.get("publicationDenialDiagnostic"), str)
+        or not publication["publicationDenialDiagnostic"]
+    ):
+        raise ValueError("diagnostic.protected-reservation-name-policy-invalid")
+    return publication
+
+
+def _safe_stem(value: str) -> str:
+    return value.replace("/", "-").replace(":", "-").replace(" ", "-")
 
 
 def _dhcp4_config(scope: Dict[str, Any], ifname: str) -> str:
@@ -342,12 +408,16 @@ def _kea_command(
     template = json.dumps(
         _kea_template(scope, ifname, family), sort_keys=True, separators=(",", ":")
     )
+    scope_id = _scope_id(scope, "v4" if family == "ipv4" else "v6")
+    publication = _protected_name_publication(
+        _dict(scope.get("reservationSource")), family, scope_id
+    )
     materializer_args = [
         "clab-protected-reservation-materializer",
         "--family",
         family,
         "--scope",
-        _scope_id(scope, "v4" if family == "ipv4" else "v6"),
+        scope_id,
         "--subnet",
         str(scope.get("subnet")),
         "--pool",
@@ -359,6 +429,19 @@ def _kea_command(
         "--output",
         config_path,
     ]
+    if publication is not None:
+        materializer_args.extend(
+            [
+                "--dns-output",
+                f"/run/protected-reservation-dns/{_safe_stem(scope_id)}.conf",
+                "--dns-namespace",
+                publication["namespace"],
+                "--dns-group",
+                "unbound",
+            ]
+        )
+        for record_class in publication["recordClasses"]:
+            materializer_args.extend(["--dns-record-class", record_class])
     materialize = " ".join(shlex.quote(value) for value in materializer_args)
     daemon = f"kea-dhcp{suffix}"
     reconcile = _kea_reconcile_script(

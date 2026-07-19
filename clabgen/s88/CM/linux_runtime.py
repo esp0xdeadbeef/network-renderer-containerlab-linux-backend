@@ -57,8 +57,8 @@ def render(
 
     cmds.extend(render_cm(node_data.get("_cm_inputs", {})))
     cmds.extend(render_dns_resolver_config(node_data, node_name))
-    cmds.extend(render_dns_service(node_data, node_name))
     cmds.extend(render_access_advertisements(node_data, eth_map))
+    cmds.extend(render_dns_service(node_data, node_name))
     cmds.extend(render_pppoe_runtime(node_name, node_data, eth_map))
 
     validate_fs370_forwarding_commands(node_data, eth_map, cmds)
