@@ -37,6 +37,7 @@ import copy
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import tempfile
 
@@ -105,6 +106,15 @@ for required in (
 ):
     assert required in provider_script, required
 assert "knotd --config=/run/clabgen-knot.conf --daemonize" not in provider_script
+assert re.search(
+    rf"ip -6 addr replace {re.escape(authority['provider']['ipv6']['address'])} dev \S+ nodad",
+    provider_script,
+)
+for address in (*authority["root"]["ipv6"], *authority["delegation"]["ipv6"]):
+    assert re.search(
+        rf"ip -6 addr replace {re.escape(address)}/128 dev \S+ nodad",
+        provider_script,
+    )
 for address in (
     *authority["root"]["ipv4"],
     *authority["root"]["ipv6"],
