@@ -32,17 +32,20 @@ nix shell --inputs-from "${repo_root}" nixpkgs#yq-go --command \
   yq -o=json '.' "${tmp_dir}/fabric.clab.yml" >"${tmp_dir}/fabric.clab.json"
 
 REPO_ROOT="${repo_root}" CPM_JSON="${tmp_dir}/cpm.json" TOPOLOGY="${tmp_dir}/fabric.clab.json" \
+  NFT_BATCH="${tmp_dir}/fs270-policy.nft" \
   PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/pycache python3 - <<'PY'
 import copy
 import json
 import ipaddress
 import os
+import shlex
 import sys
 from pathlib import Path
 
 sys.path.insert(0, os.environ["REPO_ROOT"])
 
 from clabgen.s88.CM.relation_selection_rules import render_relation_selection_rules
+from clabgen.s88.CM.cpm_firewall_rules import rules_for_cpm_rule
 
 trace_id = "FS-270-HDS-010-SDS-010-SMS-020"
 relation_id = f"{trace_id}__source-to-destination-icmp"
@@ -75,6 +78,88 @@ if len(node_matches) != 1:
     raise AssertionError("rendered downstream-selector identity is not unique")
 node = node_matches[0]
 commands = "\n".join(node.get("exec", []))
+
+policy_node_matches = [
+    node
+    for name, node in topology["topology"]["nodes"].items()
+    if name.endswith("-policy")
+]
+if len(policy_node_matches) != 1:
+    raise AssertionError("rendered policy owner identity is not unique")
+policy_exec = policy_node_matches[0].get("exec", [])
+
+nft_statements = []
+primitive_lines = []
+for bundled_command in policy_exec:
+    outer_argv = shlex.split(bundled_command)
+    if len(outer_argv) != 4 or outer_argv[:3] != ["sh", "-e", "-c"]:
+        raise AssertionError(
+            f"unexpected CLAB exec bundle shape: {outer_argv[:3]!r}"
+        )
+    primitive_lines.extend(outer_argv[3].splitlines())
+
+for line in primitive_lines:
+    try:
+        argv = shlex.split(line)
+    except ValueError:
+        continue
+    if (
+        len(argv) == 2
+        and argv[0] == "nft"
+        and argv[1].startswith("add rule inet fw forward ")
+    ):
+        nft_statements.append(argv[1])
+
+relation_nft_statements = [
+    statement for statement in nft_statements if relation_id in statement
+]
+if len(relation_nft_statements) != 4:
+    raise AssertionError(
+        "expected four relation-scoped rendered nft statements, got "
+        f"{len(relation_nft_statements)}"
+    )
+if any(
+    " icmpv6 counter " in statement
+    and " meta l4proto icmpv6 counter " not in statement
+    for statement in relation_nft_statements
+):
+    raise AssertionError(
+        "CLAB emitted bare icmpv6 as an nftables expression instead of a "
+        "protocol match"
+    )
+if sum(
+    " meta l4proto icmp counter " in statement
+    for statement in relation_nft_statements
+) != 2:
+    raise AssertionError("IPv4 relation rules do not carry the exact ICMP protocol match")
+if sum(
+    " meta l4proto icmpv6 counter " in statement
+    for statement in relation_nft_statements
+) != 2:
+    raise AssertionError(
+        "IPv6 relation rules do not carry the exact ICMPv6 protocol match"
+    )
+
+try:
+    rules_for_cpm_rule(
+        {
+            "fromInterface": "source",
+            "toInterface": "destination",
+            "family": 4,
+            "matches": [{"family": "any", "proto": "icmpv6"}],
+            "action": "accept",
+        }
+    )
+except ValueError:
+    pass
+else:
+    raise AssertionError("renderer accepted an IPv6 ICMP match for an IPv4 rule")
+
+with Path(os.environ["NFT_BATCH"]).open("w", encoding="utf-8") as handle:
+    handle.write("add table inet fw\n")
+    handle.write("add chain inet fw forward\n")
+    for statement in relation_nft_statements:
+        handle.write(f"{statement}\n")
 
 
 def interface_for_runtime(runtime_name: str):
@@ -220,3 +305,6 @@ print(
     "dual-stack policy-state selectors and bounded routes"
 )
 PY
+
+nix shell --inputs-from "${repo_root}" nixpkgs#nftables nixpkgs#util-linux --command \
+  unshare -Urn nft -c -f "${tmp_dir}/fs270-policy.nft"

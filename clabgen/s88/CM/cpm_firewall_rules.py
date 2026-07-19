@@ -78,8 +78,14 @@ def _match_suffix(match: Dict[str, Any], family: int) -> str | None:
     proto_text = "" if proto in (None, "any") else str(proto).lower()
     dports = _dports_expr(match)
 
-    if proto_text == "icmp":
-        return " meta l4proto icmp"
+    if proto_text in ("icmp", "icmpv4"):
+        if proto_text == "icmpv4" and family != 4:
+            raise ValueError("IPv4 ICMP match cannot be rendered for IPv6")
+        return f" meta l4proto {'icmpv6' if family == 6 else 'icmp'}"
+    if proto_text in ("icmpv6", "ipv6-icmp"):
+        if family != 6:
+            raise ValueError("IPv6 ICMP match cannot be rendered for IPv4")
+        return " meta l4proto icmpv6"
     if proto_text:
         return f" {proto_text}{dports}"
     return dports
