@@ -118,6 +118,11 @@ let
         trap on_failure ERR
 
         mkdir -p "$work_dir" "$artifact_dir"
+
+        if [[ ! -e /etc/hosts ]]; then
+          echo "diagnostic.clab-host-prerequisite-missing: /etc/hosts must be materialized before Containerlab cleanup or reconfiguration" >&2
+          exit 1
+        fi
         write_status running "$phase" ""
 
         # Validate pre-built CPM inputs (produced upstream by the compiler).
@@ -516,6 +521,17 @@ in
   networking.useNetworkd = true;
   systemd.network.enable = true;
   networking.useDHCP = false;
+
+  # Containerlab reads and rewrites /etc/hosts while destroying a previous
+  # topology during `deploy --reconfigure`. Some thin VM consumers disable the
+  # normal NixOS /etc/hosts link; the direct-host renderer owns restoring this
+  # platform prerequisite whenever it emits the CLAB lifecycle service.
+  environment.etc.hosts.enable = lib.mkIf hasInputs (lib.mkForce true);
+
+  assertions = lib.optional hasInputs {
+    assertion = config.environment.etc.hosts.enable;
+    message = "diagnostic.clab-host-prerequisite-missing: the Containerlab host requires declaratively managed /etc/hosts";
+  };
 
   environment.systemPackages = lib.mkIf (hasInputs && s-router-clab-render-live != null) [
     s-router-clab-render-live
