@@ -7,6 +7,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
+        dhcpcd5 \
         dnsmasq \
         dns-root-data \
         frr \
@@ -69,7 +70,7 @@ RUN sed -i \
         -e 's/^bgpd=no/bgpd=yes/' \
         /etc/frr/daemons \
     && grep -q '^bgpd=yes' /etc/frr/daemons \
-    && for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd dnsmasq knotd knotc unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do \
+    && for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff dhcpcd udhcpc udhcpd dnsmasq knotd knotc unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do \
         command -v "$cmd" >/dev/null || { echo "missing command: $cmd" >&2; exit 1; }; \
     done \
     && test -x /usr/lib/frr/zebra \

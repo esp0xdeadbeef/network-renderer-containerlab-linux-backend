@@ -132,10 +132,10 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Test 7: Tooling package commands (21 tools)
+# Test 7: Tooling package commands (22 tools)
 # ---------------------------------------------------------------------------
 tooling_ok=1
-for command_name in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff udhcpc udhcpd vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do
+for command_name in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff dhcpcd udhcpc udhcpd vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do
   if ! grep -q 'command -v "$cmd"' "${build_script}"; then
     echo "FAIL test7: build script must verify 'command -v' for package commands before cache export" >&2
     tooling_ok=0
@@ -148,7 +148,7 @@ for command_name in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe
   fi
 done
 if (( tooling_ok == 1 )); then
-  echo "PASS test7: all 21 tooling package commands verified"
+  echo "PASS test7: all 22 tooling package commands verified"
 else
   failures=$((failures + 1))
 fi
