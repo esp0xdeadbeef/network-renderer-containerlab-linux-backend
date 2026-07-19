@@ -74,6 +74,80 @@ def _unique(values: List[str]) -> List[str]:
     return result
 
 
+def _safe_stem(value: str) -> str:
+    return value.replace("/", "-").replace(":", "-").replace(" ", "-")
+
+
+def _protected_reservation_includes(dns: Dict[str, Any]) -> List[str]:
+    raw = dns.get("protectedReservationPublications", [])
+    if not isinstance(raw, list):
+        _fail("CPM emitted a malformed protected reservation publication list")
+    includes: List[str] = []
+    for publication in raw:
+        if not isinstance(publication, dict):
+            _fail("CPM emitted a malformed protected reservation publication")
+        allowed_fields = {
+            "source",
+            "scopeId",
+            "namespace",
+            "ownerScope",
+            "requesterScopes",
+            "recordClasses",
+            "materializerFamily",
+            "fallbackBehavior",
+            "publicationDenialDiagnostic",
+        }
+        if set(publication) - allowed_fields:
+            _fail("CPM leaked unsupported protected reservation publication fields")
+        source = publication.get("source")
+        scope_id = publication.get("scopeId")
+        owner_scope = publication.get("ownerScope")
+        requester_scopes = publication.get("requesterScopes")
+        record_classes = publication.get("recordClasses")
+        if (
+            not isinstance(source, dict)
+            or source.get("schema") != "gamp-protected-reservation-set-v1"
+            or source.get("sourceClass") != "protected"
+            or not isinstance(source.get("sourceFile"), str)
+            or not source["sourceFile"].startswith("/run/secrets/")
+            or source["sourceFile"] == "/run/secrets/"
+            or "/../" in source["sourceFile"]
+        ):
+            _fail("CPM emitted an unapproved protected reservation source")
+        if (
+            not isinstance(scope_id, str)
+            or not scope_id
+            or owner_scope != scope_id
+            or not isinstance(requester_scopes, list)
+            or not requester_scopes
+            or not all(isinstance(item, str) and item for item in requester_scopes)
+            or owner_scope not in requester_scopes
+            or "*" in requester_scopes
+            or not isinstance(publication.get("namespace"), str)
+            or not re.fullmatch(_ZONE_NAME_PATTERN, publication["namespace"])
+        ):
+            _fail("CPM emitted an unscoped protected reservation publication")
+        if (
+            not isinstance(record_classes, list)
+            or not record_classes
+            or len(record_classes) != len(set(record_classes))
+            or not set(record_classes).issubset({"A", "AAAA", "PTR"})
+        ):
+            _fail("CPM emitted invalid protected reservation record classes")
+        if (
+            publication.get("materializerFamily") not in {"ipv4", "ipv6"}
+            or publication.get("fallbackBehavior") != "local-only"
+            or not isinstance(publication.get("publicationDenialDiagnostic"), str)
+            or not publication["publicationDenialDiagnostic"]
+        ):
+            _fail("CPM emitted a non-reproducible protected reservation policy")
+        include_path = f"/run/protected-reservation-dns/{_safe_stem(scope_id)}.conf"
+        if include_path in includes:
+            _fail("CPM emitted duplicate protected reservation publication owners")
+        includes.append(include_path)
+    return includes
+
+
 def render_unbound_dns_service(
     dns: Dict[str, Any],
     authority: Dict[str, Any],
@@ -149,7 +223,9 @@ def render_unbound_dns_service(
             + " >&2"
         )
 
+    protected_reservation_includes = _protected_reservation_includes(dns)
     config = [
+        *[f"include: {_quote(path)}" for path in protected_reservation_includes],
         "server:",
         '  username: "unbound"',
         '  chroot: ""',
