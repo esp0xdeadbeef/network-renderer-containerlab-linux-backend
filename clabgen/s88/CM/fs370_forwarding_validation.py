@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import re
+import shlex
 from typing import Any, Dict, Iterable, List, Tuple
 
 from clabgen.s88.CM.linux_route_values import _dst, _normalize_prefix, _route_lists
@@ -80,7 +82,25 @@ def _validate_no_bad_comments(commands: List[str]) -> None:
             )
 
 
-def _validate_forward_accepts(node: Dict[str, Any], eth_map: Dict[str, str], text: str) -> None:
+def _has_interface_operand(command: str, keyword: str, interface: str) -> bool:
+    forms = {
+        interface,
+        json.dumps(interface),
+        shlex.quote(interface),
+    }
+    return any(
+        re.search(
+            rf"(?<!\S){re.escape(keyword)}\s+{re.escape(form)}(?=\s|$)",
+            command,
+        )
+        is not None
+        for form in forms
+    )
+
+
+def _validate_forward_accepts(
+    node: Dict[str, Any], eth_map: Dict[str, str], commands: List[str]
+) -> None:
     for rule in _forward_rules(node):
         if rule.get("action") != "accept":
             continue
@@ -88,10 +108,11 @@ def _validate_forward_accepts(node: Dict[str, Any], eth_map: Dict[str, str], tex
         to_eth = _runtime_name(rule.get("toInterface"), eth_map)
         if from_eth is None or to_eth is None:
             continue
-        if (
-            f'iifname "{from_eth}"' in text
-            and f'oifname "{to_eth}"' in text
-            and "counter accept" in text
+        if any(
+            _has_interface_operand(command, "iifname", from_eth)
+            and _has_interface_operand(command, "oifname", to_eth)
+            and "counter accept" in command
+            for command in commands
         ):
             continue
         raise ValueError(
@@ -141,7 +162,7 @@ def validate_fs370_forwarding_commands(
 ) -> None:
     text = _commands_text(commands)
     _validate_no_bad_comments(commands)
-    _validate_forward_accepts(node, eth_map, text)
+    _validate_forward_accepts(node, eth_map, commands)
     _validate_access_routes(node, eth_map, text)
     _validate_policy_rules(commands)
 
