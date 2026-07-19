@@ -17,6 +17,9 @@ import tempfile
 
 from clabgen.models import InterfaceModel, NodeModel
 from clabgen.s88.CM.cpm_firewall_rules import rules_for_cpm_rule
+from clabgen.s88.CM.fs370_forwarding_validation import (
+    validate_fs370_forwarding_commands,
+)
 from clabgen.s88.CM.linux_routes import _render_runtime_delegated_routes
 from clabgen.s88.site.interface_model import _dict_list
 from clabgen.s88.site.node_runtime import _protected_runtime_binds
@@ -62,6 +65,18 @@ assert "udp dport 4242" in command
 assert " tcp " not in command
 assert "|| true" not in command
 assert "2001:db8" not in command
+
+# The FS-370 completeness validator must recognize the shell-quoted runtime
+# materializer form just as it recognizes a static `nft` command.  This is the
+# exact policy-node shape emitted by the complete FS-230 five-node row.
+runtime_policy_node = {"forwardingIntent": {"rules": [RULE]}}
+validate_fs370_forwarding_commands(runtime_policy_node, {}, commands)
+try:
+    validate_fs370_forwarding_commands(runtime_policy_node, {}, [])
+except ValueError as error:
+    assert "missing-tenant-accept diagnostic" in str(error)
+else:
+    raise AssertionError("missing protected runtime accept was not rejected")
 
 family_only = copy.deepcopy(RULE)
 family_only.pop("destinationRuntimeAddresses")
@@ -182,6 +197,112 @@ PY
 helper="${repo_root}/docker-clab-frr-plus-tooling/protected-ipv6-materializer.py"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
+
+REPO_ROOT="${repo_root}" nix eval --impure --json --expr '
+  let
+    flake = builtins.getFlake ("path:" + builtins.getEnv "REPO_ROOT");
+    system = builtins.currentSystem;
+    traceId = "FS-230-HDS-010-SDS-010-SMS-040";
+    row = flake.inputs.network-labs.outPath + "/GAMP/SMT/${traceId}";
+    cpm = flake.inputs.network-control-plane-model.lib.${system}.compileAndBuild {
+      input = import (row + "/intent.nix");
+      inventory = import (row + "/inventory-clab.nix");
+    };
+  in
+  { inherit (cpm) control_plane_model; }
+' >"${tmp_dir}/cpm.json"
+
+REPO_ROOT="${repo_root}" nix eval --impure --json --expr '
+  let
+    flake = builtins.getFlake ("path:" + builtins.getEnv "REPO_ROOT");
+    row = flake.inputs.network-labs.outPath + "/GAMP/SMT/FS-230-HDS-010-SDS-010-SMS-040";
+  in
+  import (row + "/inventory-clab.nix")
+' >"${tmp_dir}/renderer-inventory.json"
+
+CLABGEN_RENDERER_INVENTORY_JSON="${tmp_dir}/renderer-inventory.json" \
+  nix run --no-write-lock-file "path:${repo_root}#generate-clab-config" -- \
+    "${tmp_dir}/cpm.json" \
+    "${tmp_dir}/fabric.clab.yml" \
+    "${tmp_dir}/bridges.nix"
+
+nix shell --inputs-from "${repo_root}" nixpkgs#yq-go --command \
+  yq -o=json '.' "${tmp_dir}/fabric.clab.yml" >"${tmp_dir}/fabric.clab.json"
+
+"${repo_root}/tests/validate-topology-conformance.sh" \
+  "${tmp_dir}/cpm.json" \
+  "${tmp_dir}/renderer-inventory.json" \
+  "${tmp_dir}/fabric.clab.yml"
+
+TOPOLOGY="${tmp_dir}/fabric.clab.json" PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONPYCACHEPREFIX=/tmp/pycache python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+trace_id = "FS-230-HDS-010-SDS-010-SMS-040"
+relation_id = f"{trace_id}__lab-wan-to-nebula-ipv6"
+source_file = "/run/secrets/fs230-lab-dmz-ipv6-prefix"
+
+with Path(os.environ["TOPOLOGY"]).open(encoding="utf-8") as handle:
+    topology = json.load(handle)["topology"]
+
+linux_nodes = {
+    name: node
+    for name, node in topology["nodes"].items()
+    if node.get("kind") == "linux" and trace_id in name
+}
+expected_suffixes = {
+    "access-dmz",
+    "core-lab-wan",
+    "downstream-selector",
+    "policy",
+    "upstream-selector",
+}
+if {name.rsplit(f"{trace_id}-", 1)[-1] for name in linux_nodes} != expected_suffixes:
+    raise AssertionError("complete five-node FS-230 CLAB chain was not rendered")
+
+all_commands: list[str] = []
+for name, node in linux_nodes.items():
+    binds = node.get("binds", [])
+    expected_bind = f"{source_file}:{source_file}:ro"
+    if binds != [expected_bind]:
+        raise AssertionError(f"{name}: protected source is not mounted exactly once read-only")
+    commands = node.get("exec", [])
+    all_commands.extend(commands)
+    relation_commands = [command for command in commands if relation_id in command]
+    if len(relation_commands) != 1:
+        raise AssertionError(f"{name}: expected one relation-owned runtime accept")
+    command = relation_commands[0]
+    required = (
+        "clab-protected-ipv6-materializer",
+        f"--source {source_file}",
+        "--delegated-prefix-length 48",
+        "--tenant-prefix-length 64",
+        "--slot 35",
+        "--interface-identifier 0:0:0:0:0:0:0:4242",
+        "meta nfproto ipv6",
+        "meta l4proto udp",
+        "udp dport 4242",
+        "counter accept",
+    )
+    if not all(fragment in command for fragment in required):
+        raise AssertionError(f"{name}: protected UDP/4242 materializer is incomplete")
+    if "tcp dport 4242" in command or "tcp dport { 4242 }" in command:
+        raise AssertionError(f"{name}: unintended TCP/4242 authority")
+
+joined = "\n".join(all_commands)
+for forbidden in (
+    " masquerade",
+    " snat ",
+    " dnat ",
+    "runtime-origin-egress",
+    'iifname "upstream" oifname "wan0" counter accept',
+):
+    if forbidden in joined:
+        raise AssertionError(f"unintended egress/translation authority: {forbidden}")
+PY
+
 source_file="${tmp_dir}/prefix"
 printf '%s\n' '2001:db8:230::/48' >"${source_file}"
 derived_prefix="$(${helper} \
