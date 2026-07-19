@@ -9,6 +9,8 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
 PYTHONPATH="${repo_root}" python3 - <<'PY'
+import copy
+
 from clabgen.s88.site.model_builder import build_nodes
 from clabgen.s88.site.node_runtime import render_linux_node
 
@@ -92,6 +94,7 @@ assert "--dns-record-class A" in text
 assert "--dns-record-class AAAA" in text
 assert "--dns-record-class PTR" in text
 assert 'include: "/run/protected-reservation-dns/client.conf"' in text
+assert 'local-zone: "client.lan." static' in text
 assert text.index(materializer_call) < text.index(unbound_config)
 assert rendered["labels"]["clab.access-advertisements.runtime"] == "kea"
 assert rendered["labels"]["clab.dns.runtime"] == "unbound"
@@ -102,17 +105,36 @@ for protected_value in (
 ):
     assert protected_value not in text
 
-bad = site["runtimeTargets"]["access-runtime"]["services"]["dns"]
+bad_site = copy.deepcopy(site)
+bad = bad_site["runtimeTargets"]["access-runtime"]["services"]["dns"]
 bad["protectedReservationPublications"][0]["requesterScopes"] = ["*"]
 try:
     render_linux_node(
-        "access-client", build_nodes(site, {})["access-client"], {"tenant-client": "eth1"}
+        "access-client",
+        build_nodes(bad_site, {})["access-client"],
+        {"tenant-client": "eth1"},
     )
 except ValueError as error:
     assert "unscoped protected reservation publication" in str(error)
     assert "10.50.20" not in str(error)
 else:
     raise AssertionError("wildcard protected publication scope was accepted")
+
+conflicting_site = copy.deepcopy(site)
+conflicting_site["runtimeTargets"]["access-runtime"]["services"]["dns"]["localZones"] = [
+    {"name": "client.lan.", "type": "transparent"}
+]
+try:
+    render_linux_node(
+        "access-client",
+        build_nodes(conflicting_site, {})["access-client"],
+        {"tenant-client": "eth1"},
+    )
+except ValueError as error:
+    assert "conflicting protected reservation namespace authority" in str(error)
+    assert "10.50.20" not in str(error)
+else:
+    raise AssertionError("conflicting protected publication namespace was accepted")
 
 print("PASS FS-560 CLAB contract and init ordering")
 PY
