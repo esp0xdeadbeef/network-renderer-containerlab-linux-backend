@@ -34,6 +34,7 @@ python3 - <<'PY'
 from __future__ import annotations
 
 import copy
+from ipaddress import ip_address, ip_network
 import json
 import os
 from pathlib import Path
@@ -177,17 +178,49 @@ site_data = next(
     for enterprise in solver["enterprise"].values()
     for site in enterprise["site"].values()
 )
-core_model = build_nodes(site_data, tenant_prefix_owners(site_data))["core-primary"]
-core_eth_map = {
-    ifname: (interface.runtime_if_name or f"eth{index}")
-    for index, (ifname, interface) in enumerate(core_model.interfaces.items(), 1)
-}
-core = build_node_data("core-primary", core_model, core_eth_map)
+models = build_nodes(site_data, tenant_prefix_owners(site_data))
+
+
+def runtime_node(logical_name: str) -> dict:
+    model = models[logical_name]
+    eth_map = {
+        ifname: (interface.runtime_if_name or f"eth{index}")
+        for index, (ifname, interface) in enumerate(model.interfaces.items(), 1)
+    }
+    return build_node_data(logical_name, model, eth_map)
+
+
+core = runtime_node("core-primary")
 core_script = shlex.split(render_dns_service(core, "core-primary")[0])[2]
 assert 'root-hints: "/tmp/clabgen-controlled-root.hints"' in core_script
 assert 'domain-insecure: "."' in core_script
 assert "auto-trust-anchor-file" not in core_script
 assert "/usr/share/dns/root.key" not in core_script
+
+for logical_name in ("access-recursive", "access-local", "core-primary"):
+    node = runtime_node(logical_name)
+    dns = node["services"]["dns"]
+    script = shlex.split(render_dns_service(node, logical_name)[0])[2]
+    assert "nft -a list chain inet filter input" in script
+    requester_prefixes = [
+        prefix
+        for policy in dns.get("requesterPolicies", [])
+        for prefix in policy.get("sourcePrefixes", [])
+    ]
+    for prefix in (*dns.get("allowFrom", []), *requester_prefixes):
+        network = ip_network(prefix, strict=False)
+        family = "ip6" if network.version == 6 else "ip"
+        for address in dns["listen"]:
+            endpoint = ip_address(address)
+            if endpoint.version != network.version:
+                continue
+            for protocol in ("udp", "tcp"):
+                expected = (
+                    f"nft insert rule inet filter input {family} saddr {network} "
+                    f"{family} daddr {endpoint} {protocol} dport 53 accept "
+                    "comment s88-dns-service-input"
+                )
+                assert expected in script, (logical_name, family, protocol)
 
 bad_core = copy.deepcopy(core)
 bad_core["services"]["dns"]["validationAuthority"]["selectedUplink"] = (

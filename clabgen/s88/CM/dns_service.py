@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ipaddress import ip_address, ip_interface
+from ipaddress import ip_address, ip_interface, ip_network
 from pathlib import Path
 from typing import Any, Dict, List
 import json
@@ -187,6 +187,56 @@ def _public_resolver_drop_commands(
     return commands
 
 
+def _dns_input_commands(dns: Dict[str, Any], authority: Dict[str, Any]) -> List[str]:
+    listeners = []
+    for value in _string_list(dns.get("listen", [])):
+        try:
+            parsed = ip_address(value)
+        except ValueError:
+            _dns_renderer_fail("DNS listener input has malformed addressing")
+        if not parsed.is_loopback and parsed not in listeners:
+            listeners.append(parsed)
+
+    requester_prefixes = list(_string_list(dns.get("allowFrom", [])))
+    for policy in authority["requesterPolicies"]:
+        requester_prefixes.extend(_string_list(policy.get("sourcePrefixes", [])))
+
+    networks = []
+    for value in requester_prefixes:
+        try:
+            parsed = ip_network(value, strict=False)
+        except ValueError:
+            _dns_renderer_fail("DNS requester input has malformed addressing")
+        if parsed not in networks:
+            networks.append(parsed)
+
+    rules: List[str] = []
+    for network in networks:
+        family = "ip6" if network.version == 6 else "ip"
+        for listener in listeners:
+            if listener.version != network.version:
+                continue
+            for protocol in ("udp", "tcp"):
+                rules.append(
+                    f"nft insert rule inet filter input {family} saddr {_nft_literal(str(network))} "
+                    f"{family} daddr {_nft_literal(str(listener))} {protocol} dport 53 "
+                    "accept comment s88-dns-service-input"
+                )
+
+    if not rules:
+        return []
+
+    return [
+        "nft -a list chain inet filter input >/dev/null",
+        "while :; do",
+        "  handle=\"$(nft -a list chain inet filter input | awk '/comment \\\"s88-dns-service-input\\\"/ { print $NF; exit }')\"",
+        '  if [ -z "$handle" ]; then break; fi',
+        '  nft delete rule inet filter input handle "$handle"',
+        "done",
+        *rules,
+    ]
+
+
 def _dns_egress_policy_commands(node: Dict[str, Any]) -> List[str]:
     policy = normalize_dns_egress_policy(node)
     if policy is None:
@@ -250,6 +300,7 @@ def render_dns_service(
             dns,
             authority,
             _service_endpoint_address_commands(node, dns)
+            + _dns_input_commands(dns, authority)
             + _public_resolver_drop_commands(dns, authority["rootForwarders"])
             + _dns_egress_policy_commands(node),
         )
