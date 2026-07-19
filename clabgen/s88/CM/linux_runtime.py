@@ -8,6 +8,7 @@ from clabgen.s88.CM.linux_bgp import _is_bgp_router, _render_bgp
 from clabgen.s88.CM.linux_interfaces import _render_addressing, _render_interfaces
 from clabgen.s88.CM.linux_routes import (
     _render_default_routes,
+    _render_runtime_delegated_routes,
     _render_static_routes,
 )
 from clabgen.s88.CM.fs370_forwarding_validation import (
@@ -54,6 +55,9 @@ def render(
         cmds.extend(_render_static_routes(node_data, eth_map))
         cmds.extend(_render_default_routes(node_data, eth_map))
         cmds.extend(render_policy_routes(node_data, eth_map))
+
+    if role != "wan-peer":
+        cmds.extend(_render_runtime_delegated_routes(node_data, eth_map))
 
     cmds.extend(render_cm(node_data.get("_cm_inputs", {})))
     cmds.extend(render_dns_resolver_config(node_data, node_name))

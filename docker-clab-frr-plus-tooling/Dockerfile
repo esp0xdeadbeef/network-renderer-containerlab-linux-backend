@@ -34,7 +34,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY protected-reservation-materializer.py /usr/local/bin/clab-protected-reservation-materializer
-RUN chmod 0755 /usr/local/bin/clab-protected-reservation-materializer
+COPY protected-ipv6-materializer.py /usr/local/bin/clab-protected-ipv6-materializer
+RUN chmod 0755 \
+        /usr/local/bin/clab-protected-reservation-materializer \
+        /usr/local/bin/clab-protected-ipv6-materializer
 
 RUN if ! command -v pppoe-sniff >/dev/null 2>&1; then \
         { \
@@ -70,7 +73,7 @@ RUN sed -i \
         -e 's/^bgpd=no/bgpd=yes/' \
         /etc/frr/daemons \
     && grep -q '^bgpd=yes' /etc/frr/daemons \
-    && for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff dhcpcd udhcpc udhcpd dnsmasq knotd knotc unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do \
+    && for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff dhcpcd udhcpc udhcpd dnsmasq knotd knotc unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer clab-protected-ipv6-materializer; do \
         command -v "$cmd" >/dev/null || { echo "missing command: $cmd" >&2; exit 1; }; \
     done \
     && test -x /usr/lib/frr/zebra \

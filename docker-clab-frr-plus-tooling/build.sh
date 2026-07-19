@@ -5,6 +5,7 @@ IMAGE="${CLAB_FRR_TOOLING_IMAGE:-clab-frr-plus-tooling:latest}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 DOCKERFILE="${DIR}/Dockerfile"
 MATERIALIZER="${DIR}/protected-reservation-materializer.py"
+IPV6_MATERIALIZER="${DIR}/protected-ipv6-materializer.py"
 LABEL_KEY="org.esp0xdeadbeef.clab-frr-plus-tooling.dockerfile-sha256"
 FORCE_REBUILD="${CLAB_FRR_TOOLING_REBUILD:-${CLAB_FRR_TOOLING_FORCE_REBUILD:-0}}"
 SAVE_CACHE="${CLAB_FRR_TOOLING_SAVE_CACHE:-1}"
@@ -18,7 +19,7 @@ CACHE_SEEDED=0
 CACHE_USED_EXISTING=0
 
 dockerfile_hash() {
-    sha256sum "${DOCKERFILE}" "${MATERIALIZER}" | sha256sum | awk '{print $1}'
+    sha256sum "${DOCKERFILE}" "${MATERIALIZER}" "${IPV6_MATERIALIZER}" | sha256sum | awk '{print $1}'
 }
 
 CACHE_KEY="${CLAB_FRR_TOOLING_CACHE_KEY:-$(dockerfile_hash)}"
@@ -88,7 +89,7 @@ image_is_usable() {
 
 verify_tooling_image() {
     docker run --rm --entrypoint /bin/sh "$IMAGE" -ec '
-        for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff dhcpcd udhcpc udhcpd dnsmasq knotd knotc unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do
+        for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff dhcpcd udhcpc udhcpd dnsmasq knotd knotc unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer clab-protected-ipv6-materializer; do
             command -v "$cmd" >/dev/null || {
                 echo "missing FRR tooling package command: $cmd" >&2
                 exit 1

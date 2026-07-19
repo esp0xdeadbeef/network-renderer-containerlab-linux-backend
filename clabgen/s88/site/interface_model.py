@@ -19,6 +19,7 @@ def _dict_list(value: Any, field_name: str) -> List[Dict[str, Any]]:
         dst = item.get("dst")
         if not isinstance(dst, str) or not dst:
             if isinstance(item.get("sourceFile"), str) and item.get("sourceFile"):
+                result.append(dict(item))
                 continue
             raise ValueError(f"{field_name} route missing non-empty 'dst'")
         result.append(dict(item))

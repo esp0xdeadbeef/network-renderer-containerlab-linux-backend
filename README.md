@@ -32,6 +32,15 @@ All behavior requirements originate from the FS spec chain.
 | FS    | FS-780 | Containerlab/Linux And NixOS Equivalence Matrix — compare scope, policy, reachability, address authority, NAT, public ingress, routing, DNS, discovery, service exposure |
 | FS    | FS-982 | Host Configuration Renderer Boundary — NixOS and Containerlab/Linux host config stays thin; generated network realization belongs in renderers, not host profiles |
 
+### Public Ingress Runtime Destination
+
+`FS-230-HDS-010-SDS-010-SMS-040` owns protected IPv6 public-ingress
+materialization. CLAB preserves the same CPM tuple as NixOS, mounts only the
+opaque protected prefix source, derives the tenant `/64` and exact endpoint
+`/128` inside the runtime, and emits the exact family/protocol/port/interface
+rule with stateful return and no NAT66. Missing, malformed, or ambiguous
+runtime input fails closed; family-neutral rules are never expanded into IPv6.
+
 ### Pipeline
 
 ```
