@@ -108,7 +108,8 @@ printf '[clab-cache] refreshing repository Docker image cache at %s\n' "${cache_
 cd "${repo_root}"
 dockerfile="docker-clab-frr-plus-tooling/Dockerfile"
 materializer="docker-clab-frr-plus-tooling/protected-reservation-materializer.py"
-hash="$(sha256sum "${dockerfile}" "${materializer}" | sha256sum | awk '{print $1}')"
+ipv6_materializer="docker-clab-frr-plus-tooling/protected-ipv6-materializer.py"
+hash="$(sha256sum "${dockerfile}" "${materializer}" "${ipv6_materializer}" | sha256sum | awk '{print $1}')"
 cache_tar="${cache_dir}/clab-frr-plus-tooling-${hash}.tar"
 cache_id="${cache_tar}.image-id"
 
@@ -126,7 +127,7 @@ test -s "${cache_tar}"
 test -s "${cache_id}"
 
 docker run --rm --entrypoint /bin/sh clab-frr-plus-tooling:latest -ec '
-    for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff dhcpcd udhcpc udhcpd dnsmasq knotd knotc unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer; do
+    for cmd in tcpdump ping traceroute curl vim rg nmap nft less pppd pppoe pppoe-server pppoe-sniff dhcpcd udhcpc udhcpd dnsmasq knotd knotc unbound unbound-checkconf vtysh python3 jq kea-dhcp4 kea-dhcp6 clab-protected-reservation-materializer clab-protected-ipv6-materializer; do
         command -v "$cmd" >/dev/null || exit 1
     done
     grep -q "^bgpd=yes" /etc/frr/daemons

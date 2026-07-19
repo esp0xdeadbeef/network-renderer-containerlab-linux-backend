@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from typing import Any, Dict, List, Tuple
 
 from clabgen.s88.CM.linux_route_state import _connected_prefixes, _local_ips
@@ -138,6 +139,97 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List
     _append_route_groups(cmds, seen, "ip", routes4)
     _append_route_groups(cmds, seen, "ip -6", routes6)
     return cmds
+
+
+def _render_runtime_delegated_routes(
+    node: Dict[str, Any], eth_map: Dict[str, str]
+) -> List[str]:
+    commands: List[str] = []
+    seen: set[Tuple[Any, ...]] = set()
+    table_ids = sorted(
+        {
+            allocation["tableId"]
+            for iface in _dict(node.get("interfaces")).values()
+            if isinstance(iface, dict)
+            for allocation in [iface.get("policyRoutingAllocation")]
+            if isinstance(allocation, dict)
+            and isinstance(allocation.get("tableId"), int)
+            and allocation["tableId"] > 0
+        }
+    )
+
+    for ifname in sorted(_dict(node.get("interfaces"))):
+        iface = node["interfaces"][ifname]
+        eth = eth_map.get(ifname)
+        if not isinstance(iface, dict) or eth is None:
+            continue
+        for route in _route_lists(iface)["ipv6"]:
+            intent = _dict(route.get("intent"))
+            if intent.get("kind") != "runtime-routed-prefix-return":
+                continue
+
+            source_file = route.get("sourceFile")
+            delegated_length = route.get("delegatedPrefixLength")
+            tenant_length = route.get("perTenantPrefixLength")
+            slot = route.get("slot")
+            via = _effective_via6(node, iface, route)
+            if (
+                not isinstance(source_file, str)
+                or not source_file.startswith("/run/secrets/")
+                or source_file == "/run/secrets/"
+                or "/../" in source_file
+                or not isinstance(delegated_length, int)
+                or not isinstance(tenant_length, int)
+                or not isinstance(slot, int)
+            ):
+                raise ValueError(
+                    "FS-350-HDS-010-SDS-010-SMS-060: incomplete protected "
+                    "runtime IPv6 route contract"
+                )
+
+            key = (
+                source_file,
+                delegated_length,
+                tenant_length,
+                slot,
+                via,
+                eth,
+                tuple(table_ids),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+
+            materializer = " ".join(
+                [
+                    "clab-protected-ipv6-materializer",
+                    "--source",
+                    shlex.quote(source_file),
+                    "--delegated-prefix-length",
+                    str(delegated_length),
+                    "--tenant-prefix-length",
+                    str(tenant_length),
+                    "--slot",
+                    str(slot),
+                ]
+            )
+            route_suffix = (
+                f"via {shlex.quote(via)} dev {shlex.quote(eth)} onlink"
+                if isinstance(via, str) and via
+                else f"dev {shlex.quote(eth)}"
+            )
+            script = [
+                "set -eu",
+                f'runtime_prefix="$({materializer})"',
+                f'ip -6 route replace "$runtime_prefix" {route_suffix}',
+            ]
+            script.extend(
+                f'ip -6 route replace table {table_id} "$runtime_prefix" {route_suffix}'
+                for table_id in table_ids
+            )
+            commands.append(f"sh -eu -c {shlex.quote(chr(10).join(script))}")
+
+    return commands
 
 
 def _render_default_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:

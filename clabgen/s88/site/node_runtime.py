@@ -162,21 +162,67 @@ def build_node_data(
     return node_data
 
 
-def _protected_reservation_binds(node: NodeModel) -> List[str]:
+def _protected_runtime_binds(node: NodeModel) -> List[str]:
+    def add_source(source_files: set[str], value: Any, field: str) -> None:
+        if value is None:
+            return
+        if (
+            not isinstance(value, str)
+            or not value.startswith("/run/secrets/")
+            or value == "/run/secrets/"
+            or "/../" in value
+        ):
+            raise ValueError(f"{field} must be a protected /run/secrets path")
+        source_files.add(value)
+
     advertisements = node.advertisements
-    if not isinstance(advertisements, dict):
-        return []
     source_files: set[str] = set()
-    for advertisement_name, family in (("dhcp4", "ipv4"), ("dhcpv6", "ipv6")):
-        scopes = advertisements.get(advertisement_name, [])
-        if not isinstance(scopes, list):
-            continue
-        for scope in scopes:
-            if not isinstance(scope, dict) or scope.get("enabled") is not True:
+    if isinstance(advertisements, dict):
+        for advertisement_name, family in (("dhcp4", "ipv4"), ("dhcpv6", "ipv6")):
+            scopes = advertisements.get(advertisement_name, [])
+            if not isinstance(scopes, list):
                 continue
-            source_file = protected_reservation_source(scope, family)
-            if source_file is not None:
-                source_files.add(source_file)
+            for scope in scopes:
+                if not isinstance(scope, dict) or scope.get("enabled") is not True:
+                    continue
+                source_file = protected_reservation_source(scope, family)
+                add_source(
+                    source_files,
+                    source_file,
+                    f"advertisements.{advertisement_name}.reservationSource.sourceFile",
+                )
+
+    for interface_name, interface in sorted(node.interfaces.items()):
+        routes = interface.routes if isinstance(interface.routes, dict) else {}
+        for family in ("ipv4", "ipv6"):
+            family_routes = routes.get(family, [])
+            if not isinstance(family_routes, list):
+                continue
+            for route in family_routes:
+                if isinstance(route, dict):
+                    add_source(
+                        source_files,
+                        route.get("sourceFile"),
+                        f"interfaces.{interface_name}.routes.{family}.sourceFile",
+                    )
+
+    forwarding_intent = node.forwarding_intent
+    if isinstance(forwarding_intent, dict):
+        rules = forwarding_intent.get("rules", [])
+        if isinstance(rules, list):
+            for rule in rules:
+                if not isinstance(rule, dict):
+                    continue
+                destinations = rule.get("destinationRuntimeAddresses", [])
+                if not isinstance(destinations, list):
+                    continue
+                for destination in destinations:
+                    if isinstance(destination, dict):
+                        add_source(
+                            source_files,
+                            destination.get("sourceFile"),
+                            "forwardingIntent.rules.destinationRuntimeAddresses.sourceFile",
+                        )
     return [f"{path}:{path}:ro" for path in sorted(source_files)]
 
 
@@ -342,7 +388,7 @@ def render_linux_node(
         "cmd": "/bin/sh -c 'sleep infinity'",
         "exec": bundled_exec_cmds,
     }
-    protected_binds = _protected_reservation_binds(node)
+    protected_binds = _protected_runtime_binds(node)
     if protected_binds:
         rendered["binds"] = protected_binds
         labels["clab.access-advertisements.runtime"] = "kea"

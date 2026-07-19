@@ -5,8 +5,10 @@ import shlex
 from typing import Any, Dict, List
 
 
-def _family_prefixes(rule_obj: Dict[str, Any], family: int) -> List[str]:
-    values = rule_obj.get("sourcePrefixes")
+def _family_prefixes(
+    rule_obj: Dict[str, Any], field: str, family: int
+) -> List[str]:
+    values = rule_obj.get(field)
     if not isinstance(values, list):
         return []
 
@@ -138,6 +140,117 @@ def _connection_state_expr(rule_obj: Dict[str, Any]) -> str:
     return " ct state established,related"
 
 
+def _runtime_destination_rule(
+    rule_obj: Dict[str, Any],
+    from_interface: str,
+    to_interface: str,
+    action: str,
+    connection_state: str,
+) -> str | None:
+    raw_destinations = rule_obj.get("destinationRuntimeAddresses")
+    if raw_destinations in (None, []):
+        return None
+    if not isinstance(raw_destinations, list) or len(raw_destinations) != 1:
+        raise ValueError(
+            "FS-230-HDS-010-SDS-010-SMS-040: runtime IPv6 destination "
+            "owner is missing or ambiguous"
+        )
+    if rule_obj.get("destinationPrefixes") not in (None, []):
+        raise ValueError(
+            "FS-230-HDS-010-SDS-010-SMS-040: protected runtime and static "
+            "destinations cannot coexist"
+        )
+
+    destination = raw_destinations[0]
+    if not isinstance(destination, dict):
+        raise ValueError(
+            "FS-230-HDS-010-SDS-010-SMS-040: runtime IPv6 destination is malformed"
+        )
+    source_file = destination.get("sourceFile")
+    interface_identifier = destination.get("interfaceIdentifier")
+    delegated_length = destination.get("delegatedPrefixLength")
+    tenant_length = destination.get("perTenantPrefixLength")
+    slot = destination.get("slot")
+    if (
+        destination.get("sourceClass") != "protected"
+        or not isinstance(source_file, str)
+        or not source_file.startswith("/run/secrets/")
+        or source_file == "/run/secrets/"
+        or "/../" in source_file
+        or not isinstance(interface_identifier, str)
+        or not interface_identifier
+        or not isinstance(delegated_length, int)
+        or not isinstance(tenant_length, int)
+        or not isinstance(slot, int)
+        or destination.get("targetPrefixLength") != 128
+    ):
+        raise ValueError(
+            "FS-230-HDS-010-SDS-010-SMS-040: incomplete protected runtime "
+            "IPv6 destination contract"
+        )
+
+    matches = rule_obj.get("matches")
+    if not isinstance(matches, list) or len(matches) != 1:
+        raise ValueError(
+            "FS-230-HDS-010-SDS-010-SMS-040: runtime destination requires "
+            "one exact IPv6 transport match"
+        )
+    match = matches[0]
+    dports = match.get("dports") if isinstance(match, dict) else None
+    if (
+        not isinstance(match, dict)
+        or match.get("family") != "ipv6"
+        or match.get("proto") not in ("tcp", "udp")
+        or not isinstance(dports, list)
+        or len(dports) != 1
+        or not isinstance(dports[0], int)
+    ):
+        raise ValueError(
+            "FS-230-HDS-010-SDS-010-SMS-040: runtime destination transport "
+            "match is incomplete"
+        )
+
+    protocol = match["proto"]
+    destination_port = dports[0]
+    comment = _identity_comment(rule_obj)
+    if not comment:
+        raise ValueError(
+            "FS-230-HDS-010-SDS-010-SMS-040: runtime destination has no "
+            "deterministic rule owner"
+        )
+    materializer = " ".join(
+        [
+            "clab-protected-ipv6-materializer",
+            "--source",
+            shlex.quote(source_file),
+            "--delegated-prefix-length",
+            str(delegated_length),
+            "--tenant-prefix-length",
+            str(tenant_length),
+            "--slot",
+            str(slot),
+            "--interface-identifier",
+            shlex.quote(interface_identifier),
+        ]
+    )
+    script = "\n".join(
+        [
+            "set -eu",
+            f'runtime_address="$({materializer})"',
+            (
+                "nft add rule inet fw forward "
+                f"iifname {shlex.quote(from_interface)} "
+                f"oifname {shlex.quote(to_interface)}"
+                f"{connection_state} meta nfproto ipv6 "
+                'ip6 daddr "$runtime_address" '
+                f"meta l4proto {protocol} {protocol} dport {destination_port} "
+                f"counter {action}{comment}"
+            ),
+        ]
+    )
+    return f"sh -eu -c {shlex.quote(script)}"
+
+
 def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
     from_interface = rule_obj.get("fromInterface")
     to_interface = rule_obj.get("toInterface")
@@ -153,13 +266,40 @@ def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
     comment = _identity_comment(rule_obj)
     connection_state = _connection_state_expr(rule_obj)
 
+    runtime_rule = _runtime_destination_rule(
+        rule_obj,
+        from_interface,
+        to_interface,
+        action,
+        connection_state,
+    )
+    if runtime_rule is not None:
+        return [runtime_rule]
+
     rules: List[str] = []
+    raw_matches = rule_obj.get("matches")
+    has_explicit_matches = isinstance(raw_matches, list) and raw_matches != []
+    has_destination_prefixes = isinstance(
+        rule_obj.get("destinationPrefixes"), list
+    ) and rule_obj["destinationPrefixes"] != []
     for rule_family in families:
-        prefix_part = ""
-        prefixes = _family_prefixes(rule_obj, rule_family)
-        if prefixes:
-            prefix_part = (
-                f" ip{'6' if rule_family == 6 else ''} saddr {_prefix_expr(prefixes)}"
+        source_part = ""
+        source_prefixes = _family_prefixes(rule_obj, "sourcePrefixes", rule_family)
+        if source_prefixes:
+            source_part = (
+                f" ip{'6' if rule_family == 6 else ''} saddr "
+                f"{_prefix_expr(source_prefixes)}"
+            )
+        destination_part = ""
+        destination_prefixes = _family_prefixes(
+            rule_obj, "destinationPrefixes", rule_family
+        )
+        if has_destination_prefixes and not destination_prefixes:
+            continue
+        if destination_prefixes:
+            destination_part = (
+                f" ip{'6' if rule_family == 6 else ''} daddr "
+                f"{_prefix_expr(destination_prefixes)}"
             )
 
         base = (
@@ -167,7 +307,8 @@ def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
             f"iifname {json.dumps(from_interface)} "
             f"oifname {json.dumps(to_interface)}"
             f"{connection_state}"
-            f"{prefix_part}"
+            f"{source_part}"
+            f"{destination_part}"
         )
 
         match_suffixes = _explicit_match_suffixes(rule_obj, rule_family)
@@ -175,6 +316,8 @@ def rules_for_cpm_rule(rule_obj: Dict[str, Any]) -> List[str]:
             for suffix in match_suffixes:
                 statement = f"{base}{suffix} counter {action}{comment}"
                 rules.append(f"nft {shlex.quote(statement)}")
+        elif has_explicit_matches:
+            continue
         elif traffic_type == "dns":
             udp_statement = f"{base} udp dport 53 counter {action}{comment}"
             tcp_statement = f"{base} tcp dport 53 counter {action}{comment}"
