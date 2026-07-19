@@ -67,6 +67,12 @@ site = {
                     "onLink": True, "autonomous": False,
                 }],
             },
+            "services": {
+                "dns": {
+                    "listen": ["10.50.20.1", "fd42:dead:beef:20::1"],
+                    "forwarders": [],
+                },
+            },
         },
     },
     "nodes": {
@@ -107,6 +113,9 @@ for family, advertisement, root in (
 
 assert rendered["binds"] == [f"{source_file}:{source_file}:ro"]
 assert rendered["labels"]["clab.access-advertisements.runtime"] == "kea"
+assert "clab.dns.runtime" not in rendered["labels"]
+assert "/tmp/clabgen-dns-proxy.py" in text
+assert "/tmp/clabgen-reconcile-unbound.sh" not in text
 for required in (
     "install -d -m 0700 /run/kea /var/lib/kea",
     "until ip link show up dev eth1",

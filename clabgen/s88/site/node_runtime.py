@@ -8,6 +8,7 @@ from typing import Dict, Any, List
 
 from clabgen.models import NodeModel
 from clabgen.s88.CM.access_advertisements import protected_reservation_source
+from clabgen.s88.CM.dns_authority import normalize_dns_authority
 from clabgen.s88.EM.base import render as render_em
 
 EXEC_BUNDLE_SIZE = 100
@@ -189,9 +190,13 @@ def _has_unbound_runtime(node: NodeModel) -> bool:
     listen = dns.get("listen")
     if not isinstance(listen, list):
         return False
-    return any(
+    has_non_loopback_listener = any(
         isinstance(value, str) and value not in {"127.0.0.1", "::1"}
         for value in listen
+    )
+    return (
+        has_non_loopback_listener
+        and normalize_dns_authority(dns)["recursionMode"] is not None
     )
 
 
