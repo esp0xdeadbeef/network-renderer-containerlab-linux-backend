@@ -78,11 +78,14 @@ def _safe_stem(value: str) -> str:
     return value.replace("/", "-").replace(":", "-").replace(" ", "-")
 
 
-def _protected_reservation_includes(dns: Dict[str, Any]) -> List[str]:
+def _protected_reservation_artifacts(
+    dns: Dict[str, Any],
+) -> tuple[List[str], List[str]]:
     raw = dns.get("protectedReservationPublications", [])
     if not isinstance(raw, list):
         _fail("CPM emitted a malformed protected reservation publication list")
     includes: List[str] = []
+    namespaces: List[str] = []
     for publication in raw:
         if not isinstance(publication, dict):
             _fail("CPM emitted a malformed protected reservation publication")
@@ -144,8 +147,12 @@ def _protected_reservation_includes(dns: Dict[str, Any]) -> List[str]:
         include_path = f"/run/protected-reservation-dns/{_safe_stem(scope_id)}.conf"
         if include_path in includes:
             _fail("CPM emitted duplicate protected reservation publication owners")
+        namespace = publication["namespace"]
+        if namespace in namespaces:
+            _fail("CPM emitted duplicate protected reservation namespace owners")
         includes.append(include_path)
-    return includes
+        namespaces.append(namespace)
+    return includes, namespaces
 
 
 def render_unbound_dns_service(
@@ -175,10 +182,17 @@ def render_unbound_dns_service(
     outgoing_interfaces = _unique(
         [_address(value) for value in _string_list(dns.get("outgoingInterfaces", []))]
     )
+    protected_reservation_includes, protected_reservation_namespaces = (
+        _protected_reservation_artifacts(dns)
+    )
 
     local_zones: List[tuple[str, str]] = []
     for zone in _dict_list(dns.get("localZones", [])):
         local_zones.append((_zone_name(zone.get("name")), _zone_type(zone.get("type"))))
+    for namespace in protected_reservation_namespaces:
+        if any(name == namespace and zone_type != "static" for name, zone_type in local_zones):
+            _fail("CPM emitted a conflicting protected reservation namespace authority")
+        local_zones.append((namespace, "static"))
     namespace_fallback = dns.get("namespaceFallback")
     if isinstance(namespace_fallback, dict):
         for decision in _dict_list(namespace_fallback.get("decisions", [])):
@@ -210,6 +224,8 @@ def render_unbound_dns_service(
                 bool(zone.get("forwardFirst", False)),
             )
         )
+    if any(name in protected_reservation_namespaces for name, _, _ in forward_zones):
+        _fail("CPM forwarded a protected reservation namespace outside its local authority")
 
     warning_commands: List[str] = []
     for code in authority["warningCodes"]:
@@ -223,7 +239,6 @@ def render_unbound_dns_service(
             + " >&2"
         )
 
-    protected_reservation_includes = _protected_reservation_includes(dns)
     config = [
         *[f"include: {_quote(path)}" for path in protected_reservation_includes],
         "server:",
