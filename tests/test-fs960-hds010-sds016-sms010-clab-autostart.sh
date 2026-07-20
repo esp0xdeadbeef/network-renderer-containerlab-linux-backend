@@ -747,7 +747,9 @@ if grep -q 'CLAB_DEPLOY_MAX_WORKERS' "${host_module}" &&
    grep -q -- '--max-workers' "${host_module}" &&
    grep -q 'containerlab deploy produced no output' "${host_module}" &&
    grep -q 'containerlab deploy emitted ERRO lines; refusing readiness marker' "${host_module}" &&
-   grep -q 'diagnostic.clab-host-prerequisite-missing' "${host_module}"; then
+   grep -q 'diagnostic.clab-host-prerequisite-missing' "${host_module}" &&
+   grep -q 'diagnostic.clab-host-prerequisite-not-writable' "${host_module}" &&
+   grep -Fq '[[ -L /etc/hosts || ! -w /etc/hosts ]]' "${host_module}"; then
   echo "PASS test11: host autostart deploy is bounded and refuses ERRO readiness"
 else
   echo "FAIL test11: host autostart deploy can race or accept Containerlab ERRO output" >&2
@@ -755,9 +757,9 @@ else
 fi
 
 # ===========================================================================
-# Test 12: the rendered NixOS host restores /etc/hosts for Containerlab.
+# Test 12: the rendered NixOS host restores writable /etc/hosts for Containerlab.
 # The consumer-side `false` mirrors a thin VM profile that disables the normal
-# hosts link; the renderer-owned mkForce must make the effective value true.
+# hosts link; the renderer-owned mkForce must enable a copied 0644 artifact.
 # ===========================================================================
 positive_expr="${tmp_dir}/hosts-positive.nix"
 cat >"${positive_expr}" <<NIX
@@ -780,13 +782,15 @@ let
       })
     ];
   };
-in if evaluated.config.environment.etc.hosts.enable then "enabled" else "disabled"
+in if evaluated.config.environment.etc.hosts.enable
+   then evaluated.config.environment.etc.hosts.mode
+   else "disabled"
 NIX
 
-if [[ "$(nix eval --impure --raw --file "${positive_expr}")" == "enabled" ]]; then
-  echo "PASS test12: CLAB host realization restores declarative /etc/hosts"
+if [[ "$(nix eval --impure --raw --file "${positive_expr}")" == "0644" ]]; then
+  echo "PASS test12: CLAB host realization restores copied writable /etc/hosts"
 else
-  echo "FAIL test12: CLAB host realization left /etc/hosts disabled" >&2
+  echo "FAIL test12: CLAB host realization did not provide copied writable /etc/hosts" >&2
   failures=$((failures + 1))
 fi
 
@@ -830,6 +834,45 @@ else
 fi
 
 # ===========================================================================
+# Test 14 (seeded negative): an enabled read-only Nix-store symlink is not a
+# usable Containerlab lifecycle prerequisite.
+# ===========================================================================
+readonly_expr="${tmp_dir}/hosts-readonly-negative.nix"
+cat >"${readonly_expr}" <<NIX
+let
+  source = builtins.toPath "${repo_root}";
+  flake = builtins.getFlake (toString source);
+  evaluated = flake.inputs.nixpkgs.lib.nixosSystem {
+    system = builtins.currentSystem;
+    modules = [
+      (source + "/host-module.nix")
+      ({ pkgs, lib, ... }: {
+        _module.args.clabDeploymentHost = "s-router-clab";
+        _module.args.clabCpmJsonPath = builtins.toFile "cpm.json" "{}";
+        _module.args.clabRendererInventoryJsonPath = builtins.toFile "inventory.json" "{}";
+        _module.args.containerlabLinuxRendererSelf = source;
+        _module.args.containerlabLinuxGenerateClabConfig = pkgs.writeShellScriptBin "generate-clab-config" "exit 0";
+        _module.args.containerlabLinuxRendererInput = {};
+        environment.etc.hosts.mode = lib.mkOverride 0 "symlink";
+        system.stateVersion = "26.05";
+      })
+    ];
+  };
+in evaluated.config.system.build.toplevel.drvPath
+NIX
+
+if nix eval --impure --raw --file "${readonly_expr}" >"${tmp_dir}/hosts-readonly.stdout" 2>"${tmp_dir}/hosts-readonly.stderr"; then
+  echo "FAIL test14: seeded negative accepted read-only /etc/hosts" >&2
+  failures=$((failures + 1))
+elif grep -q 'diagnostic.clab-host-prerequisite-not-writable' "${tmp_dir}/hosts-readonly.stderr"; then
+  echo "PASS test14: seeded negative rejects read-only /etc/hosts"
+else
+  echo "FAIL test14: read-only negative failed without the writable prerequisite diagnostic" >&2
+  cat "${tmp_dir}/hosts-readonly.stderr" >&2
+  failures=$((failures + 1))
+fi
+
+# ===========================================================================
 # Summary
 # ===========================================================================
 if (( failures > 0 )); then
@@ -837,4 +880,4 @@ if (( failures > 0 )); then
   exit 1
 fi
 
-echo "PASS FS-960-HDS-010-SDS-016-SMS-010: all 12 acceptance predicates covered (locked-source, readiness marker, container state, 7 seeded negatives)"
+echo "PASS FS-960-HDS-010-SDS-016-SMS-010: all 14 acceptance predicates covered (locked-source, readiness marker, container state, 8 seeded negatives)"

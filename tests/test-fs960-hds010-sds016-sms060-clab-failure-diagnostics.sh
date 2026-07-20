@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # GAMP-ID: FS-960-HDS-010-SDS-016-SMS-060
-# GAMP-SCOPE: software-module-test (CMC focused test)
+# GAMP-SCOPE: software-module-test (focused construction test)
 # Tests CLAB failure diagnostic classification from deploy-clab.sh.
 # Isolates wait_for_docker diagnostics and fail() patterns.
 # Non-destructive: uses fake binaries, no real Docker or Containerlab.
@@ -87,6 +87,12 @@ classify_failure_record() {
     host-prerequisite-missing)
       if [[ "${reported_category}" != "host_prerequisite_failure" ]]; then
         echo "diagnostic.clab-host-prerequisite-misclassified: missing direct-host prerequisite reported as ${reported_category}" >&2
+        return 1
+      fi
+      ;;
+    host-prerequisite-not-writable)
+      if [[ "${reported_category}" != "host_prerequisite_not_writable" ]]; then
+        echo "diagnostic.clab-host-prerequisite-not-writable: non-writable direct-host prerequisite reported as ${reported_category}" >&2
         return 1
       fi
       ;;
@@ -555,6 +561,36 @@ elif ! grep -q 'diagnostic.clab-host-prerequisite-missing' "${host_module}" ||
   failures=$((failures + 1))
 else
   echo "PASS test14: missing /etc/hosts is classified separately and ERRO handling stays fail-closed"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 15 (seeded negative): an existing read-only /etc/hosts must not be
+# accepted as a usable or merely missing prerequisite.
+# ---------------------------------------------------------------------------
+if classify_failure_record \
+    host-prerequisite-not-writable \
+    host_prerequisite_failure \
+    direct-host-clab \
+    locked-hat-source \
+    2>"${tmp_dir}/test15.stderr"; then
+  echo "FAIL test15: seeded negative — read-only host prerequisite unexpectedly accepted" >&2
+  failures=$((failures + 1))
+elif ! grep -q 'diagnostic.clab-host-prerequisite-not-writable' "${tmp_dir}/test15.stderr"; then
+  echo "FAIL test15: wrong diagnostic for read-only host prerequisite" >&2
+  cat "${tmp_dir}/test15.stderr" >&2
+  failures=$((failures + 1))
+elif ! classify_failure_record \
+    host-prerequisite-not-writable \
+    host_prerequisite_not_writable \
+    direct-host-clab \
+    locked-hat-source; then
+  echo "FAIL test15: corrected read-only host prerequisite category rejected" >&2
+  failures=$((failures + 1))
+elif ! grep -q 'diagnostic.clab-host-prerequisite-not-writable' "${host_module}"; then
+  echo "FAIL test15: renderer omitted the non-writable prerequisite diagnostic" >&2
+  failures=$((failures + 1))
+else
+  echo "PASS test15: read-only /etc/hosts is classified separately"
 fi
 
 # ===========================================================================
