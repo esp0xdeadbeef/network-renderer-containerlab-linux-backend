@@ -6,9 +6,8 @@ required, one normalized CLAB platform-binding bundle.
 
 It is an emission stage only.
 
-Pipeline position: this repository is downstream of
-`network-control-plane-model` and upstream of Containerlab/Linux backend
-artifacts.
+Pipeline position: this repository is downstream of canonical realization and
+schema validation and upstream of Containerlab/Linux backend artifacts.
 
 Migration, deviation, exception, transition, or temporary compatibility behavior
 must be explicit in the README, tests, and owning layer before it is accepted.
@@ -19,7 +18,8 @@ network-control-plane-model -> network-realization-model -> schema validation ->
 
 ## Spec Chain
 
-This renderer materializes Containerlab/Linux backend artifacts from explicit CPM output.
+This renderer materializes Containerlab/Linux backend artifacts from a
+validated canonical realization bundle.
 All behavior requirements originate from the FS spec chain.
 
 ### Owning Chain: Renderer Contract and Host Configuration Boundary
@@ -27,7 +27,9 @@ All behavior requirements originate from the FS spec chain.
 | Layer | ID | Description |
 |-------|----|-------------|
 | URS   | Via FS | Platform-native realization, thin host configuration |
-| FS    | FS-310 | Renderer Policy Boundary — materialize explicit CPM policy, no local allow rules |
+| FS    | FS-310 | Renderer Policy Boundary — materialize explicit canonical policy, no local allow rules |
+| FS    | FS-161 / FS-162 | Canonical realization authority and peer-renderer boundary |
+| FS    | FS-168 / FS-169 | Renderer consumption and rendered-output coverage |
 | FS    | FS-320 | Renderer Layout Preservation — compact layouts preserve roles/policy/hygiene |
 | FS    | FS-770 | Common Intent For Containerlab/Linux And NixOS — same modeled meaning for both lab profiles |
 | FS    | FS-780 | Containerlab/Linux And NixOS Equivalence Matrix — compare scope, policy, reachability, address authority, NAT, public ingress, routing, DNS, discovery, service exposure |
@@ -36,7 +38,7 @@ All behavior requirements originate from the FS spec chain.
 ### Public Ingress Runtime Destination
 
 `FS-230-HDS-010-SDS-010-SMS-040` owns protected IPv6 public-ingress
-materialization. CLAB preserves the same CPM tuple as NixOS, mounts only the
+materialization. CLAB preserves the same canonical tuple as NixOS, mounts only the
 opaque protected prefix source, derives the tenant `/64` and exact endpoint
 `/128` inside the runtime, and emits the exact family/protocol/port/interface
 rule with stateful return and no NAT66. Missing, malformed, or ambiguous
@@ -70,14 +72,15 @@ Do not use `vlan2` as testing infrastructure.
 `vlan2` is the runtime management/reachability network for the VM/host
 lifecycle. It must stay separate from Containerlab test semantics, generated
 test uplinks, fake-provider paths, or mini POC traffic. If a test needs DHCP
-uplinks, use `vlan4` or `vlan5` and make that CPM/renderer input explicit.
+uplinks, use `vlan4` or `vlan5` and make that canonical or validated
+platform-binding input explicit.
 
 ## Allowed
 
 - Render Containerlab topology files from explicit realized nodes, links,
   interfaces, services, and host bridge attachments.
 - Emit helper artifacts required to start the generated lab backend.
-- Preserve CPM routing mode and service data without reinterpretation.
+- Preserve canonical routing mode and service data without reinterpretation.
 - Accept harness-scoped fake-provider or PPPoE-like lab-emulation artifacts
   only when the request carries explicit lab-emulation capability facts.
 
@@ -88,7 +91,8 @@ uplinks, use `vlan4` or `vlan5` and make that CPM/renderer input explicit.
 - Choose static vs BGP or any other control-plane mode locally.
 - Guess missing bridge/link/interface semantics from names.
 - Implement provider-specific overlay runtime such as Nebula, WireGuard, or
-  OpenVPN unless CPM explicitly models that backend output for this renderer.
+  OpenVPN unless the canonical bundle explicitly carries that selected target
+  behavior.
 - Infer fake-provider or PPPoE-like emulation from interface names, VLAN IDs,
   host names, or provider-like labels.
 - Consume CPM side-channel fields such as `upstreamEmulation` or
@@ -138,9 +142,10 @@ cache, clears stale Containerlab state for the rendered lab, materializes host
 bridges and explicit VLAN/NAT bridge attachments, deploys Containerlab, and
 checks that rendered fabric containers have non-loopback interfaces.
 
-For deterministic service integration, pin this flake and invoke the app with
-locked CPM and renderer-inventory artifacts. `--dry-run` renders artifacts and
-the bridge plan without touching Docker, Linux links, or Containerlab.
+For historical diagnostic use, pin this flake and invoke the superseded app
+with locked CPM and renderer-inventory artifacts. `--dry-run` renders artifacts
+and the bridge plan without touching Docker, Linux links, or Containerlab, but
+does not turn that direct-entry path into the controlled renderer boundary.
 
 ## Tests
 
