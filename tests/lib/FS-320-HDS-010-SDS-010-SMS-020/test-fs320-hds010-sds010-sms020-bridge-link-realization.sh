@@ -1,0 +1,1 @@
+../shared/test-fs320-hds010-sds010-sms020-bridge-link-realization.sh

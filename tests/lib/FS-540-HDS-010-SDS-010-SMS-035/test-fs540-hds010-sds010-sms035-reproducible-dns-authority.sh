@@ -1,0 +1,1 @@
+../shared/test-fs540-hds010-sds010-sms035-reproducible-dns-authority.sh

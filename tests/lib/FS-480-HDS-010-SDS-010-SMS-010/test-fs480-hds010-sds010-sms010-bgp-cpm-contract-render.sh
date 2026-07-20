@@ -1,0 +1,1 @@
+../shared/test-fs480-hds010-sds010-sms010-bgp-cpm-contract-render.sh
