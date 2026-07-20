@@ -9,6 +9,7 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
 PYTHONPATH="${repo_root}" python3 - <<'PY'
+from clabgen.models import InterfaceModel, NodeModel
 from clabgen.s88.CM.access_advertisements import (
     _kea_command,
     _kea_template,
@@ -139,6 +140,37 @@ for required in (
 assert "udhcpd /run/udhcpd.eth1.conf" not in text
 assert "protected-client-serial" not in text
 assert "02:00:00:00:00:70" not in text
+
+route_source = "/run/secrets/fs970-protected-routed-prefix"
+route_only = NodeModel(
+    name="route-only",
+    role="core",
+    routing_domain="lab",
+    routing_mode="static",
+    interfaces={
+        "toward-target": InterfaceModel(
+            name="toward-target",
+            routes={
+                "ipv4": [],
+                "ipv6": [
+                    {
+                        "sourceFile": route_source,
+                        "via6": "fd42:dead:beef:970::1",
+                        "delegatedPrefixLength": 48,
+                        "perTenantPrefixLength": 64,
+                        "slot": 1,
+                    }
+                ],
+            },
+        )
+    },
+)
+route_only_rendered = render_linux_node(
+    "route-only", route_only, {"toward-target": "eth1"}
+)
+assert route_only_rendered["binds"] == [f"{route_source}:{route_source}:ro"]
+assert "clab.access-advertisements.runtime" not in route_only_rendered["labels"]
+assert "/run/kea/reconcile-" not in "\n".join(route_only_rendered["exec"])
 
 try:
     protected_reservation_source(

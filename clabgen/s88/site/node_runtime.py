@@ -226,6 +226,30 @@ def _protected_runtime_binds(node: NodeModel) -> List[str]:
     return [f"{path}:{path}:ro" for path in sorted(source_files)]
 
 
+def _has_kea_runtime(node: NodeModel, eth_map: Dict[str, str]) -> bool:
+    advertisements = node.advertisements
+    if not isinstance(advertisements, dict):
+        return False
+
+    for advertisement_name, family in (("dhcp4", "ipv4"), ("dhcpv6", "ipv6")):
+        scopes = advertisements.get(advertisement_name, [])
+        if not isinstance(scopes, list):
+            continue
+        for scope in scopes:
+            if not isinstance(scope, dict) or scope.get("enabled") is not True:
+                continue
+            logical_interface = scope.get("bindInterface") or scope.get("interface")
+            if (
+                not isinstance(logical_interface, str)
+                or not isinstance(eth_map.get(logical_interface), str)
+                or not eth_map[logical_interface]
+            ):
+                continue
+            if protected_reservation_source(scope, family) is not None:
+                return True
+    return False
+
+
 def _has_unbound_runtime(node: NodeModel) -> bool:
     services = node.services
     if not isinstance(services, dict):
@@ -391,6 +415,7 @@ def render_linux_node(
     protected_binds = _protected_runtime_binds(node)
     if protected_binds:
         rendered["binds"] = protected_binds
+    if _has_kea_runtime(node, eth_map):
         labels["clab.access-advertisements.runtime"] = "kea"
     if _has_unbound_runtime(node):
         labels["clab.dns.runtime"] = "unbound"
