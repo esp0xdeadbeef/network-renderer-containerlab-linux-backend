@@ -15,7 +15,7 @@
     network-compiler.inputs.nixpkgs.follows = "nixpkgs";
     network-forwarding-model.inputs.nixpkgs.follows = "nixpkgs";
 
-    network-realization-model.url = "github:esp0xdeadbeef/network-realization-model/759ed91eb1ea7524951cba99357828223c26b2e7";
+    network-realization-model.url = "github:esp0xdeadbeef/network-realization-model";
     network-realization-model.inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -262,7 +262,7 @@
               identity = "clab-renderer-boundary";
             };
             rootLockIdentity = "network-renderer-clab-flake-lock";
-            producerRevision = "network-realization-model-759ed91";
+            producerRevision = network-realization-model.rev;
           };
           accepted = canonicalInput { inherit bundle; };
           rawRejected =
