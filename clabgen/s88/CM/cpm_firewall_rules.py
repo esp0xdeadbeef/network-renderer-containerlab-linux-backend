@@ -243,19 +243,32 @@ def _runtime_destination_rule(
             shlex.quote(interface_identifier),
         ]
     )
+    statement_prefix = (
+        "add rule inet fw forward "
+        f"iifname {json.dumps(from_interface)} "
+        f"oifname {json.dumps(to_interface)}"
+        f"{connection_state} meta nfproto ipv6 "
+        "ip6 daddr "
+    )
+    statement_suffix = (
+        f" meta l4proto {protocol} {protocol} dport {destination_port} "
+        f"counter {action}{comment}"
+    )
+    # `nft` parses its own grammar after the shell has parsed argv. Passing the
+    # rule as separate shell tokens loses the string-literal quotes around an
+    # interface such as "policy", which nft then reinterprets as a keyword.
+    # Keep the complete statement in one argv element while expanding only the
+    # protected runtime address between two shell-quoted literal fragments.
+    nft_statement = (
+        shlex.quote(statement_prefix)
+        + '"$runtime_address"'
+        + shlex.quote(statement_suffix)
+    )
     script = "\n".join(
         [
             "set -eu",
             f'runtime_address="$({materializer})"',
-            (
-                "nft add rule inet fw forward "
-                f"iifname {shlex.quote(from_interface)} "
-                f"oifname {shlex.quote(to_interface)}"
-                f"{connection_state} meta nfproto ipv6 "
-                'ip6 daddr "$runtime_address" '
-                f"meta l4proto {protocol} {protocol} dport {destination_port} "
-                f"counter {action}{comment}"
-            ),
+            f"nft {nft_statement}",
         ]
     )
     return f"sh -eu -c {shlex.quote(script)}"

@@ -4,8 +4,10 @@ set -euo pipefail
 # GAMP-SCOPE: software-module-test
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "${tmp_dir}"' EXIT
 
-REPO_ROOT="${repo_root}" PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+REPO_ROOT="${repo_root}" TEST_TMP_DIR="${tmp_dir}" PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 from __future__ import annotations
 
 import copy
@@ -65,6 +67,16 @@ assert "udp dport 4242" in command
 assert " tcp " not in command
 assert "|| true" not in command
 assert "2001:db8" not in command
+
+# Seeded negative 10 uses interface identifiers that are also nftables grammar
+# tokens. The runtime rule must pass them as quoted string data inside one
+# nftables statement, never as separate unquoted CLI tokens.
+keyword_rule = copy.deepcopy(RULE)
+keyword_rule["fromInterface"] = "policy"
+keyword_rule["toInterface"] = "access"
+keyword_commands = rules_for_cpm_rule(keyword_rule)
+assert len(keyword_commands) == 1, keyword_commands
+keyword_command = keyword_commands[0]
 
 # The FS-370 completeness validator must recognize the shell-quoted runtime
 # materializer form just as it recognizes a static `nft` command.  This is the
@@ -174,7 +186,17 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     )
     materializer.chmod(0o755)
     nft = tmp / "nft"
-    nft.write_text("#!/bin/sh\nprintf 'nft %s\\n' \"$*\" >>\"$COMMAND_LOG\"\n")
+    nft.write_text(
+        "#!/bin/sh\n"
+        "test \"$#\" -eq 1 || { printf '%s\\n' "
+        "'diagnostic.clab-nft-interface-literal-invalid: nft statement was split into raw tokens' >&2; exit 1; }\n"
+        "case \"$1\" in\n"
+        "  *'iifname \"policy\"'*'oifname \"access\"'*) ;;\n"
+        "  *) printf '%s\\n' "
+        "'diagnostic.clab-nft-interface-literal-invalid: keyword-like interface was not serialized as string data' >&2; exit 1 ;;\n"
+        "esac\n"
+        "printf '%s\\n' \"$1\" >>\"$NFT_STATEMENT_LOG\"\n"
+    )
     nft.chmod(0o755)
     ip = tmp / "ip"
     ip.write_text("#!/bin/sh\nprintf 'ip %s\\n' \"$*\" >>\"$COMMAND_LOG\"\n")
@@ -182,11 +204,15 @@ with tempfile.TemporaryDirectory() as raw_tmp:
     env = dict(os.environ)
     env["PATH"] = f"{tmp}:/usr/bin:/bin"
     env["COMMAND_LOG"] = str(log)
-    subprocess.run(command, shell=True, check=True, env=env)
+    nft_statement_log = Path(os.environ["TEST_TMP_DIR"]) / "runtime-nft-statements"
+    env["NFT_STATEMENT_LOG"] = str(nft_statement_log)
+    subprocess.run(keyword_command, shell=True, check=True, env=env)
     subprocess.run(route_command, shell=True, check=True, env=env)
+    rendered_nft = nft_statement_log.read_text()
     rendered = log.read_text()
-    assert "ip6 daddr 2001:db8:230:2::4242/128" in rendered
-    assert "udp dport 4242 counter accept" in rendered
+    assert 'iifname "policy" oifname "access"' in rendered_nft
+    assert "ip6 daddr 2001:db8:230:2::4242/128" in rendered_nft
+    assert "udp dport 4242 counter accept" in rendered_nft
     assert "route replace 2001:db8:230:2::/64" in rendered
     assert "route replace table 1002 2001:db8:230:2::/64" in rendered
     assert "route replace table 1005 2001:db8:230:2::/64" in rendered
@@ -194,9 +220,16 @@ with tempfile.TemporaryDirectory() as raw_tmp:
 print("PASS FS-230-HDS-010-SDS-010-SMS-040 CLAB protected IPv6 ingress contract")
 PY
 
+{
+  printf '%s\n' 'add table inet fw'
+  printf '%s\n' 'add chain inet fw forward { type filter hook forward priority filter; policy drop; }'
+  cat "${tmp_dir}/runtime-nft-statements"
+} >"${tmp_dir}/runtime-nft-batch.nft"
+
+nix shell --inputs-from "${repo_root}" nixpkgs#nftables nixpkgs#util-linux --command \
+  unshare -Urn nft -c -f "${tmp_dir}/runtime-nft-batch.nft"
+
 helper="${repo_root}/docker-clab-frr-plus-tooling/protected-ipv6-materializer.py"
-tmp_dir="$(mktemp -d)"
-trap 'rm -rf "${tmp_dir}"' EXIT
 
 REPO_ROOT="${repo_root}" nix eval --impure --json --expr '
   let
