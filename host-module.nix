@@ -123,6 +123,10 @@ let
           echo "diagnostic.clab-host-prerequisite-missing: /etc/hosts must be materialized before Containerlab cleanup or reconfiguration" >&2
           exit 1
         fi
+        if [[ -L /etc/hosts || ! -w /etc/hosts ]]; then
+          echo "diagnostic.clab-host-prerequisite-not-writable: /etc/hosts must be a copied writable artifact before Containerlab cleanup or reconfiguration" >&2
+          exit 1
+        fi
         write_status running "$phase" ""
 
         # Validate pre-built CPM inputs (produced upstream by the compiler).
@@ -524,14 +528,24 @@ in
 
   # Containerlab reads and rewrites /etc/hosts while destroying a previous
   # topology during `deploy --reconfigure`. Some thin VM consumers disable the
-  # normal NixOS /etc/hosts link; the direct-host renderer owns restoring this
-  # platform prerequisite whenever it emits the CLAB lifecycle service.
-  environment.etc.hosts.enable = lib.mkIf hasInputs (lib.mkForce true);
-
-  assertions = lib.optional hasInputs {
-    assertion = config.environment.etc.hosts.enable;
-    message = "diagnostic.clab-host-prerequisite-missing: the Containerlab host requires declaratively managed /etc/hosts";
+  # normal NixOS /etc/hosts entry. The default NixOS entry is a read-only store
+  # symlink, which exists but still cannot satisfy this lifecycle contract, so
+  # the direct-host renderer owns restoring a copied writable host artifact.
+  environment.etc.hosts = lib.mkIf hasInputs {
+    enable = lib.mkForce true;
+    mode = lib.mkForce "0644";
   };
+
+  assertions = lib.optionals hasInputs [
+    {
+      assertion = config.environment.etc.hosts.enable;
+      message = "diagnostic.clab-host-prerequisite-missing: the Containerlab host requires declaratively managed /etc/hosts";
+    }
+    {
+      assertion = config.environment.etc.hosts.mode == "0644";
+      message = "diagnostic.clab-host-prerequisite-not-writable: the Containerlab host requires /etc/hosts as a copied writable artifact, not a Nix-store symlink";
+    }
+  ];
 
   environment.systemPackages = lib.mkIf (hasInputs && s-router-clab-render-live != null) [
     s-router-clab-render-live
