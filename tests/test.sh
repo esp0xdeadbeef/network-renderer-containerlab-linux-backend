@@ -52,6 +52,7 @@ tests=(
   test-fs480-hds010-sds010-sms010-bgp-cpm-contract-render.sh
   test-fs760-hds010-sds010-sms010-policy-firewall-forwarding.sh
   test-fs230-hds010-sds010-sms030-stateful-return-rendering.sh
+  test-fs230-hds010-sds010-sms040-nebula-ipv6-public-ingress.sh
   test-fs270-hds010-sds010-sms020-relation-policy-state-route-selection.sh
   test-fs310-hds010-sds010-sms120-role-independent-cm-inputs.sh
   test-fs970-hds010-sds010-sms010-access-advertisements-runtime.sh
