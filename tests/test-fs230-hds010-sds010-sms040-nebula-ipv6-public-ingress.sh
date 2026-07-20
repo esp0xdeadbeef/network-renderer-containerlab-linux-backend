@@ -301,6 +301,8 @@ for name, node in linux_nodes.items():
     expected_bind = f"{source_file}:{source_file}:ro"
     if binds != [expected_bind]:
         raise AssertionError(f"{name}: protected source is not mounted exactly once read-only")
+    if "clab.access-advertisements.runtime" in node.get("labels", {}):
+        raise AssertionError(f"{name}: routed-prefix bind was classified as Kea runtime")
     commands = node.get("exec", [])
     all_commands.extend(commands)
     relation_commands = [command for command in commands if relation_id in command]
