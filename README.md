@@ -1,7 +1,8 @@
 # network-renderer-containerlab-linux-backend
 
 `network-renderer-containerlab-linux-backend` emits Containerlab/Linux backend
-artifacts from explicit `network-control-plane-model` output.
+artifacts from one validated canonical network-realization bundle and, when
+required, one normalized CLAB platform-binding bundle.
 
 It is an emission stage only.
 
@@ -13,7 +14,7 @@ Migration, deviation, exception, transition, or temporary compatibility behavior
 must be explicit in the README, tests, and owning layer before it is accepted.
 
 ```text
-network-forwarding-model -> network-control-plane-model -> network-renderer-containerlab-linux-backend
+network-control-plane-model -> network-realization-model -> schema validation -> network-renderer-containerlab-linux-backend
 ```
 
 ## Spec Chain
@@ -44,7 +45,7 @@ runtime input fails closed; family-neutral rules are never expanded into IPv6.
 ### Pipeline
 
 ```
-network-labs (intent + inventory) → network-compiler → NFM → CPM → network-renderer-containerlab-linux-backend
+network-labs → compiler → NFM → CPM → realization → schema validation → CLAB renderer
 ```
 
 ### Owning Repository
@@ -53,11 +54,14 @@ Construction tests: `network-renderer-containerlab-linux-backend/tests/`
 
 ## Contract
 
-- The forwarding model and CPM are the source of truth.
-- This renderer consumes resolved CPM data and emits Containerlab/Linux backend
+- Upstream network meaning reaches this renderer only through the validated
+  canonical bundle.
+- The optional platform-binding bundle supplies bounded CLAB mechanics and may
+  not create network meaning.
+- This renderer emits Containerlab/Linux backend
   files.
 - Missing, partial, or inconsistent input must fail evaluation.
-- Renderer output must be deterministic for the same CPM input.
+- Renderer output must be deterministic for the same bundle and binding identities.
 
 ## VLAN Boundary
 
@@ -90,9 +94,25 @@ uplinks, use `vlan4` or `vlan5` and make that CPM/renderer input explicit.
 - Consume CPM side-channel fields such as `upstreamEmulation` or
   `providerAccess`.
 
-## Usage
+## Controlled API
 
-Build CPM JSON from a pinned lab example, then render:
+Current controlled consumers use:
+
+```nix
+inputs.network-renderer-containerlab-linux-backend.lib.renderer.canonical.hostModule {
+  inherit bundle platformBinding;
+  hostName = "s-router-clab";
+}
+```
+
+`validateInput` under the same `renderer.canonical` namespace exposes the
+common bundle, scope, target, and optional binding validation result.
+
+## Superseded direct-CPM CLI
+
+The following commands remain for historical direct-entry regression fixtures.
+They are not the controlled canonical boundary and cannot produce current
+FS-166 evidence by themselves.
 
 ```bash
 nix run .#generate-clab-config -- \
@@ -110,7 +130,7 @@ nix run .#deploy-clab -- \
   ./renderer-inventory.json
 ```
 
-`deploy-clab` is downstream of CPM. It does not parse intent or inventory Nix
+`deploy-clab` does not parse intent or inventory Nix
 files; callers must build the CPM JSON first and pass renderer inventory as
 JSON. The command renders `fabric.clab.yml` and `vm-bridges-generated.nix`,
 evaluates the rendered bridge artifact, prepares the Docker tooling image
