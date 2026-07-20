@@ -3,7 +3,7 @@ set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPYCACHEPREFIX=/tmp/pycache
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)}"
 
 if [[ "${NETWORK_REPO_SWEEP:-0}" != "1" && "${NETWORK_REPO_DIRECT_TEST_OK:-0}" != "1" ]]; then
   echo "WARN: direct repo tests are partial; set NETWORK_REPO_DIRECT_TEST_OK=1 for intentional focused runs, or run network-codex-agent/scripts/s-router-full-lab-rebuild-loop.sh for the locked full network-* sweep plus live validation." >&2
@@ -21,73 +21,11 @@ if ! [[ "${test_timeout_seconds}" =~ ^[0-9]+$ ]] || [[ "${test_timeout_seconds}"
   exit 2
 fi
 
-tests=(
-  test-fs960-hds010-sds010-sms080-regression-resolved-states.sh
-  test-fs100-hds010-sds010-sms010-renderer-output-provenance.sh
-  test-fs310-hds010-sds010-sms020-target-capability-limitation.sh
-  test-fs310-hds020-sds010-sms040-interface-name-source-binding.sh
-  test-fs310-hds020-sds010-sms050-nftables-primitive-source-binding.sh
-  test-fs310-hds020-sds010-sms060-route-command-source-binding.sh
-  test-fs310-hds020-sds010-sms070-nat-primitive-source-binding.sh
-  test-fs310-hds030-sds010-sms080-shell-fallback-error-propagation.sh
-  test-fs310-hds030-sds010-sms090-check-bypass-prevention.sh
-  test-fs310-hds020-sds010-sms190-pppoe-no-default.sh
-  test-fs310-hds020-sds010-sms200-bridge-no-default.sh
-  test-fs310-hds020-sds010-sms210-route-table-allocation.sh
-  test-fs380-hds020-sds010-sms050-upstream-selector-policy-routes.sh
-  test-fs380-hds020-sds010-sms050-active-lab-upstream-selector-render.sh
-  test-fs380-hds020-sds010-sms050-host-bridge-netfilter.sh
-  test-fs380-hds020-sds010-sms060-core-wan-ip-assignment.sh
-  test-fs380-hds020-sds010-sms120-prod-like-access-policy-routes.sh
-  test-fs720-hds030-sds010-sms041-wan-host-uplink-bridge.sh
-  test-fs320-hds010-sds010-sms030-runtime-interface-mapping.sh
-  test-fs320-hds010-sds010-sms020-bridge-link-realization.sh
-  test-fs960-hds010-sds010-sms020-lab-emulation-capability-gate.sh
-  test-fs800-hds030-sds010-sms010-pppoe-artifacts.sh
-  test-fs800-hds030-sds010-sms010-target-host-bridge-scope.sh
-  test-fs470-active-lab-empty-clab-intent-noop.sh
-  test-fs960-hds010-sds010-sms070-deploy-clab-app-contract.sh
-  test-fs960-hds010-sds016-sms020-clab-cache-evidence.sh
-  test-fs320-hds010-sds010-sms010-topology-conformance-parity.sh
-  test-fs480-hds010-sds010-sms010-bgp-cpm-contract-render.sh
-  test-fs760-hds010-sds010-sms010-policy-firewall-forwarding.sh
-  test-fs230-hds010-sds010-sms030-stateful-return-rendering.sh
-  test-fs230-hds010-sds010-sms040-nebula-ipv6-public-ingress.sh
-  test-fs270-hds010-sds010-sms020-relation-policy-state-route-selection.sh
-  test-fs310-hds010-sds010-sms120-role-independent-cm-inputs.sh
-  test-fs970-hds010-sds010-sms010-access-advertisements-runtime.sh
-  test-fs970-hds010-sds020-sms040-protected-reservation-runtime.sh
-  test-fs560-hds010-sds010-sms050-protected-reservation-name-materialization.sh
-  test-fs570-hds010-sds010-sms010-namespace-fallback.sh
-  test-FS-540-HDS-010-SDS-010-SMS-020-clab-dns-resolver-materialization.sh
-  test-FS-540-HDS-010-SDS-010-SMS-020-clab-dns-proxy-runtime-resilience.sh
-  test-fs540-hds010-sds010-sms035-dns-self-referential-guard.sh
-  FS-540-HDS-010-SDS-010-SMS-045-controlled-authority.sh
-  test-fs540-hds010-sds010-sms045-local-dns-return-path.sh
-  test-fs540-hds020-sds010-sms010-clab-recursive-dns-requester-fixture.sh
-  test-fs520-hds010-sds010-sms040-policy-no-main-defaults.sh
-  test-fs500-hds010-sds010-sms040-clab-route-materialization-artifact.sh
-  test-FS-500-HDS-010-SDS-010-SMS-050-clab-bridge-colocation.sh
-  test-fs960-hds010-sds016-sms010-clab-autostart.sh
-  test-fs960-hds010-sds016-sms020-clab-docker-readiness.sh
-  test-fs960-hds010-sds016-sms050-clab-privileged-inspect.sh
-  test-fs960-hds010-sds016-sms030-clab-cache-absent-build-save.sh
-  test-fs960-hds010-sds016-sms040-clab-marker-ordering.sh
-  test-fs960-hds010-sds016-sms060-clab-failure-diagnostics.sh
-  test-fs310-hds010-sds010-sms110-cmc-clab-fail-closed-domain.sh
-  test-fs310-hds040-sds010-sms102-clab-cpm-only-consumption.sh
-  test-fs310-hds030-sds010-sms112-clab-fail-closed-contract.sh
-  test-fs370-hds010-sds010-sms110-clab-forwarding-materialization.sh
-  test-fs310-hds010-sds010-sms130-no-policy-no-nftables.sh
-  test-fs840-hds010-sds010-sms030-sops-service-ordering.sh
-  run-fs982-sms110.sh
+mapfile -t tests < <(
+  find "${repo_root}/tests" -maxdepth 1 -regextype posix-extended \( -type f -o -type l \) \
+    \( -name 'test-*.sh' -o -regex '.*\/FS-[0-9]+-HDS-[0-9]+-SDS-[0-9]+-SMS-[0-9]+\.sh' \) \
+    ! -name 'test.sh' -printf '%f\n' | LC_ALL=C sort
 )
-
-if [[ "${NETWORK_REPO_RUNTIME_TEST_OK:-0}" == "1" ]]; then
-  tests+=(
-    test-fs800-hds030-sds010-sms010-pppoe-runtime.sh
-  )
-fi
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT

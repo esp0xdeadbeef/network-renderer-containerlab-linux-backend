@@ -1,0 +1,1 @@
+../shared/test-fs320-hds010-sds010-sms030-runtime-interface-mapping.sh

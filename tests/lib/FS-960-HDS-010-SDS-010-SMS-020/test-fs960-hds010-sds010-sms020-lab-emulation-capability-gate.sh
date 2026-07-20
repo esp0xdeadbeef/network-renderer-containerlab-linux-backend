@@ -1,0 +1,1 @@
+../shared/test-fs960-hds010-sds010-sms020-lab-emulation-capability-gate.sh
