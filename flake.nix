@@ -14,12 +14,17 @@
 
     network-compiler.inputs.nixpkgs.follows = "nixpkgs";
     network-forwarding-model.inputs.nixpkgs.follows = "nixpkgs";
+
+    network-realization-model.url = "github:esp0xdeadbeef/network-realization-model/759ed91eb1ea7524951cba99357828223c26b2e7";
+    network-realization-model.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
-    inputs @ { self
-    , nixpkgs
-    , ...
+    inputs@{
+      self,
+      nixpkgs,
+      network-realization-model,
+      ...
     }:
     let
       systems = [
@@ -37,47 +42,92 @@
           }
         );
 
+      legacyHostModule =
+        rendererInput:
+        let
+          # Accept cpm (Nix CPM structure) and produce cpmJsonPath.
+          # All string values passed as separate _module.args keys to avoid
+          # NixOS attrset corruption (store paths and empty strings get
+          # extracted and replace the whole attrset).
+          cpmJsonPath =
+            if rendererInput ? cpmJsonPath then
+              rendererInput.cpmJsonPath
+            else if rendererInput ? cpm then
+              builtins.toFile "cpm-${rendererInput.hostName or "clab"}.json" (builtins.toJSON rendererInput.cpm)
+            else
+              "";
+          deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
+          rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or null;
+        in
+        { lib, pkgs, ... }:
+        {
+          _module.args.clabDeploymentHost = deploymentHost;
+          _module.args.clabCpmJsonPath = cpmJsonPath;
+          _module.args.clabRendererInventoryJsonPath = rendererInventoryJsonPath;
+          _module.args.containerlabLinuxRendererSelf = self.outPath;
+          _module.args.containerlabLinuxGenerateClabConfig =
+            self.packages.${pkgs.system}.generate-clab-config;
+          # Keep containerlabLinuxRendererInput for non-string fields (bridgeControl etc)
+          _module.args.containerlabLinuxRendererInput = builtins.removeAttrs rendererInput [
+            "cpmJsonPath"
+            "deploymentHost"
+            "rendererInventoryJsonPath"
+            "cpm"
+            "controlPlane"
+          ];
+
+          assertions = [
+            {
+              assertion = rendererInput ? hostName;
+              message = "containerlab linux renderer input must include hostName";
+            }
+          ];
+
+          networking.hostName = lib.mkDefault rendererInput.hostName;
+
+          imports = [ ./host-module.nix ];
+        };
+
+      canonicalInput =
+        {
+          bundle,
+          platformBinding ? null,
+        }:
+        network-realization-model.lib.validateRendererInput {
+          inherit bundle platformBinding;
+          expectedTarget = "clab";
+        };
+
+      canonicalHostModule =
+        {
+          bundle,
+          platformBinding ? null,
+          ...
+        }@rendererInput:
+        let
+          validated = canonicalInput { inherit bundle platformBinding; };
+          forwarded = builtins.removeAttrs rendererInput [
+            "bundle"
+            "platformBinding"
+          ];
+        in
+        legacyHostModule (
+          forwarded
+          // {
+            cpm = validated.controlPlaneEnvelope;
+            canonicalBundleIdentity = validated.bundleIdentity;
+            canonicalBindingIdentity = validated.bindingIdentity;
+          }
+        );
+
       rendererLib = {
-        renderer.hostModule =
-          rendererInput:
-          let
-            # Accept cpm (Nix CPM structure) and produce cpmJsonPath.
-            # All string values passed as separate _module.args keys to avoid
-            # NixOS attrset corruption (store paths and empty strings get
-            # extracted and replace the whole attrset).
-            cpmJsonPath =
-              if rendererInput ? cpmJsonPath then rendererInput.cpmJsonPath
-              else if rendererInput ? cpm then
-                builtins.toFile
-                  "cpm-${rendererInput.hostName or "clab"}.json"
-                  (builtins.toJSON rendererInput.cpm)
-              else "";
-            deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
-            rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or null;
-          in
-          { lib, pkgs, ... }:
-          {
-            _module.args.clabDeploymentHost = deploymentHost;
-            _module.args.clabCpmJsonPath = cpmJsonPath;
-            _module.args.clabRendererInventoryJsonPath = rendererInventoryJsonPath;
-            _module.args.containerlabLinuxRendererSelf = self.outPath;
-            _module.args.containerlabLinuxGenerateClabConfig =
-              self.packages.${pkgs.system}.generate-clab-config;
-            # Keep containerlabLinuxRendererInput for non-string fields (bridgeControl etc)
-            _module.args.containerlabLinuxRendererInput =
-              builtins.removeAttrs rendererInput [ "cpmJsonPath" "deploymentHost" "rendererInventoryJsonPath" "cpm" "controlPlane" ];
-
-            assertions = [
-              {
-                assertion = rendererInput ? hostName;
-                message = "containerlab linux renderer input must include hostName";
-              }
-            ];
-
-            networking.hostName = lib.mkDefault rendererInput.hostName;
-
-            imports = [ ./host-module.nix ];
+        renderer = {
+          hostModule = legacyHostModule;
+          canonical = {
+            hostModule = canonicalHostModule;
+            validateInput = canonicalInput;
           };
+        };
       };
     in
     {
@@ -94,11 +144,16 @@
           rendererSourceName = "network-renderer-containerlab-linux-backend";
           rendererSourceRev = self.rev or (self.dirtyRev or "unknown");
           rendererSourceShortRev =
-            self.shortRev or (self.dirtyShortRev or (
-              if rendererSourceRev == "unknown" then "unknown" else builtins.substring 0 7 rendererSourceRev
-            ));
+            self.shortRev or (self.dirtyShortRev
+              or (if rendererSourceRev == "unknown" then "unknown" else builtins.substring 0 7 rendererSourceRev)
+            );
           rendererSourceDirty =
-            if self ? rev then "0" else if self ? dirtyRev then "1" else "unknown";
+            if self ? rev then
+              "0"
+            else if self ? dirtyRev then
+              "1"
+            else
+              "unknown";
           rendererSourceLastModified = toString (self.lastModified or 0);
           rendererSourceNarHash = self.narHash or "unknown";
 
@@ -195,6 +250,38 @@
       libBySystem = forAllSystems (
         { ... }:
         rendererLib
+      );
+
+      checks = forAllSystems (
+        { system, pkgs }:
+        let
+          bundle = network-realization-model.lib.realize {
+            input = import "${network-realization-model}/examples/cpm-result.nix";
+            requestScope = {
+              kind = "complete-artifact";
+              identity = "clab-renderer-boundary";
+            };
+            rootLockIdentity = "network-renderer-clab-flake-lock";
+            producerRevision = "network-realization-model-759ed91";
+          };
+          accepted = canonicalInput { inherit bundle; };
+          rawRejected =
+            !(builtins.tryEval (
+              builtins.deepSeq (canonicalInput {
+                bundle = {
+                  control_plane_model = { };
+                };
+              }) true
+            )).success;
+        in
+        assert accepted.bundleIdentity == bundle.bundleIdentity;
+        assert accepted.controlPlaneEnvelope.control_plane_model == bundle.network.data;
+        assert rawRejected;
+        {
+          canonical-renderer-input = pkgs.runCommand "network-renderer-clab-canonical-input" { } ''
+            touch "$out"
+          '';
+        }
       );
     };
 }
