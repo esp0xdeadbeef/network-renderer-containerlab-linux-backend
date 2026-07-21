@@ -282,5 +282,16 @@ assert json.loads(emitted) == authority, emitted
 print("  PASS: explicit inventory authority emitted into generated bridges artifact")
 PY
 
+# ── 10. Isolated VM work directories receive every imported module ─────
+echo
+echo "=== Check 10: VM staging copies the host-firewall authority module ==="
+if grep -Fq 'cp "${FLAKE_DIR}/vm-host-firewall.nix" "${VM_WORK_DIR}/vm-host-firewall.nix"' \
+  "${repo_root}/start-vm.sh"; then
+  echo "  PASS: start-vm stages vm-host-firewall.nix beside vm.nix"
+else
+  echo "  FAIL: isolated VM work directory omits vm-host-firewall.nix" >&2
+  exit 1
+fi
+
 echo
 echo "PASS FS-310-HDS-020-SDS-010-SMS-200: bridge no-default + host-firewall authority contract"

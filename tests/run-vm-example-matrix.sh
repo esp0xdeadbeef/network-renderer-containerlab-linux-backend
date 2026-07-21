@@ -69,7 +69,7 @@ start_worker() {
     export TMPDIR="${state_dir}/tmp"
     mkdir -p "${XDG_CACHE_HOME}" "${TMPDIR}"
     cd "${repo_root}"
-    stdbuf -oL -eL bash tests/test-vm-examples.sh "$@"
+    stdbuf -oL -eL bash tests/FS-780-HDS-010-SDS-010-SMS-010.sh "$@"
   ) > "${log_file}" 2>&1 &
   pids+=("$!")
 }

@@ -23,6 +23,7 @@ repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-p
 script="${repo_root}/run-in-vm.sh"
 dockerfile="${repo_root}/docker-clab-frr-plus-tooling/Dockerfile"
 build_script="${repo_root}/docker-clab-frr-plus-tooling/build.sh"
+vm_examples_test="${repo_root}/tests/FS-780-HDS-010-SDS-010-SMS-010.sh"
 
 failures=0
 
@@ -56,7 +57,8 @@ if grep -q 'docker_wait_seconds=' "${script}" &&
    grep -q 'CLAB_VM_VALIDATION_TIMEOUT_SECONDS' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
    grep -q 'if ! ssh_vm_once "' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
    grep -q 'if ! guard_vm_runtime_log "${validation_log}"; then' "${repo_root}/tests/lib/vm-lifecycle.sh" &&
-   grep -q 'if ! run_in_vm_validation "${validation_log}"; then' "${repo_root}/tests/test-vm-examples.sh"; then
+   rg -q 'if ! run_in_vm_validation "\$\{validation_log\}"; then' \
+     "${repo_root}/tests/lib/FS-780-HDS-010-SDS-010-SMS-010"; then
   echo "PASS test1: VM runner Docker readiness"
 else
   echo "FAIL test1: VM runner Docker readiness" >&2
@@ -222,16 +224,21 @@ fi
 # ---------------------------------------------------------------------------
 # Test 12: VM example runtime failures must fail-close
 # ---------------------------------------------------------------------------
-if grep -q 'if ! run_in_vm_validation "${validation_log}"; then' "${repo_root}/tests/test-vm-examples.sh" &&
+if [[ -x "${vm_examples_test}" ]] &&
+   rg -q 'if ! run_in_vm_validation "\$\{validation_log\}"; then' \
+     "${repo_root}/tests/lib/FS-780-HDS-010-SDS-010-SMS-010" &&
    grep -q 'if ! ssh_vm_once "' "${repo_root}/tests/lib/vm-runtime-targets.sh" &&
-   grep -q 'extract_runtime_target_tenant_dataplane_checks' "${repo_root}/tests/test-vm-examples.sh" &&
-   grep -q 'check_runtime_target_tenant_dataplane' "${repo_root}/tests/test-vm-examples.sh" &&
+   rg -q 'extract_runtime_target_tenant_dataplane_checks' \
+     "${repo_root}/tests/lib/FS-780-HDS-010-SDS-010-SMS-010" &&
+   rg -q 'check_runtime_target_tenant_dataplane' \
+     "${repo_root}/tests/lib/FS-780-HDS-010-SDS-010-SMS-010" &&
    grep -q 'ip route get 8.8.8.8 from ${source4} iif ${tenant_if}' "${repo_root}/tests/lib/vm-runtime-targets.sh" &&
-   grep -q 'return 1' "${repo_root}/tests/test-vm-examples.sh" &&
+   rg -q 'return 1' "${repo_root}/tests/lib/FS-780-HDS-010-SDS-010-SMS-010" &&
    grep -q 'FATAL VM-backed Containerlab validation emitted runtime errors' "${repo_root}/tests/lib/vm-runtime-log-guard.sh" &&
-   grep -q 'test-vm-examples.sh)' "${repo_root}/run-all-tests.sh" &&
-   grep -q 'NETWORK_REPO_RUNTIME_TEST_OK' "${repo_root}/run-all-tests.sh" &&
-   grep -q 'VM-backed example matrix; explicit runtime opt-in' "${repo_root}/run-all-tests.sh"; then
+   grep -q 'NETWORK_REPO_RUNTIME_TEST_OK' "${repo_root}/tests/lib/run-sms-cases.sh" &&
+   rg -q '^# GAMP-EXECUTION: live$' \
+     "${repo_root}/tests/lib/FS-780-HDS-010-SDS-010-SMS-010" &&
+   grep -q 'exec bash.*tests/test.sh' "${repo_root}/run-all-tests.sh"; then
   echo "PASS test12: VM example runtime validation fail-closes"
 else
   echo "FAIL test12: VM example runtime validation can be masked" >&2
