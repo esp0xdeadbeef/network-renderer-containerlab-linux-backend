@@ -49,6 +49,7 @@ mkdir -p "${VM_WORK_DIR}"
 
 if [[ "${VM_WORK_DIR}" != "${FLAKE_DIR}" ]]; then
   cp "${FLAKE_DIR}/vm.nix" "${VM_WORK_DIR}/vm.nix"
+  cp "${FLAKE_DIR}/vm-host-firewall.nix" "${VM_WORK_DIR}/vm-host-firewall.nix"
   cp "${FLAKE_DIR}/vm-network.nix" "${VM_WORK_DIR}/vm-network.nix"
   cp "${FLAKE_DIR}/vm-network-nat.nix" "${VM_WORK_DIR}/vm-network-nat.nix"
 fi

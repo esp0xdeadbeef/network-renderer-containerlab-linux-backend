@@ -100,7 +100,7 @@ for w in $(seq 0 $((workers - 1))); do
     printf 'printf "worker %s log: %%s\\n" %q\n' "$w" "${log_file}"
     echo 'stty sane 2>/dev/null || true'
     echo 'set +e'
-    printf 'stdbuf -oL -eL bash tests/test-vm-examples.sh'
+    printf 'stdbuf -oL -eL bash tests/FS-780-HDS-010-SDS-010-SMS-010.sh'
     for ex in "${subset[@]}"; do
       printf ' %q' "${ex}"
     done

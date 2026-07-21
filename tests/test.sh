@@ -23,8 +23,8 @@ fi
 
 mapfile -t tests < <(
   find "${repo_root}/tests" -maxdepth 1 -regextype posix-extended \( -type f -o -type l \) \
-    \( -name 'test-*.sh' -o -regex '.*\/FS-[0-9]+-HDS-[0-9]+-SDS-[0-9]+-SMS-[0-9]+\.sh' \) \
-    ! -name 'test.sh' -printf '%f\n' | LC_ALL=C sort
+    -regex '.*\/FS-[0-9]+-HDS-[0-9]+-SDS-[0-9]+-SMS-[0-9]+\.sh' \
+    -printf '%f\n' | LC_ALL=C sort
 )
 
 tmp_dir="$(mktemp -d)"
@@ -64,7 +64,7 @@ for test_name in "${tests[@]}"; do
   test_path="${repo_root}/tests/${test_name}"
   log_file="${tmp_dir}/${test_name}.log"
   printf 'START %s\n' "${test_name}"
-  timeout "${test_timeout_seconds}" "${test_path}" >"${log_file}" 2>&1 &
+  timeout "${test_timeout_seconds}" bash "${test_path}" >"${log_file}" 2>&1 &
   pid_to_name[$!]="${test_name}"
   pid_to_log[$!]="${log_file}"
   pid_to_start[$!]="${SECONDS}"
