@@ -358,6 +358,8 @@ def _append_route_groups(
     ip_cmd: str,
     groups: Dict[str, List[Tuple[str, str]]],
 ) -> None:
+    import sys
+
     def sort_nexthop(item: Tuple[str, str]) -> Tuple[str, str]:
         via, eth = item
         return eth, via
@@ -367,11 +369,37 @@ def _append_route_groups(
         if len(nexthops) == 1:
             via, eth = nexthops[0]
             cmd = f"{ip_cmd} route replace {dst} via {via} dev {eth} onlink"
-        else:
+        elif _has_explicit_multipath_authority(groups, dst):
             parts = [f"{ip_cmd} route replace {dst}"]
             for via, eth in sorted(nexthops, key=sort_nexthop):
                 parts.append(f"nexthop via {via} dev {eth} onlink")
             cmd = " ".join(parts)
+        else:
+            # Conflicting next hops without explicit multipath authority:
+            # reject with diagnostic and zero route output.
+            print(
+                f"FS-310-HDS-020-SDS-010-SMS-060: conflicting-next-hop for "
+                f"destination {dst}: {len(nexthops)} distinct next hops "
+                f"({sorted(set(nexthops), key=lambda x: (x[1], x[0]))}). "
+                f"No explicit multipath authority; route rejected.",
+                file=sys.stderr,
+            )
+            continue
         if cmd not in seen:
             seen.add(cmd)
             cmds.append(cmd)
+
+
+def _has_explicit_multipath_authority(
+    groups: Dict[str, List[Tuple[str, str]]],
+    dst: str,
+) -> bool:
+    """Check whether the route group has explicit upstream multipath authority.
+
+    Multipath is valid only when upstream supplies an explicit multipath
+    identity and member set and the target declares that capability.
+    Currently no multipath authority mechanism exists; this is a
+    construction stub that returns False until the upstream contract
+    is implemented.
+    """
+    return False
