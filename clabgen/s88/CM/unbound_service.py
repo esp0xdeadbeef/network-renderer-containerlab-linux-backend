@@ -228,15 +228,37 @@ def render_unbound_dns_service(
         _fail("CPM forwarded a protected reservation namespace outside its local authority")
 
     warning_commands: List[str] = []
-    for code in authority["warningCodes"]:
+    for warning in authority.get("reproducibilityWarnings", []):
+        code = warning.get("code", "UNKNOWN")
         if not re.fullmatch(_WARNING_CODE_PATTERN, code):
             _fail("CPM emitted a malformed DNS warning code")
+        source_layer = warning.get("sourceLayer", "intent")
+        enterprise = warning.get("enterprise")
+        site = warning.get("site")
+        requester = warning.get("requester")
+        resolver = warning.get("resolverService")
+        relation_id = warning.get("relationId")
+        cpm_message = warning.get("message", "")
+
+        parts = []
+        if enterprise and site:
+            parts.append(f'site "{enterprise}/{site}"')
+        elif site:
+            parts.append(f'site "{site}"')
+        if requester and resolver:
+            relation = f"{requester} → {resolver}"
+            if relation_id:
+                relation += f' (relation "{relation_id}")'
+            parts.append(relation)
+
+        detail = "; ".join(parts) if parts else ""
+        msg = (
+            f"CLAB DNS reproducibility warning {code} [{source_layer}]: {cpm_message}"
+            + (f" — {detail}" if detail else "")
+            + "; address material is intentionally omitted"
+        )
         warning_commands.append(
-            "printf '%s\\n' "
-            + shlex.quote(
-                f"CLAB DNS reproducibility warning {code}; address material is intentionally omitted"
-            )
-            + " >&2"
+            "printf '%s\\n' " + shlex.quote(msg) + " >&2"
         )
 
     config = [
