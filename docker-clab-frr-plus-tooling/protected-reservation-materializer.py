@@ -41,6 +41,7 @@ from typing import Any
 
 DIAGNOSTIC = "diagnostic.runtime-reservation-secret-record-invalid"
 PUBLICATION_HOSTNAME_MISSING = "diagnostic.protected-reservation-name-publication-hostname-missing"
+CROSS_IDENTITY_MISMATCH = "diagnostic.protected-reservation-cross-identity-mismatch"
 SCHEMA_FIELDS = {"id", "scope", "ipv4", "ipv6", "hostname"}
 HOSTNAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 MAC = re.compile(r"^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
@@ -119,7 +120,7 @@ def validated_ipv6_identity(value: object) -> tuple[ipaddress.IPv6Address, str]:
 
 def materialize_records(
     family: str, scope: str, subnet_text: str, pool_text: str, source_path: Path
-) -> tuple[list[dict[str, Any]], bool]:
+) -> tuple[list[dict[str, Any]], bool, set[str]]:
     require(family in {"ipv4", "ipv6"})
     require(scope != "")
     network = ipaddress.ip_network(subnet_text, strict=True)
@@ -182,7 +183,7 @@ def materialize_records(
             emitted_record["hostname"] = hostname
         emitted.append(emitted_record)
 
-    return (emitted, has_out_of_pool)
+    return (emitted, has_out_of_pool, ids)
 
 
 def materialize_dns_lines(
@@ -190,7 +191,7 @@ def materialize_dns_lines(
     namespace: str,
     record_classes: list[str],
     source_path: Path,
-) -> list[str]:
+) -> tuple[list[str], set[str]]:
     require(scope != "")
     require(DNS_NAMESPACE.fullmatch(namespace) is not None)
     require(record_classes and set(record_classes).issubset(DNS_RECORD_CLASSES))
@@ -203,13 +204,17 @@ def materialize_dns_lines(
     lines: list[str] = ["server:"]
     records_by_name: dict[str, dict[int, set[str]]] = {}
     address_owners: dict[str, str] = {}
+    dns_ids: set[str] = set()
     for record in source:
         require(isinstance(record, dict))
         require(set(record).issubset(SCHEMA_FIELDS))
         require(record.get("scope") == scope)
+        handle = record.get("id")
+        require(isinstance(handle, str) and handle != "")
         hostname = record.get("hostname")
         if not isinstance(hostname, str) or not hostname:
             raise ReservationContractError(PUBLICATION_HOSTNAME_MISSING)
+        dns_ids.add(handle)
         require(
             HOSTNAME.fullmatch(hostname) is not None
             and "." not in hostname
@@ -273,7 +278,7 @@ def materialize_dns_lines(
                         f'  local-data-ptr: "{address} {normalized_fqdn}"'
                     )
 
-    return lines
+    return (lines, dns_ids)
 
 
 def insert_reservations(
@@ -380,21 +385,25 @@ def main() -> None:
     )
     with args.template.open("r", encoding="utf-8") as template_handle:
         config = json.load(template_handle)
+    kea_ids: set[str] | None = None
+    dns_ids: set[str] | None = None
     if args.source is not None:
-        records, has_out_of_pool = materialize_records(
+        records, has_out_of_pool, kea_ids = materialize_records(
             args.family, args.scope, args.subnet, args.pool, args.source
         )
         config = insert_reservations(
             config, args.family, records, has_out_of_pool
         )
     if dns_enabled:
-        dns_lines = materialize_dns_lines(
+        dns_lines, dns_ids = materialize_dns_lines(
             args.scope,
             args.dns_namespace,
             args.dns_record_class,
             args.source,
         )
         atomic_write_dns(args.dns_output, dns_lines, args.dns_group)
+    if kea_ids is not None and dns_ids is not None:
+        require(kea_ids == dns_ids)
     atomic_write(args.output, config)
 
 
