@@ -166,7 +166,7 @@ if grep -F -e '02:10:20:aa:bb:cc' -e '0001000123456789001122334455' "${dns_outpu
   exit 1
 fi
 
-unbound_out="$(nix eval --raw nixpkgs#unbound.outPath)"
+unbound_out="$(nix build --no-link --print-out-paths "nixpkgs#unbound^out")"
 printf 'include: "%s"\nserver:\n  username: ""\n  chroot: ""\n  directory: "/tmp"\n  pidfile: "%s"\n' \
   "${dns_output}" "${tmp_dir}/unbound.pid" >"${tmp_dir}/unbound.conf"
 "${unbound_out}/bin/unbound-checkconf" "${tmp_dir}/unbound.conf" >/dev/null
