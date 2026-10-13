@@ -24,8 +24,8 @@ in
 built.control_plane_model
 ' >"${tmp_dir}/cpm.json"
 
-unbound_out="$(nix eval --raw nixpkgs#unbound.outPath)"
-dns_root_out="$(nix eval --raw nixpkgs#dns-root-data.outPath)"
+unbound_out="$(nix build --no-link --print-out-paths "nixpkgs#unbound^out")"
+dns_root_out="$(nix build --no-link --print-out-paths "nixpkgs#dns-root-data^out")"
 
 CPM_JSON="${tmp_dir}/cpm.json" \
 UNBOUND_CHECKCONF="${unbound_out}/bin/unbound-checkconf" \
