@@ -7,13 +7,18 @@ repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-p
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
+# Resolve the sibling repositories from this flake's pinned inputs rather than a
+# developer-machine path, so the row is reproducible from any checkout (CI
+# included) and stays pinned by flake.lock.
+flake_ref="$(realpath "${repo_root}")"
+
 nix eval --json --impure --expr '
 let
-  cpmFlake = builtins.getFlake (toString /home/deadbeef/github/network-control-plane-model);
-  labs = /home/deadbeef/github/network-labs;
+  flake = builtins.getFlake ("path:'"${flake_ref}"'");
+  cpmFlake = flake.inputs.network-control-plane-model;
   system = builtins.currentSystem;
   trace = "FS-540-HDS-010-SDS-010-SMS-045";
-  row = labs + "/GAMP/SMT/${trace}";
+  row = "${flake.inputs.network-labs}/GAMP/SMT/${trace}";
   inventory = import (row + "/inventory-clab.nix");
   built = cpmFlake.libBySystem.${system}.compileAndBuild {
     input = import (row + "/intent.nix");
@@ -22,9 +27,12 @@ let
 in built.control_plane_model
 ' >"${tmp_dir}/cpm.json"
 
-nix eval --json --file \
-  /home/deadbeef/github/network-labs/GAMP/SMT/FS-540-HDS-010-SDS-010-SMS-045/inventory-clab.nix \
-  >"${tmp_dir}/inventory.json"
+nix eval --json --impure --expr '
+let
+  flake = builtins.getFlake ("path:'"${flake_ref}"'");
+in
+  import "${flake.inputs.network-labs}/GAMP/SMT/FS-540-HDS-010-SDS-010-SMS-045/inventory-clab.nix"
+' >"${tmp_dir}/inventory.json"
 
 CPM_JSON="${tmp_dir}/cpm.json" \
 INVENTORY_JSON="${tmp_dir}/inventory.json" \
