@@ -15,6 +15,19 @@ if [[ -z "${cpm_path}" && -d "${repo_root}/../network-control-plane-model" ]]; t
   cpm_path="$(cd "${repo_root}/../network-control-plane-model" && pwd)"
 fi
 
+# Last resort: resolve the sibling repositories from this flake's pinned inputs.
+# CI checks out this repository only, so the sibling-directory layout above does
+# not exist there. These are the same revisions flake.lock already pins.
+if [[ -z "${labs_path}" || -z "${cpm_path}" ]]; then
+  flake_root="$(realpath "${repo_root}")"
+  if [[ -z "${labs_path}" ]]; then
+    labs_path="$(nix eval --impure --raw --expr "(builtins.getFlake \"path:${flake_root}\").inputs.network-labs.outPath" 2>/dev/null || true)"
+  fi
+  if [[ -z "${cpm_path}" ]]; then
+    cpm_path="$(nix eval --impure --raw --expr "(builtins.getFlake \"path:${flake_root}\").inputs.network-control-plane-model.outPath" 2>/dev/null || true)"
+  fi
+fi
+
 if [[ -z "${labs_path}" || ! -f "${labs_path}/current-lab/metadata.nix" ]]; then
   echo "FAIL FS-380 active-lab CLAB render: missing network-labs current-lab" >&2
   exit 1
