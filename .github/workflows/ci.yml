@@ -48,6 +48,15 @@ jobs:
             nixpkgs#yq
           printf '%s\n' "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
 
+      # Ubuntu runner images restrict unprivileged user namespaces via AppArmor;
+      # the CLAB suites validate nftables batches with `unshare -Urn`.
+      - name: "Allow unprivileged user namespaces"
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
+
       - name: "Run repository test suite"
         env:
           NETWORK_REPO_DIRECT_TEST_OK: "1"
