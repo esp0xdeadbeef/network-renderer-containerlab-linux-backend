@@ -43,9 +43,18 @@ REPO_ROOT="${repo_root}" nix eval --impure --json --expr '
     rawCpmRejected = !(builtins.tryEval (builtins.deepSeq (canonical.validateInput {
       bundle = cpm;
     }) true)).success;
+    # The schema owns the canonical network content, so the seeded mutation adds
+    # renderer-invented content inside the enterprise map (the envelope fields
+    # are the control plane artifact contract, not the schema contract).
     tamperedBundle = bundle // {
       network = bundle.network // {
-        data = bundle.network.data // { rendererInventedDefault = true; };
+        data = bundle.network.data // {
+          data =
+            bundle.network.data.data
+            // {
+              rendererInventedDefault = true;
+            };
+        };
       };
     };
     unvalidatedMutationRejected = !(builtins.tryEval (builtins.deepSeq (canonical.validateInput {
