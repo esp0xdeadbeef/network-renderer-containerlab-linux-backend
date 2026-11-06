@@ -506,72 +506,37 @@ else
 fi
 
 # ===========================================================================
-# Test 7: CPM input locked-source validation (uses nix-built deploy_app)
-# deploy-clab validates: cpm_json exists, is not a .nix file, is non-empty.
+# Test 7: canonical-input locked-source validation (uses nix-built deploy_app)
+# FS-310-HDS-040-SDS-010-SMS-100: deploy-clab consumes one validated canonical
+# realization bundle (released by the upstream chain), never a raw CPM payload.
 # This proves the module loads from locked (pre-built) source, not mutable Nix.
 # ===========================================================================
 test7_dir="${tmp_dir}/test7"
 mkdir -p "${test7_dir}"
 
-# Create valid CPM JSON fixture (minimal enterprise with two edge nodes)
-cat >"${test7_dir}/cpm.json" <<'JSON'
-{
-  "enterprise": {
-    "esp0xdeadbeef": {
-      "site": {
-        "s-router-clab": {
-          "nodes": {
-            "edge-a": {
-              "role": "core",
-              "routing_mode": "static",
-              "routingDomain": "core",
-              "loopback": {
-                "ipv4": "10.255.0.1/32",
-                "ipv6": "2001:db8:ffff::1/128"
-              },
-              "interfaces": {
-                "to-edge-b": {
-                  "runtimeIfName": "eth1",
-                  "kind": "wan",
-                  "addr4": "192.0.2.0/31",
-                  "addr6": "2001:db8:100::/127"
-                }
-              }
-            },
-            "edge-b": {
-              "role": "core",
-              "routing_mode": "static",
-              "routingDomain": "core",
-              "loopback": {
-                "ipv4": "10.255.0.2/32",
-                "ipv6": "2001:db8:ffff::2/128"
-              },
-              "interfaces": {
-                "to-edge-a": {
-                  "runtimeIfName": "eth1",
-                  "kind": "wan",
-                  "addr4": "192.0.2.1/31",
-                  "addr6": "2001:db8:100::1/127"
-                }
-              }
-            }
-          },
-          "links": {
-            "edge-a-b": {
-              "kind": "wan",
-              "bridge": "br-fs960",
-              "endpoints": {
-                "edge-a": { "interface": "to-edge-b" },
-                "edge-b": { "interface": "to-edge-a" }
-              }
-            }
-          }
-        }
-      }
-    }
+# FS-960-HDS-010-SDS-016-SMS-010: the locked source is the compiled
+# control-plane artifact for this trace, released through
+# network-realization-model; the renderer consumes only the canonical bundle.
+REPO_ROOT="${repo_root}" nix eval --impure --json --expr '
+  let
+    flake = builtins.getFlake ("path:" + builtins.getEnv "REPO_ROOT");
+    system = builtins.currentSystem;
+    # The FS-960-016 trace row does not compile against the pinned labs rev
+    # (FS-180 allow-relation returnBehavior); deploy-mechanics coverage uses the
+    # compiled FS-270 row as the locked upstream artifact.
+    traceId = "FS-270-HDS-010-SDS-010-SMS-020";
+    row = flake.inputs.network-labs.outPath + "/GAMP/SMT/${traceId}";
+    cpm = flake.inputs.network-control-plane-model.lib.${system}.compileAndBuild {
+      input = import (row + "/intent.nix");
+      inventory = import (row + "/inventory-clab.nix");
+    };
+  in
+  {
+    inherit (cpm) control_plane_model;
   }
-}
-JSON
+' >"${test7_dir}/cpm.json"
+SMS_TEST_REPO_ROOT="${repo_root}" bash "${repo_root}/scripts/canonical-bundle.sh" \
+  "${test7_dir}/cpm.json" "${test7_dir}/canonical-bundle.json" fs960-deploy
 
 # Create valid renderer inventory JSON fixture
 cat >"${test7_dir}/inventory.json" <<'JSON'
@@ -582,10 +547,10 @@ JSON
 if "${deploy_app}/bin/deploy-clab" \
   --dry-run \
   --work-dir "${test7_dir}/work" \
-  "${test7_dir}/cpm.json" \
+  "${test7_dir}/canonical-bundle.json" \
   "${test7_dir}/inventory.json" \
   >"${test7_dir}/stdout" 2>"${test7_dir}/stderr"; then
-  echo "PASS test7: locked-source CPM+inventory JSON validated and deploy dry-run succeeds"
+  echo "PASS test7: locked-source canonical bundle + inventory JSON validated and deploy dry-run succeeds"
 else
   echo "FAIL test7: deploy dry-run with valid locked inputs failed" >&2
   cat "${test7_dir}/stderr" >&2
@@ -595,7 +560,7 @@ fi
 # ===========================================================================
 # Test 8 (seeded negative): deploy-clab rejects .nix input as not-locked
 # The SMS-010 spec requires the module to reject mutable Nix sources.
-# deploy-clab already enforces: cpm_json must not end in .nix
+# deploy-clab enforces: the canonical bundle input must not end in .nix
 # ===========================================================================
 test8_dir="${tmp_dir}/test8"
 mkdir -p "${test8_dir}"
@@ -614,10 +579,10 @@ if "${deploy_app}/bin/deploy-clab" \
   "${test8_dir}/cpm.nix" \
   "${test8_dir}/inv.json" \
   >/dev/null 2>"${test8_dir}/stderr"; then
-  echo "FAIL test8: expected rejection of .nix CPM input, but got success" >&2
+  echo "FAIL test8: expected rejection of .nix bundle input, but got success" >&2
   failures=$((failures + 1))
 else
-  if grep -q "prebuilt CPM JSON" "${test8_dir}/stderr"; then
+  if grep -q "released canonical realization bundle" "${test8_dir}/stderr"; then
     echo "PASS test8: seeded negative — mutable .nix source correctly rejected as not-locked"
   else
     echo "FAIL test8: wrong rejection message for .nix CPM input" >&2
@@ -643,11 +608,11 @@ if "${deploy_app}/bin/deploy-clab" \
   "${test9_dir}/nonexistent-cpm.json" \
   "${test9_dir}/inv.json" \
   >/dev/null 2>"${test9_dir}/stderr"; then
-  echo "FAIL test9: expected rejection of missing CPM JSON, but got success" >&2
+  echo "FAIL test9: expected rejection of missing canonical bundle JSON, but got success" >&2
   failures=$((failures + 1))
 else
-  if grep -q "missing or empty CPM JSON" "${test9_dir}/stderr"; then
-    echo "PASS test9: seeded negative — missing locked CPM source correctly rejected"
+  if grep -q "missing or empty canonical bundle JSON" "${test9_dir}/stderr"; then
+    echo "PASS test9: seeded negative — missing locked canonical bundle source correctly rejected"
   else
     echo "FAIL test9: wrong rejection message for missing CPM source" >&2
     cat "${test9_dir}/stderr" >&2
