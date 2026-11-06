@@ -7,7 +7,9 @@ compile_example_cpm() {
   local labs_path="$3"
   local cpm_path="$4"
 
-  nix run "${cpm_path}#compile-and-build-control-plane-model" -- \
+  # The CPM input is a read-only flake store path when it comes from the flake
+  # lock; a lock rewrite there fails with "Read-only file system".
+  nix run --no-write-lock-file "${cpm_path}#compile-and-build-control-plane-model" -- \
     "${labs_path}/examples/${example}/intent.nix" \
     "${labs_path}/examples/${example}/inventory-clab.nix" \
     "${out_json}" >/dev/null
