@@ -183,7 +183,20 @@ terminal_addresses = {
     for key in ("addr4", "addr6")
     if terminal_interfaces[0].get(key)
 }
-assert {ip_address(address) for address in core_endpoint_binding["addresses"]} == terminal_addresses
+# FS-540: the DNS service endpoint is the resolver SERVICE address, which the
+# model places on the resolver loopback; the terminal attachment names the
+# transport interface that carries it. The binding must equal the modeled
+# loopback, not the transport address.
+loopback = core["loopback"]
+loopback_addresses = {
+    ip_interface(loopback[key]).ip
+    for key in ("ipv4", "ipv6")
+    if loopback.get(key)
+}
+assert {ip_address(address) for address in core_endpoint_binding["addresses"]} == loopback_addresses
+assert loopback_addresses != terminal_addresses, (
+    "fixture no longer distinguishes the resolver loopback from its transport address"
+)
 for address in core_endpoint_binding["addresses"]:
     parsed = ip_address(address)
     prefix = 128 if parsed.version == 6 else 32
