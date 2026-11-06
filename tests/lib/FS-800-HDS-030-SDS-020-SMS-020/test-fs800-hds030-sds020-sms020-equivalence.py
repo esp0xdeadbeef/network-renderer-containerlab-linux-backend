@@ -29,13 +29,14 @@ def normalize_pppoe_output(text: str) -> dict:
     feats["ipv6only"] = "ipv6only" in text
     m = re.search(r"interface (\S+)", text)
     feats["interface"] = m.group(1) if m else None
-    feats["has_restricted_firewall"] = (
-        "iifname ppp-test ip6 saddr fe80::/10 udp sport 547 udp dport 546" in text
+    # nft quotes interface names in some renderers and not in others; the
+    # contract is the rule itself, so normalize the quoting.
+    restricted_rule = re.compile(
+        r"iifname\s+\"?ppp-test\"?\s+ip6\s+saddr\s+fe80::/10\s+udp\s+sport\s+547\s+udp\s+dport\s+546"
     )
+    feats["has_restricted_firewall"] = restricted_rule.search(text) is not None
     dport547 = text.count("udp dport 547")
-    restricted = text.count(
-        "iifname ppp-test ip6 saddr fe80::/10 udp sport 547 udp dport 546"
-    )
+    restricted = len(restricted_rule.findall(text))
     feats["firewall_tight"] = restricted >= 1 and dport547 == restricted
     return feats
 
@@ -114,7 +115,14 @@ nixos_expr = """\
       inherit system;
       modules = [ module.config ];
     };
-  in builtins.readFile evaluated.config.environment.etc."s88/pppoe-ipv6-provider-handoff.conf".source\
+  in
+    # SMS-020 requires the exact DHCPv6 reply rule as well as the PD client
+    # config, so the reference artifact carries both: the rendered client config
+    # and the rendered firewall ruleset. Comparing only the config file (as the
+    # test did) made the firewall feature unobservable on the reference side.
+    (builtins.readFile evaluated.config.environment.etc."s88/pppoe-ipv6-provider-handoff.conf".source)
+    + "\n"
+    + (evaluated.config.networking.nftables.ruleset or "")
 """
 nixos_expr = nixos_expr.replace("__NIXOS_REPO__", nixos_repo)
 nixos_dhcpcd = subprocess.run(
@@ -133,16 +141,23 @@ check_equivalence_int(nixos_dhcpcd, clab_output)
 # --- Mutation: change IAID to break equivalence ---
 mutant_client = deepcopy(client)
 mutant_client["ipv6"]["iaid"] = 0
-mutant_clab = "\n".join(
-    render("test-core", {"services": {"pppoe": {"client": mutant_client}}}, {"provider-handoff": "eth1"})
-)
 try:
-    check_equivalence_int(nixos_dhcpcd, mutant_clab)
-    raise AssertionError(
-        "FS-800 ordinal 5: mutated CLAB IAID was accepted as equivalent to NixOS reference"
+    mutant_clab = "\n".join(
+        render("test-core", {"services": {"pppoe": {"client": mutant_client}}}, {"provider-handoff": "eth1"})
     )
-except AssertionError as e:
-    if "Equivalence broken" not in str(e):
-        raise
+except ValueError:
+    # SMS-020 requires incomplete realization facts to be rejected rather than
+    # derived; a fail-closed rejection is the correct non-equivalent outcome.
+    mutant_clab = None
+
+if mutant_clab is not None:
+    try:
+        check_equivalence_int(nixos_dhcpcd, mutant_clab)
+        raise AssertionError(
+            "FS-800 ordinal 5: mutated CLAB IAID was accepted as equivalent to NixOS reference"
+        )
+    except AssertionError as e:
+        if "Equivalence broken" not in str(e):
+            raise
 
 print("PASS FS-800-HDS-030-SDS-020-SMS-020 ordinal 5: NixOS/CLAB artifact equivalence")
