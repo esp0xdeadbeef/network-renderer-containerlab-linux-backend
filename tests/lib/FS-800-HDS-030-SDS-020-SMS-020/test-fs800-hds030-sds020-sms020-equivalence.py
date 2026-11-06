@@ -66,11 +66,21 @@ client = {
     "ipv6": ipv6,
 }
 
-# Compute NixOS reference artifact via nix eval
-nixos_repo = "/home/deadbeef/github/network-renderer-nixos"
+# Compute the NixOS reference artifact via nix eval. The NixOS renderer is a
+# separate repository (not an input of this flake), so this cross-repo
+# comparison runs only where that checkout is supplied, never from a
+# machine-local absolute path.
+nixos_repo = os.environ.get("NETWORK_RENDERER_NIXOS_PATH", "")
+if not nixos_repo or not os.path.isdir(nixos_repo):
+    print(
+        "SKIP FS-800 equivalence: set NETWORK_RENDERER_NIXOS_PATH to a "
+        "network-renderer-nixos checkout"
+    )
+    sys.exit(0)
+
 nixos_expr = """\
   let
-    repoRoot = "/home/deadbeef/github/network-renderer-nixos";
+    repoRoot = "__NIXOS_REPO__";
     flake = builtins.getFlake ("path:" + repoRoot);
     lib = flake.inputs.nixpkgs.lib;
     system = builtins.currentSystem;
@@ -106,6 +116,7 @@ nixos_expr = """\
     };
   in builtins.readFile evaluated.config.environment.etc."s88/pppoe-ipv6-provider-handoff.conf".source\
 """
+nixos_expr = nixos_expr.replace("__NIXOS_REPO__", nixos_repo)
 nixos_dhcpcd = subprocess.run(
     ["nix", "eval", "--impure", "--raw", "--expr", nixos_expr],
     capture_output=True, text=True, cwd=nixos_repo, timeout=120,
