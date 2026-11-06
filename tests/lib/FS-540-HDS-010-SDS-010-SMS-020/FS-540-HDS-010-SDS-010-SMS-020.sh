@@ -113,11 +113,14 @@ prefix="mini-smt-FS-540-HDS-010-SDS-010-SMS-020"
 node_block "${prefix}-access-dns" "${tmp_dir}/access.block"
 node_block "${prefix}-resolver-node" "${tmp_dir}/core.block"
 
+# FS-540: the access DNS forwards to the modeled resolver SERVICE address, which
+# is the resolver loopback (pools.loopback 10.2.0.0/24 and fd42:021c:ff::/118),
+# not the p2p transport address it used before.
 for expected in \
 	'clab.dns.runtime: unbound' \
 	'forward-zone:' \
-	'forward-addr: \"10.2.255.6\"' \
-	'forward-addr: \"fd42:21c:fe::6\"' \
+	'forward-addr: \"10.2.0.3\"' \
+	'forward-addr: \"fd42:21c:ff::3\"' \
 	'forward-first: no'; do
 	grep -Fq "${expected}" "${tmp_dir}/access.block" ||
 		fail "access DNS output lacks ${expected}"
