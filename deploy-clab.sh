@@ -66,11 +66,20 @@ done
 
 (($# == 2)) || { usage; exit 2; }
 
-cpm_json="$1"
+bundle_json="$1"
 renderer_inventory_json="$2"
 
-[[ "${cpm_json}" != *.nix ]] || fail "deploy-clab consumes prebuilt CPM JSON, not intent/inventory Nix"
-[[ -s "${cpm_json}" ]] || fail "missing or empty CPM JSON: ${cpm_json}"
+[[ "${bundle_json}" != *.nix ]] || fail "deploy-clab consumes a released canonical realization bundle, not intent/inventory Nix"
+[[ -s "${bundle_json}" ]] || fail "missing or empty canonical bundle JSON: ${bundle_json}"
+python3 - "${bundle_json}" <<'PY_CHECK'
+import json, sys
+bundle = json.load(open(sys.argv[1]))
+if bundle.get("kind") != "network-realization-bundle":
+    raise SystemExit("deploy-clab requires a network-realization-bundle (FS-310-HDS-040-SDS-010-SMS-100)")
+validation = bundle.get("validation") or {}
+if validation.get("valid") is not True:
+    raise SystemExit("deploy-clab requires the schema- and digest-bound release validation")
+PY_CHECK
 [[ -s "${renderer_inventory_json}" ]] || fail "missing or empty renderer inventory JSON: ${renderer_inventory_json}"
 
 mkdir -p "${work_dir}"
@@ -84,7 +93,7 @@ render_artifacts() {
   log "rendering ${topology_file} and ${bridges_file}"
   CLABGEN_RENDERER_INVENTORY_JSON="${renderer_inventory_json}" \
     "${python_bin}" "${repo_root}/generate-clab-config.py" \
-      "${cpm_json}" \
+      "${bundle_json}" \
       "${topology_file}" \
       "${bridges_file}"
 }
@@ -153,7 +162,7 @@ PY
 write_deploy_provenance() {
   log "writing renderer deploy provenance ${deploy_provenance_file}"
   REPO_ROOT="${repo_root}" \
-  CPM_JSON="${cpm_json}" \
+  CANONICAL_BUNDLE_JSON="${bundle_json}" \
   RENDERER_INVENTORY_JSON="${renderer_inventory_json}" \
   WORK_DIR="${work_dir}" \
   TOPOLOGY_FILE="${topology_file}" \
@@ -176,7 +185,7 @@ payload = {
         "renderer": renderer_lock_summary(repo_root),
     },
     "inputs": {
-        "controlPlaneModel": os.environ["CPM_JSON"],
+        "canonicalBundle": os.environ["CANONICAL_BUNDLE_JSON"],
         "rendererInventory": os.environ["RENDERER_INVENTORY_JSON"],
     },
     "artifacts": {

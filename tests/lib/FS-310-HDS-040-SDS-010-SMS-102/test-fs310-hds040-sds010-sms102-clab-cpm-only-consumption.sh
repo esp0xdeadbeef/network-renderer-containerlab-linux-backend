@@ -240,19 +240,45 @@ else:
         fail("  flake.nix hostModule does not accept cpm struct — may accept raw paths")
 
 # ═══════════════════════════════════════════════════════════════════════
-# CHECK 6: Entrypoints require CPM JSON, not raw .nix paths
+# CHECK 6: Entrypoints consume the canonical realization bundle
+# FS-310-HDS-040-SDS-010-SMS-100: CPM output is upstream authority for
+# network-realization-model; renderers receive one validated canonical
+# realization bundle and reject raw CPM payloads.
 # ═══════════════════════════════════════════════════════════════════════
-print("\n=== Check 6: entrypoints require CPM JSON, not raw .nix paths ===")
+print("\n=== Check 6: entrypoints consume the canonical realization bundle ===")
 
-# generate-clab-config.py
+gate = repo / "clabgen" / "canonical_bundle.py"
+if not gate.exists():
+    fail("  clabgen/canonical_bundle.py missing: renderer has no canonical-input gate")
+gate_content = gate.read_text()
+for needle in ("network-realization-bundle", "GAMP-MODEL-BOUNDARY-VIOLATION", "control_plane_envelope"):
+    if needle not in gate_content:
+        fail(f"  clabgen/canonical_bundle.py missing boundary marker {needle!r}")
+print("  PASS: canonical-input gate rejects raw CPM and requires a released bundle")
+
+solver_content = (repo / "clabgen" / "solver.py").read_text()
+if "control_plane_envelope" not in solver_content or "bundle" not in solver_content:
+    fail("  clabgen/solver.py does not route bundle input through the canonical gate")
+print("  PASS: solver loads renderer meaning from the canonical bundle envelope")
+
 gen_py = repo / "generate-clab-config.py"
 gen_content = gen_py.read_text()
-has_json_validation = "cpm_input_path.suffix not in (\".json\",)" in gen_content or \
-    ".json" in gen_content and "CPM JSON" in gen_content
-if has_json_validation:
-    print("  PASS: generate-clab-config.py validates CPM JSON input")
-else:
-    fail("  generate-clab-config.py missing CPM JSON input validation")
+if "canonical realization bundle" not in gen_content:
+    fail("  generate-clab-config.py does not require a canonical realization bundle")
+if "CPM JSON" in gen_content:
+    fail("  generate-clab-config.py still advertises a raw CPM JSON input")
+print("  PASS: generate-clab-config.py requires the canonical bundle input")
+
+runner_content = (repo / "run-clab-generator.sh").read_text()
+if "GAMP-MODEL-BOUNDARY-VIOLATION" not in runner_content:
+    fail("  run-clab-generator.sh does not reject a raw control-plane-model payload")
+print("  PASS: run-clab-generator.sh rejects raw control-plane-model payloads")
+
+# The renderer inventory must not be read out of a raw CPM payload.
+parser_content = (repo / "clabgen" / "parse-solver-json.py").read_text()
+if 'cpm.get("endpointInventory")' in parser_content:
+    fail("  clabgen/parse-solver-json.py still reads endpointInventory from a raw CPM payload")
+print("  PASS: renderer inventory is not sourced from a raw CPM payload")
 
 # deploy-clab.sh
 deploy_sh = repo / "deploy-clab.sh"

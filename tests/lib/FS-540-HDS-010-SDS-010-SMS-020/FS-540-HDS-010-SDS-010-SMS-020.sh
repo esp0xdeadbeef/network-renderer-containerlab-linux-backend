@@ -4,6 +4,7 @@
 set -euo pipefail
 
 repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)}"
+source "${repo_root}/tests/lib/canonical-bundle.sh"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
@@ -84,9 +85,32 @@ jq -e '
 jq '.controlPlane' "${tmp_dir}/canonical-input.json" >"${tmp_dir}/cpm.json"
 jq '.inventory' "${tmp_dir}/canonical-input.json" >"${tmp_dir}/inventory.json"
 
+# FS-310-HDS-040-SDS-010-SMS-100: the renderer consumes the released bundle,
+# never the raw control-plane payload.
+REPO_ROOT="${repo_root}" CPM_JSON="${tmp_dir}/cpm.json" BUNDLE_OUT="${tmp_dir}/bundle.json" \
+	nix eval --impure --json --expr '
+	  let
+	    flake = builtins.getFlake ("path:" + builtins.getEnv "REPO_ROOT");
+	    cpm = builtins.fromJSON (builtins.readFile (builtins.getEnv "CPM_JSON"));
+	    artifact = {
+	      kind = "network-control-plane-artifact";
+	      artifactIdentity = "FS-540-HDS-010-SDS-010-SMS-020-clab-cpm";
+	      artifactDigest = builtins.hashString "sha256" (builtins.toJSON cpm.control_plane_model);
+	      inherit (cpm) control_plane_model;
+	    };
+	    realization = flake.inputs.network-realization-model;
+	  in
+	    realization.lib.realize {
+	      input = artifact;
+	      requestScope = { kind = "complete-artifact"; identity = "FS-540-HDS-010-SDS-010-SMS-020-clab"; };
+	      rootLockIdentity = "network-renderer-clab-flake-lock";
+	      producerRevision = realization.rev or "unknown";
+	    }
+	' >"${tmp_dir}/bundle.json"
+
 CLABGEN_RENDERER_INVENTORY_JSON="${tmp_dir}/inventory.json" \
 	nix run "path:${repo_root}#generate-clab-config" -- \
-	"${tmp_dir}/cpm.json" \
+	"${tmp_dir}/bundle.json" \
 	"${tmp_dir}/fabric.clab.yml" \
 	"${tmp_dir}/vm-bridges-generated.nix"
 
@@ -94,7 +118,7 @@ CLABGEN_RENDERER_INVENTORY_JSON="${tmp_dir}/inventory.json" \
 	"${tmp_dir}/fabric.clab.yml" \
 	"${tmp_dir}/vm-bridges-generated.nix"
 "${repo_root}/tests/validate-topology-conformance.sh" \
-	"${tmp_dir}/cpm.json" \
+	"${tmp_dir}/bundle.json" \
 	"${tmp_dir}/inventory.json" \
 	"${tmp_dir}/fabric.clab.yml"
 

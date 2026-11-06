@@ -6,11 +6,12 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() {
   cat >&2 <<'EOF'
 usage:
-  ./run-clab-generator.sh <control-plane-model.json|output-solver.json> [topology_out] [bridges_out]
+  ./run-clab-generator.sh <canonical-realization-bundle.json|output-solver.json> [topology_out] [bridges_out]
 
-defaults:
-  - No default input is assumed.
-  - Prefer generating a fresh CPM JSON in a temp dir (see ./start-vm.sh).
+notes:
+  - FS-310-HDS-040-SDS-010-SMS-100: renderers consume one validated canonical
+    realization bundle; a raw control-plane-model payload is rejected.
+  - Release the bundle with scripts/canonical-bundle.sh (see ./start-vm.sh).
 
 EOF
 }
@@ -43,19 +44,45 @@ if not isinstance(root, dict):
     print(f"[run-clab-generator] invalid JSON: {p}: top-level must be an object", file=sys.stderr)
     sys.exit(2)
 
-cpm = root.get("control_plane_model")
-if cpm is None:
-    # Not CPM JSON; assume solver JSON and let clabgen validate.
+if isinstance(root.get("control_plane_model"), dict) and not isinstance(root.get("network"), dict):
+    print(
+        "[run-clab-generator] GAMP-MODEL-BOUNDARY-VIOLATION: renderer input is a raw\n"
+        "control-plane-model payload. Renderers consume only one validated canonical\n"
+        "realization bundle (FS-310-HDS-040-SDS-010-SMS-100); run the realization model\n"
+        "over the CPM output and pass the released bundle instead.",
+        file=sys.stderr,
+    )
+    sys.exit(4)
+
+if root.get("kind") != "network-realization-bundle":
+    # Solver JSON (a renderer-internal intermediate) is accepted; anything else
+    # is not network-semantic input.
     sys.exit(0)
 
-if not isinstance(cpm, dict):
-    print(f"[run-clab-generator] invalid CPM JSON: {p}: control_plane_model must be an object", file=sys.stderr)
-    sys.exit(2)
+validation = root.get("validation")
+if not isinstance(validation, dict) or validation.get("valid") is not True:
+    print(
+        f"[run-clab-generator] canonical bundle at {p} lacks the schema- and digest-bound release validation",
+        file=sys.stderr,
+    )
+    sys.exit(5)
 
+network = root.get("network")
+if not isinstance(network, dict) or not isinstance(network.get("data"), dict):
+    print(
+        f"[run-clab-generator] canonical bundle at {p} does not carry network data",
+        file=sys.stderr,
+    )
+    sys.exit(5)
+
+cpm = network["data"]
 data = cpm.get("data")
 if not isinstance(data, dict):
-    print(f"[run-clab-generator] invalid CPM JSON: {p}: control_plane_model.data must be an object", file=sys.stderr)
-    sys.exit(2)
+    print(
+        f"[run-clab-generator] canonical bundle network data at {p} is missing the control-plane data map",
+        file=sys.stderr,
+    )
+    sys.exit(5)
 
 missing = []
 for ent, sites in data.items():

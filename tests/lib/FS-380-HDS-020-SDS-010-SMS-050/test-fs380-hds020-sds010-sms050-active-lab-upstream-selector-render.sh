@@ -4,6 +4,7 @@
 set -euo pipefail
 
 repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)}"
+source "${repo_root}/tests/lib/canonical-bundle.sh"
 
 labs_path="${NETWORK_LABS_PATH:-${NETWORK_INPUT_PATH_NETWORK_LABS:-}}"
 if [[ -z "${labs_path}" && -d "${repo_root}/../network-labs/current-lab" ]]; then
@@ -83,9 +84,11 @@ nix eval --impure --json --expr \
   "import ${labs_path}/current-lab/inventory-s-router-clab.nix" \
   >"${tmp_dir}/renderer-inventory.json"
 
+emit_canonical_bundle "${tmp_dir}/cpm.json" "${tmp_dir}/bundle.json" "clab-fs380"
+
 CLABGEN_RENDERER_INVENTORY_JSON="${tmp_dir}/renderer-inventory.json" \
   nix run --show-trace "path:${repo_root}#generate-clab-config" -- \
-    "${tmp_dir}/cpm.json" \
+    "${tmp_dir}/bundle.json" \
     "${tmp_dir}/fabric.clab.yml" \
     "${tmp_dir}/vm-bridges-generated.nix" >/dev/null
 

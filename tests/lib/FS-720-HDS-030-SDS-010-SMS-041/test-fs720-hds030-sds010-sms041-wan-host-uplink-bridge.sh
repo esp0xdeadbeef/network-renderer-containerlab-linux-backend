@@ -57,6 +57,14 @@ cpm = {
 
 cpm_path = tmp / "cpm.json"
 cpm_path.write_text(json.dumps(cpm))
+# FS-310-HDS-040-SDS-010-SMS-100: focused test, released canonical fixture.
+from clabgen.testing.canonical_fixture import canonical_bundle_path
+cpm_path = canonical_bundle_path(
+    Path(os.environ.get("SMS_TEST_REPO_ROOT", ".")).resolve(),
+    cpm,
+    "fs720-clab",
+    dest=tmp / "canonical-bundle.json",
+)
 
 rendered = Enterprise.from_solver_json(cpm_path, renderer_inventory={}).render()
 links = rendered["topology"]["links"]
@@ -83,8 +91,12 @@ del missing_bridge["control_plane_model"]["data"]["mini-smt"][
 ]["runtimeTargets"]["mini-smt-internet-mode-verification-emulated-isp"][
     "effectiveRuntimeRealization"
 ]["interfaces"]["internet-vlan4"]["hostUplink"]["bridge"]
-missing_path = tmp / "missing-bridge.json"
-missing_path.write_text(json.dumps(missing_bridge))
+missing_path = canonical_bundle_path(
+    Path(os.environ.get("SMS_TEST_REPO_ROOT", ".")).resolve(),
+    missing_bridge,
+    "fs720-clab-missing-bridge",
+    dest=tmp / "missing-bridge-bundle.json",
+)
 
 try:
     Enterprise.from_solver_json(missing_path, renderer_inventory={}).render()

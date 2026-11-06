@@ -6,27 +6,27 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 usage() {
   cat >&2 <<'EOF'
 usage:
-  ./tests/validate-topology-conformance.sh <cpm.json> <renderer-inventory.json> <fabric.clab.yml>
+  ./tests/validate-topology-conformance.sh <canonical-bundle.json> <renderer-inventory.json> <fabric.clab.yml>
 EOF
 }
 
-cpm_json="${1:-}"
+bundle_json="${1:-}"
 renderer_inventory_json="${2:-}"
 topology_yaml="${3:-}"
 
-if [[ -z "${cpm_json}" || -z "${renderer_inventory_json}" || -z "${topology_yaml}" ]]; then
+if [[ -z "${bundle_json}" || -z "${renderer_inventory_json}" || -z "${topology_yaml}" ]]; then
   usage
   exit 1
 fi
 
-[[ -s "${cpm_json}" ]] || { echo "conformance: missing or empty cpm json: ${cpm_json}" >&2; exit 1; }
+[[ -s "${bundle_json}" ]] || { echo "conformance: missing or empty canonical bundle json: ${bundle_json}" >&2; exit 1; }
 [[ -s "${renderer_inventory_json}" ]] || {
   echo "conformance: missing or empty renderer inventory json: ${renderer_inventory_json}" >&2
   exit 1
 }
 [[ -s "${topology_yaml}" ]] || { echo "conformance: missing or empty topology yaml: ${topology_yaml}" >&2; exit 1; }
 
-PYTHONPATH="${repo_root}" python3 - "${cpm_json}" "${renderer_inventory_json}" "${topology_yaml}" <<'PY'
+PYTHONPATH="${repo_root}" python3 - "${bundle_json}" "${renderer_inventory_json}" "${topology_yaml}" <<'PY'
 from __future__ import annotations
 
 import json

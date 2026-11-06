@@ -7,6 +7,7 @@ repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-p
 
 PYTHONPATH="${repo_root}" python3 - <<'PY'
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -14,11 +15,19 @@ from clabgen.s88.enterprise.site_loader import load_sites
 
 
 def write_payload(payload):
+    # FS-310-HDS-040-SDS-010-SMS-100: focused tests use a released canonical
+    # fixture; the renderer never receives a raw CPM payload.
+    from clabgen.testing.canonical_fixture import canonical_bundle_path
+
     tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
     try:
         json.dump(payload, tmp)
         tmp.close()
-        return Path(tmp.name)
+        return canonical_bundle_path(
+            Path(os.environ.get("SMS_TEST_REPO_ROOT", ".")).resolve(),
+            payload,
+            "fs470-clab",
+        )
     except Exception:
         tmp.close()
         Path(tmp.name).unlink(missing_ok=True)

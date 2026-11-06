@@ -4,6 +4,7 @@
 set -euo pipefail
 
 repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)}"
+source "${repo_root}/tests/lib/canonical-bundle.sh"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
@@ -23,8 +24,10 @@ REPO_ROOT="${repo_root}" nix eval --impure --json --expr '
   }
 ' >"${tmp_dir}/cpm.json"
 
+emit_canonical_bundle "${tmp_dir}/cpm.json" "${tmp_dir}/bundle.json" "clab-fs270"
+
 nix run --no-write-lock-file "path:${repo_root}#generate-clab-config" -- \
-    "${tmp_dir}/cpm.json" \
+    "${tmp_dir}/bundle.json" \
     "${tmp_dir}/fabric.clab.yml" \
     "${tmp_dir}/bridges.nix"
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 set -euo pipefail
 
 # CMC: FS-310 — renderer consumes ONLY CPM output, never intent/inventory
@@ -61,20 +62,26 @@ VM_NIX="${VM_WORK_DIR}/vm.nix"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-# Copy the pre-built CPM JSON into the work area
-cp "${cpm_json}" "${tmp_dir}/cpm.json"
+# FS-310-HDS-040-SDS-010-SMS-100: the renderer consumes one validated canonical
+# realization bundle. Release the bundle from the upstream chain here; the raw
+# control-plane payload is never handed to the renderer, and target mechanics
+# come from the explicit inventory input rather than a CPM field read.
+echo "[*] Releasing the canonical realization bundle..."
+bundle_json="${tmp_dir}/canonical-bundle.json"
+SMS_TEST_REPO_ROOT="$(pwd)" bash -c 'source "$1"; emit_canonical_bundle "$2" "$3" "$4"' \
+  canonical-bundle "${repo_root}/scripts/canonical-bundle.sh" "${cpm_json}" "${bundle_json}" "clab-vm"
 
-echo "[*] Extracting renderer inventory from CPM endpointInventory..."
-renderer_inv="${tmp_dir}/renderer-inventory.json"
-if ! jq -e '.endpointInventory' "${tmp_dir}/cpm.json" > "${renderer_inv}" 2>/dev/null; then
-  echo "[!] CPM output missing endpointInventory — cannot extract renderer inventory." >&2
-  echo "    The CPM must emit endpointInventory for renderer consumption (SMS-100)." >&2
+renderer_inv="${CLABGEN_RENDERER_INVENTORY_JSON:-}"
+if [[ -z "${renderer_inv}" || ! -s "${renderer_inv}" ]]; then
+  echo "[!] CLABGEN_RENDERER_INVENTORY_JSON is required: renderer target mechanics" >&2
+  echo "    come from an explicit validated inventory input, not from a CPM payload" >&2
+  echo "    (FS-310-HDS-040-SDS-010-SMS-100)." >&2
   exit 1
 fi
 
 echo "[*] Rendering Containerlab topology + bridges..."
 CLABGEN_RENDERER_INVENTORY_JSON="${renderer_inv}" nix run .#generate-clab-config -- \
-  "${tmp_dir}/cpm.json" \
+  "${bundle_json}" \
   "${TOPO_FILE}" \
   "${BRIDGES_FILE}" >/dev/null
 

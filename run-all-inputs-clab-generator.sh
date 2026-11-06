@@ -104,7 +104,14 @@ for example_dir in "$labs_root"/*; do
 
     run_cpm_build "$intent" "$inventory" "$cpm_json"
 
-    nix run "path:${repo_root}#generate-clab-config" -- "$cpm_json" "$topo_out" "$bridges_out" >/dev/null
+    # FS-310-HDS-040-SDS-010-SMS-100: release the canonical bundle and render
+    # from that, never from the raw control-plane payload.
+    _cb="${repo_root}/scripts/canonical-bundle.sh"
+    bundle_json="$tmp_dir/canonical-bundle.json"
+    SMS_TEST_REPO_ROOT="$repo_root" bash -c 'source "$1"; emit_canonical_bundle "$2" "$3" "$4"' \
+      canonical-bundle "$_cb" "$cpm_json" "$bundle_json" "clab-batch-${name}"
+
+    nix run "path:${repo_root}#generate-clab-config" -- "$bundle_json" "$topo_out" "$bridges_out" >/dev/null
     "${repo_root}/tests/validate-rendered-artifacts.sh" "$topo_out" "$bridges_out"
 
     echo "    - $topo_out"
