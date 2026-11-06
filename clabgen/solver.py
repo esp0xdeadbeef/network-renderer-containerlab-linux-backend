@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict
 
+from clabgen.canonical_bundle import control_plane_envelope, is_direct_cpm
 from clabgen.cpm_solver import control_plane_model_to_solver_json
 from clabgen.site_validation import (
     extract_enterprise_sites,
@@ -16,8 +17,16 @@ def load_solver(path: Path) -> Dict[str, Any]:
     raw = path.read_text()
     parsed = parse_json_candidates(path, raw)
 
-    if "control_plane_model" in parsed:
-        return control_plane_model_to_solver_json(parsed)
+    # FS-310-HDS-040-SDS-010-SMS-100: renderer input is one validated canonical
+    # realization bundle. A raw CPM payload is rejected by the canonical gate;
+    # the envelope inside the bundle is what the renderer projects.
+    if isinstance(parsed, dict) and isinstance(parsed.get("network"), dict):
+        return control_plane_model_to_solver_json(
+            {"control_plane_model": control_plane_envelope(parsed)}
+        )
+
+    if is_direct_cpm(parsed):
+        control_plane_envelope(parsed)  # raises the boundary diagnostic
 
     return parsed
 

@@ -55,3 +55,13 @@ NETWORK_REPO_DIRECT_TEST_OK=1 ./run-all-tests.sh
 5. Tests that need live infrastructure (containers, live hosts, secrets) stay
    opt-in and must remain skipped in CI; they must not become silently passing
    because the environment lacks them.
+
+## Renderer input boundary
+
+FS-310-HDS-040-SDS-010-SMS-100 makes the validated canonical realization bundle
+the only network-semantic renderer input: "CPM output is upstream authority
+consumed by `network-realization-model`; it is not a public renderer input."
+Release the bundle with `scripts/canonical-bundle.sh` and render from it; a raw
+`control_plane_model` payload is rejected with `GAMP-MODEL-BOUNDARY-VIOLATION`.
+Target mechanics come from an explicit renderer-inventory/platform-binding
+input, never from a CPM field read.

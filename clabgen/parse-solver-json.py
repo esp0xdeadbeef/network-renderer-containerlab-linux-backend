@@ -34,31 +34,18 @@ def _load_renderer_inventory_for_input(input_path: Path) -> Dict[str, Any]:
     reproducible.
     """
 
+    # FS-310-HDS-040-SDS-010-SMS-100: target mechanics come from an explicit
+    # validated inventory input (or its validated platform-binding bundle),
+    # never from a direct CPM payload read. No bundle field is invented here
+    # (FS-171: a consumer imports what the producer modeled).
     env_path = os.environ.get("CLABGEN_RENDERER_INVENTORY_JSON", "").strip()
-    if env_path:
-        p = Path(env_path)
-        data = json.loads(p.read_text())
-        if not isinstance(data, dict):
-            raise ValueError(
-                f"CLABGEN_RENDERER_INVENTORY_JSON must contain a JSON object: {p}"
-            )
-        return _with_env_target_host(data)
-
-    raw = input_path.read_text()
-    parsed = json.loads(raw)
-
-    if not isinstance(parsed, dict):
+    if not env_path:
         return {}
-
-    cpm = parsed.get("control_plane_model")
-    if not isinstance(cpm, dict):
-        return {}
-
-    endpoint_inventory = cpm.get("endpointInventory")
-    if not isinstance(endpoint_inventory, dict):
-        return {}
-
-    return _with_env_target_host(endpoint_inventory)
+    p = Path(env_path)
+    data = json.loads(p.read_text())
+    if not isinstance(data, dict):
+        raise ValueError(f"CLABGEN_RENDERER_INVENTORY_JSON must contain a JSON object: {p}")
+    return _with_env_target_host(data)
 
 
 def _with_env_target_host(renderer_inventory: Dict[str, Any]) -> Dict[str, Any]:

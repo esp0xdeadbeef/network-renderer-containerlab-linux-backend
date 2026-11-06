@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${repo_root}/tests/lib/input-path.sh"
+source "${repo_root}/tests/lib/canonical-bundle.sh"
 
 fail() { echo "$*" >&2; exit 1; }
 pass() { echo "PASS $*"; }
@@ -46,9 +47,11 @@ EOF
       "import ${inventory_path}" \
       > "${tmp_dir}/renderer-inventory.json"
 
+    emit_canonical_bundle "${tmp_dir}/cpm.json" "${tmp_dir}/bundle.json" "clab-example-${example_name}"
+
     CLABGEN_RENDERER_INVENTORY_JSON="${tmp_dir}/renderer-inventory.json" \
       nix run --show-trace "path:${repo_root}#generate-clab-config" -- \
-        "${tmp_dir}/cpm.json" \
+        "${tmp_dir}/bundle.json" \
         "${tmp_dir}/fabric.clab.yml" \
         "${tmp_dir}/vm-bridges-generated.nix" >/dev/null
   )

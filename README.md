@@ -112,31 +112,38 @@ inputs.network-renderer-containerlab-linux-backend.lib.renderer.canonical.hostMo
 `validateInput` under the same `renderer.canonical` namespace exposes the
 common bundle, scope, target, and optional binding validation result.
 
-## Superseded direct-CPM CLI
+## Canonical renderer-input CLI
 
-The following commands remain for historical direct-entry regression fixtures.
-They are not the controlled canonical boundary and cannot produce current
-FS-166 evidence by themselves.
+FS-310-HDS-040-SDS-010-SMS-100 makes the validated canonical realization bundle
+the only network-semantic renderer input: CPM output is upstream authority for
+`network-realization-model` and is not a public renderer input. Release the
+bundle from the upstream chain, then render:
 
 ```bash
+scripts/canonical-bundle.sh ./output-control-plane-model.json ./canonical-bundle.json
 nix run .#generate-clab-config -- \
-  ./output-control-plane-model.json \
+  ./canonical-bundle.json \
   ./fabric.clab.yml \
   ./vm-bridges-generated.nix
 ```
 
-Deploy from explicit CPM and renderer inventory JSON:
+A raw control-plane-model payload is rejected with a
+`GAMP-MODEL-BOUNDARY-VIOLATION` diagnostic. Target mechanics (renderer
+inventory) are supplied through the explicit renderer-inventory input, never
+read out of a CPM payload.
+
+Deploy from an explicit canonical bundle and renderer inventory JSON:
 
 ```bash
 nix run .#deploy-clab -- \
   --work-dir /var/lib/network-renderer-containerlab-linux-backend \
-  ./output-control-plane-model.json \
+  ./canonical-bundle.json \
   ./renderer-inventory.json
 ```
 
 `deploy-clab` does not parse intent or inventory Nix
-files; callers must build the CPM JSON first and pass renderer inventory as
-JSON. The command renders `fabric.clab.yml` and `vm-bridges-generated.nix`,
+files; callers must release the canonical bundle first and pass renderer
+inventory as JSON. The command renders `fabric.clab.yml` and `vm-bridges-generated.nix`,
 evaluates the rendered bridge artifact, prepares the Docker tooling image
 cache, clears stale Containerlab state for the rendered lab, materializes host
 bridges and explicit VLAN/NAT bridge attachments, deploys Containerlab, and

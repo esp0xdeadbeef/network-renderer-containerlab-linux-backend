@@ -9,6 +9,7 @@ source "${repo_root}/tests/lib/input-path.sh"
 PYTHONPATH="${repo_root}" python3 - <<'PY'
 import copy
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -208,9 +209,16 @@ assert "pkill -f 'pppoe-server -I eth2'" not in explicit_server
 
 
 def render_cpm(cpm):
+    # FS-310-HDS-040-SDS-010-SMS-100: released canonical fixture.
+    from clabgen.testing.canonical_fixture import canonical_bundle_path
+
     with tempfile.TemporaryDirectory() as tmpdir:
-        path = Path(tmpdir) / "cpm.json"
-        path.write_text(json.dumps(cpm))
+        path = canonical_bundle_path(
+            Path(os.environ.get("SMS_TEST_REPO_ROOT", ".")).resolve(),
+            cpm,
+            "fs800-clab",
+            dest=Path(tmpdir) / "bundle.json",
+        )
         return Enterprise.from_solver_json(path, renderer_inventory={}).render()
 
 

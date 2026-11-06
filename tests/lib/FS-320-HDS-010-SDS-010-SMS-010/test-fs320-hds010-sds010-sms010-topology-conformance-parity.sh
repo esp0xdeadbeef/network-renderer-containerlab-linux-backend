@@ -90,6 +90,15 @@ missing_link_path = tmp / "fabric-missing-link.clab.yml"
 extra_link_path = tmp / "fabric-extra-link.clab.yml"
 
 cpm_path.write_text(json.dumps(cpm))
+# FS-310-HDS-040-SDS-010-SMS-100: focus tests may use a schema-valid canonical
+# fixture; the released bundle is produced by network-realization-model.
+from clabgen.testing.canonical_fixture import canonical_bundle_path
+cpm_path = canonical_bundle_path(
+    Path(os.environ.get("SMS_TEST_REPO_ROOT", ".")).resolve(),
+    cpm,
+    "fs320-clab",
+    dest=tmp / "canonical-bundle.json",
+)
 inventory_path.write_text("{}")
 
 def write_topology(path, topology):
@@ -142,12 +151,12 @@ write_topology(extra_link_path, extra_link)
 PY
 
 "${repo_root}/tests/validate-topology-conformance.sh" \
-  "${tmp_dir}/cpm.json" \
+  "${tmp_dir}/canonical-bundle.json" \
   "${tmp_dir}/renderer-inventory.json" \
   "${tmp_dir}/fabric-good.clab.yml"
 
 if "${repo_root}/tests/validate-topology-conformance.sh" \
-  "${tmp_dir}/cpm.json" \
+  "${tmp_dir}/canonical-bundle.json" \
   "${tmp_dir}/renderer-inventory.json" \
   "${tmp_dir}/fabric-extra-node.clab.yml" >"${tmp_dir}/extra-node.out" 2>"${tmp_dir}/extra-node.err"; then
   echo "FAIL topology-conformance-parity-guard: accepted extra rendered node" >&2
@@ -156,7 +165,7 @@ fi
 grep -q "unexpected nodes" "${tmp_dir}/extra-node.err"
 
 if "${repo_root}/tests/validate-topology-conformance.sh" \
-  "${tmp_dir}/cpm.json" \
+  "${tmp_dir}/canonical-bundle.json" \
   "${tmp_dir}/renderer-inventory.json" \
   "${tmp_dir}/fabric-missing-link.clab.yml" >"${tmp_dir}/missing-link.out" 2>"${tmp_dir}/missing-link.err"; then
   echo "FAIL topology-conformance-parity-guard: accepted missing rendered link" >&2
@@ -165,7 +174,7 @@ fi
 grep -q "missing links" "${tmp_dir}/missing-link.err"
 
 if "${repo_root}/tests/validate-topology-conformance.sh" \
-  "${tmp_dir}/cpm.json" \
+  "${tmp_dir}/canonical-bundle.json" \
   "${tmp_dir}/renderer-inventory.json" \
   "${tmp_dir}/fabric-extra-link.clab.yml" >"${tmp_dir}/extra-link.out" 2>"${tmp_dir}/extra-link.err"; then
   echo "FAIL topology-conformance-parity-guard: accepted extra rendered link" >&2
