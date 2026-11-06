@@ -132,7 +132,7 @@ if "${deploy_app}/bin/deploy-clab" \
   echo "deploy-clab accepted intent/inventory Nix input" >&2
   exit 1
 fi
-grep -F 'prebuilt CPM JSON' "${tmp_dir}/bad.stderr" >/dev/null
+grep -F 'released canonical realization bundle' "${tmp_dir}/bad.stderr" >/dev/null
 
 "${deploy_app}/bin/deploy-clab" \
   --dry-run \

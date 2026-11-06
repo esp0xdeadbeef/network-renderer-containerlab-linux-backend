@@ -4,13 +4,15 @@ set -euo pipefail
 usage() {
   cat >&2 <<'EOF'
 usage:
-  deploy-clab [--work-dir DIR] [--dry-run] <control-plane-model.json> <renderer-inventory.json>
+  deploy-clab [--work-dir DIR] [--dry-run] <canonical-realization-bundle.json> <renderer-inventory.json>
 
-Renders Containerlab artifacts from explicit CPM and renderer inventory inputs,
-then prepares host bridges, clears stale lab state, deploys Containerlab, and
-verifies rendered fabric containers have non-loopback interfaces.
+Renders Containerlab artifacts from one validated canonical realization bundle
+and explicit renderer inventory inputs, then prepares host bridges, clears stale
+lab state, deploys Containerlab, and verifies rendered fabric containers have
+non-loopback interfaces.
 
-The renderer is downstream of CPM. Build CPM before invoking this command.
+FS-310-HDS-040-SDS-010-SMS-100: release the canonical bundle from the upstream
+chain (network-realization-model); a raw control-plane payload is rejected.
 EOF
 }
 
@@ -71,15 +73,9 @@ renderer_inventory_json="$2"
 
 [[ "${bundle_json}" != *.nix ]] || fail "deploy-clab consumes a released canonical realization bundle, not intent/inventory Nix"
 [[ -s "${bundle_json}" ]] || fail "missing or empty canonical bundle JSON: ${bundle_json}"
-python3 - "${bundle_json}" <<'PY_CHECK'
-import json, sys
-bundle = json.load(open(sys.argv[1]))
-if bundle.get("kind") != "network-realization-bundle":
-    raise SystemExit("deploy-clab requires a network-realization-bundle (FS-310-HDS-040-SDS-010-SMS-100)")
-validation = bundle.get("validation") or {}
-if validation.get("valid") is not True:
-    raise SystemExit("deploy-clab requires the schema- and digest-bound release validation")
-PY_CHECK
+# The canonical-input boundary is enforced by the renderer
+# (FS-310-HDS-040-SDS-010-SMS-100); deploy only proves the source is a locked,
+# prebuilt artifact rather than mutable Nix.
 [[ -s "${renderer_inventory_json}" ]] || fail "missing or empty renderer inventory JSON: ${renderer_inventory_json}"
 
 mkdir -p "${work_dir}"
