@@ -37,7 +37,8 @@ REPO_ROOT="${repo_root}" nix eval --impure --json --expr '
         identity = "${trace}-clab";
       };
       rootLockIdentity = "network-renderer-clab-flake-lock";
-      producerRevision = renderer.inputs.network-realization-model.rev;
+      # path: overrides used by local/dev validation have no rev.
+      producerRevision = renderer.inputs.network-realization-model.rev or "path-override";
     };
     canonical = renderer.libBySystem.${system}.renderer.canonical;
     validated = canonical.validateInput { inherit bundle; };
@@ -137,18 +138,48 @@ prefix="mini-smt-FS-540-HDS-010-SDS-010-SMS-020"
 node_block "${prefix}-access-dns" "${tmp_dir}/access.block"
 node_block "${prefix}-resolver-node" "${tmp_dir}/core.block"
 
-# FS-540: the access DNS forwards to the modeled resolver SERVICE address, which
-# is the resolver loopback (pools.loopback 10.2.0.0/24 and fd42:021c:ff::/118),
-# not the p2p transport address it used before.
+# FS-540-HDS-010-SDS-010-SMS-020: the requester forwarder must match the
+# emitted provider listener per family, and neither may be a substituted
+# ownership loopback (FS-540-HDS-010-SDS-010-SMS-035). Derive the expected
+# forwarders from the canonical bundle's emitted endpoint bindings instead of a
+# snapshot address.
+mapfile -t expected_forwarders < <(jq -r '
+	[.. | objects | select(has("upstreamResolvers"))
+	 | .upstreamResolvers[] | select(.kind == "named-core-resolver")
+	 | .addresses[]] | unique | .[]' "${tmp_dir}/bundle.json")
+((${#expected_forwarders[@]} > 0)) || fail "canonical bundle carries no named-core forwarders"
+mapfile -t emitted_listeners < <(jq -r '
+	[.. | objects | select(has("serviceEndpointBindings"))
+	 | .serviceEndpointBindings[] | .addresses[]] | unique | .[]' "${tmp_dir}/bundle.json")
+((${#emitted_listeners[@]} > 0)) || fail "canonical bundle carries no DNS endpoint bindings"
+for address in "${expected_forwarders[@]}"; do
+	printf '%s\n' "${emitted_listeners[@]}" | grep -Fxq "${address}" ||
+		fail "requester forwarder ${address} is not an emitted provider listener"
+done
+
 for expected in \
 	'clab.dns.runtime: unbound' \
 	'forward-zone:' \
-	'forward-addr: \"10.2.0.3\"' \
-	'forward-addr: \"fd42:21c:ff::3\"' \
 	'forward-first: no'; do
 	grep -Fq "${expected}" "${tmp_dir}/access.block" ||
 		fail "access DNS output lacks ${expected}"
 done
+
+python3 - "${tmp_dir}/access.block" "${expected_forwarders[@]}" <<'PY' || fail "access DNS output lacks an emitted provider listener forward-addr"
+import ipaddress
+import re
+import sys
+
+text = open(sys.argv[1], encoding="utf-8").read()
+rendered = {
+    ipaddress.ip_address(match)
+    for match in re.findall(r"forward-addr:\s*\\?\"?([0-9a-fA-F:.]+)", text)
+}
+expected = {ipaddress.ip_address(value) for value in sys.argv[2:]}
+missing = expected - rendered
+if missing:
+    raise SystemExit(f"missing emitted forwarders: {sorted(str(a) for a in missing)}")
+PY
 
 for expected in \
 	'clab.dns.runtime: unbound' \
