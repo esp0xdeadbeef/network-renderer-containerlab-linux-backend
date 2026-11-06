@@ -183,19 +183,33 @@ terminal_addresses = {
     for key in ("addr4", "addr6")
     if terminal_interfaces[0].get(key)
 }
-# FS-540: the DNS service endpoint is the resolver SERVICE address, which the
-# model places on the resolver loopback; the terminal attachment names the
-# transport interface that carries it. The binding must equal the modeled
-# loopback, not the transport address.
+# FS-540-HDS-010-SDS-010-SMS-020: "Emit topology-derived IPv4 and IPv6 listener
+# endpoints for the resolver provider from the exit-side terminal attachment of
+# each selected access-to-core relation. An ownership loopback is not a
+# substitute." FS-540-HDS-010-SDS-010-SMS-035 repeats the prohibition: a renderer
+# (or an upstream stage) that substitutes a node loopback for the emitted
+# relation endpoint is a construction defect. The binding therefore carries the
+# terminal attachment endpoints, and the listener/forwarder must agree with
+# them per family.
 loopback = core["loopback"]
 loopback_addresses = {
     ip_interface(loopback[key]).ip
     for key in ("ipv4", "ipv6")
     if loopback.get(key)
 }
-assert {ip_address(address) for address in core_endpoint_binding["addresses"]} == loopback_addresses
-assert loopback_addresses != terminal_addresses, (
-    "fixture no longer distinguishes the resolver loopback from its transport address"
+binding_addresses = {
+    ip_address(address) for address in core_endpoint_binding["addresses"]
+}
+assert binding_addresses == terminal_addresses, (
+    "service endpoint binding must carry the emitted terminal attachment "
+    f"endpoints, got {sorted(str(a) for a in binding_addresses)}"
+)
+assert binding_addresses != loopback_addresses, (
+    "fixture no longer distinguishes the resolver loopback from its terminal "
+    "attachment address"
+)
+assert {ip_address(address) for address in named_core["addresses"]} == terminal_addresses, (
+    "requester forwarder must match the provider listener per family"
 )
 for address in core_endpoint_binding["addresses"]:
     parsed = ip_address(address)
@@ -286,15 +300,19 @@ assert process_wide_uid_rule.search(core_script) is None
 assert core_script.index("nft add table inet s88_dns_egress") < core_script.index(
     "cat >/tmp/clabgen-reconcile-unbound.sh"
 )
+# The lane interface and policy table are canonical realization facts emitted by
+# the control plane; assert the dynamic-WAN hooks against that emitted authority
+# rather than a snapshot table number.
+selected_ifname = core_policy["runtimeIfName"]
 for fragment in (
-    "/run/udhcpc.wan0.s88-table-1002",
-    'ip -4 route replace table 1002 default via "$router" dev "$interface"',
-    "/run/s88-ra-route-wan0-table-1002.sh",
-    "route=\"$(ip -6 route show table main default dev wan0 | sed -n '1s/^default //; s/ expires [^ ]*//; p')\"",
-    "selected_route=\"$(ip -6 route show table 1002 default dev wan0 | sed -n '1s/ expires [^ ]*//; p')\"",
+    f"/run/udhcpc.{selected_ifname}.s88-table-{table}",
+    f'ip -4 route replace table {table} default via "$router" dev "$interface"',
+    f"/run/s88-ra-route-{selected_ifname}-table-{table}.sh",
+    f"route=\"$(ip -6 route show table main default dev {selected_ifname} | sed -n '1s/^default //; s/ expires [^ ]*//; p')\"",
+    f"selected_route=\"$(ip -6 route show table {table} default dev {selected_ifname} | sed -n '1s/ expires [^ ]*//; p')\"",
     'if [ "default $route" != "$selected_route" ]; then',
-    "ip -6 route replace table 1002 default $route dev wan0",
-    "ip -6 monitor route dev wan0",
+    f"ip -6 route replace table {table} default $route dev {selected_ifname}",
+    f"ip -6 monitor route dev {selected_ifname}",
 ):
     assert fragment in core_dynamic_script, (fragment, core_dynamic_script)
 assert "${route#" not in core_dynamic_script
@@ -306,7 +324,7 @@ ra_route_sample = subprocess.run(
     check=True,
 ).stdout.strip()
 assert ra_route_sample == "via fe80::1 proto ra metric 1024 pref medium"
-assert "dev wan0" in core_dynamic_script
+assert f"dev {selected_ifname}" in core_dynamic_script
 for command, payload in zip(core_dynamic_commands, core_dynamic_payloads, strict=True):
     argv = shlex.split(command)
     assert argv[:2] == ["sh", "-c"]
