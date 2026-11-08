@@ -149,7 +149,7 @@ PY
 # ── 6. Host-firewall predicate: no unconditional disablement ─────────
 echo
 echo "=== Check 6: vm.nix has no unconditional host-firewall decision ==="
-tmp_dir="$(mktemp -d /tmp/sms200-host-firewall.XXXXXX)"
+tmp_dir="$(mktemp -d "${TMPDIR:-/var/tmp}/sms200-host-firewall.XXXXXX")"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
 scan_firewall_literal() {

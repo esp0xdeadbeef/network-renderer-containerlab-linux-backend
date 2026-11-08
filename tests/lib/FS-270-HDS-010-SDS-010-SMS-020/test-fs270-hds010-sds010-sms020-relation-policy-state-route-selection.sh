@@ -36,7 +36,7 @@ nix shell --inputs-from "${repo_root}" nixpkgs#yq-go --command \
 
 REPO_ROOT="${repo_root}" CPM_JSON="${tmp_dir}/cpm.json" TOPOLOGY="${tmp_dir}/fabric.clab.json" \
   NFT_BATCH="${tmp_dir}/fs270-policy.nft" \
-  PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/pycache python3 - <<'PY'
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX="${TMPDIR:-/var/tmp}/pycache" python3 - <<'PY'
 import copy
 import json
 import ipaddress

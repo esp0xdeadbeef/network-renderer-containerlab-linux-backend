@@ -271,7 +271,7 @@ nix shell --inputs-from "${repo_root}" nixpkgs#yq-go --command \
   "${tmp_dir}/fabric.clab.yml"
 
 TOPOLOGY="${tmp_dir}/fabric.clab.json" PYTHONDONTWRITEBYTECODE=1 \
-  PYTHONPYCACHEPREFIX=/tmp/pycache python3 - <<'PY'
+  PYTHONPYCACHEPREFIX="${TMPDIR:-/var/tmp}/pycache" python3 - <<'PY'
 import json
 import os
 from pathlib import Path

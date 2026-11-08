@@ -9,7 +9,7 @@ source "${repo_root}/tests/lib/vm-cpm-context.sh"
 
 labs_path="$(resolve_input_path network-labs)"
 cpm_path="$(resolve_input_path network-control-plane-model)"
-work_dir="$(mktemp -d /tmp/fs780-example-compilation.XXXXXX)"
+work_dir="$(mktemp -d "${TMPDIR:-/var/tmp}/fs780-example-compilation.XXXXXX")"
 trap 'rm -rf "${work_dir}"' EXIT
 
 mapfile -t examples < <(

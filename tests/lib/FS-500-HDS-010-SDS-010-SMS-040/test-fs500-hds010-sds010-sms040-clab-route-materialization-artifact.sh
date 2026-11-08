@@ -4,7 +4,7 @@
 set -euo pipefail
 
 repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)}"
-tmpdir="$(mktemp -d /tmp/clab-route-materialization.XXXXXX)"
+tmpdir="$(mktemp -d "${TMPDIR:-/var/tmp}/clab-route-materialization.XXXXXX")"
 trap 'rm -rf "${tmpdir}"' EXIT
 
 fixture="${tmpdir}/cpm.json"
