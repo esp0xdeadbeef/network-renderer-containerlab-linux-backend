@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
-export PYTHONPYCACHEPREFIX=/tmp/pycache
+export PYTHONPYCACHEPREFIX="${TMPDIR:-/var/tmp}/pycache"
 
 repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)}"
 
