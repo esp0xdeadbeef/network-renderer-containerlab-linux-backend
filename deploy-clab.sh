@@ -482,7 +482,7 @@ run_containerlab_deploy_once() {
   local saw_idle_timeout=0
   local message
 
-  deploy_pipe="$(mktemp -u "${TMPDIR:-/tmp}/deploy-clab.XXXXXX.pipe")"
+  deploy_pipe="$(mktemp -u "${TMPDIR:-/var/tmp}/deploy-clab.XXXXXX.pipe")"
   mkfifo "${deploy_pipe}"
   if command -v setsid >/dev/null 2>&1; then
     setsid timeout --foreground "${deploy_timeout_seconds}" \
@@ -537,7 +537,7 @@ deploy_lab() {
   local retryable
 
   log "deploying Containerlab topology ${topology_file}"
-  deploy_log="$(mktemp "${TMPDIR:-/tmp}/deploy-clab.XXXXXX.log")"
+  deploy_log="$(mktemp "${TMPDIR:-/var/tmp}/deploy-clab.XXXXXX.log")"
   for attempt in $(seq 1 "${deploy_attempts}"); do
     if ((attempt > 1)); then
       log "retrying Containerlab deploy after cleanup (attempt ${attempt}/${deploy_attempts})"

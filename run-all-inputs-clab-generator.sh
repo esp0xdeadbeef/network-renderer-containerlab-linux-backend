@@ -21,7 +21,7 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-out_root="${1:-$(mktemp -d "${TMPDIR:-/tmp}/clabgen-all.XXXXXX")}"
+out_root="${1:-$(mktemp -d "${TMPDIR:-/var/tmp}/clabgen-all.XXXXXX")}"
 
 resolve_input_path() {
   local input_name="$1"
@@ -93,7 +93,7 @@ for example_dir in "$labs_root"/*; do
   echo "[*] ${name}"
 
   (
-    tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/clabgen.${name}.XXXXXX")"
+    tmp_dir="$(mktemp -d "${TMPDIR:-/var/tmp}/clabgen.${name}.XXXXXX")"
     trap 'rm -rf "$tmp_dir"' EXIT
 
     cpm_json="$tmp_dir/output-control-plane-model.json"
