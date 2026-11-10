@@ -21,11 +21,10 @@ if ! [[ "${test_timeout_seconds}" =~ ^[0-9]+$ ]] || [[ "${test_timeout_seconds}"
   exit 2
 fi
 
-mapfile -t tests < <(
-  find "${repo_root}/tests" -maxdepth 1 -regextype posix-extended \( -type f -o -type l \) \
-    -regex '.*\/FS-[0-9]+-HDS-[0-9]+-SDS-[0-9]+-SMS-[0-9]+\.sh' \
-    -printf '%f\n' | LC_ALL=C sort
-)
+# shellcheck source=../scripts/lib/discover-tests.sh
+source "${repo_root}/scripts/lib/discover-tests.sh"
+
+mapfile -t tests < <(discover_tests "${repo_root}")
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
@@ -64,7 +63,7 @@ for test_name in "${tests[@]}"; do
   test_path="${repo_root}/tests/${test_name}"
   log_file="${tmp_dir}/${test_name}.log"
   printf 'START %s\n' "${test_name}"
-  timeout "${test_timeout_seconds}" bash "${test_path}" >"${log_file}" 2>&1 &
+  timeout "${test_timeout_seconds}" "$(discover_test_runner "${test_path}")" "${test_path}" >"${log_file}" 2>&1 &
   pid_to_name[$!]="${test_name}"
   pid_to_log[$!]="${log_file}"
   pid_to_start[$!]="${SECONDS}"
