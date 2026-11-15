@@ -217,27 +217,83 @@ if check4_fails == 0:
     print("  PASS: no direct intent/inventory file reads in Nix production code")
 
 # ═══════════════════════════════════════════════════════════════════════
-# CHECK 5: flake.nix hostModule accepts cpm struct, not raw paths
+# CHECK 5: flake.nix hostModule consumes the released canonical bundle
+# FS-310-HDS-040-SDS-010-SMS-100: the host wiring takes one validated bundle
+# and has no raw-CPM entry point left.
 # ═══════════════════════════════════════════════════════════════════════
-print("\n=== Check 5: flake.nix hostModule accepts cpm struct, not raw paths ===")
+print("\n=== Check 5: flake.nix hostModule consumes the released canonical bundle ===")
 
 flake_nix = repo / "flake.nix"
 flake_content = flake_nix.read_text()
 
-# hostModule must accept rendererInput (which may contain cpm struct),
-# not raw file paths to intent.nix or inventory*.nix.
-# Verify: the hostModule signature includes the cpm handling
-has_host_module = "renderer.hostModule" in flake_content
-has_cpm_struct = "rendererInput ? cpm" in flake_content or "rendererInput.cpm" in flake_content
-has_cpm_json_path = "cpmJsonPath" in flake_content
+has_host_module = "hostModule = canonicalHostModule" in flake_content
+has_bundle_input = "bundle," in flake_content and "rendererInputJsonPath" in flake_content
+accepts_raw_cpm = "rendererInput ? cpm" in flake_content or "rendererInput.cpm" in flake_content
 
-if has_host_module and (has_cpm_struct or has_cpm_json_path):
-    print("  PASS: flake.nix hostModule consumes cpm struct via rendererInput")
+if not has_host_module:
+    fail("flake.nix renderer.hostModule is not the canonical bundle host module")
+if not has_bundle_input:
+    fail("flake.nix hostModule does not take a bundle and hand the host a renderer input path")
+if accepts_raw_cpm:
+    fail("flake.nix hostModule still accepts a raw cpm payload")
+
+if has_host_module and has_bundle_input and not accepts_raw_cpm:
+    print("  PASS: flake.nix hostModule consumes the released bundle and rejects raw cpm")
+
+# ═══════════════════════════════════════════════════════════════════════
+# CHECK 5b: both producer envelope shapes reach the same solver input
+# The SMT fixtures carry the semantic model, the real pipeline carries a
+# control-plane envelope; wrapping either one twice drops `.data`.
+# ═══════════════════════════════════════════════════════════════════════
+print("\n=== Check 5b: canonical envelope unwraps both producer shapes ===")
+
+from clabgen.canonical_bundle import control_plane_envelope  # noqa: E402
+from clabgen.cpm_solver import control_plane_model_to_solver_json  # noqa: E402
+
+enterprise = {"esp": {"site-b": {"runtimeTargets": {"router-a": {}}}}}
+
+
+def released(network_data):
+    return {
+        "kind": "network-realization-bundle",
+        "bundleIdentity": "bundle-x",
+        "validation": {"valid": True, "artifactIdentity": "bundle-x"},
+        "network": {"data": network_data},
+    }
+
+
+check5b_fails = 0
+for label, bundle in (
+    ("semantic-model", released({"data": enterprise, "version": 1})),
+    (
+        "control-plane-envelope",
+        released({"control_plane_model": {"data": enterprise, "version": 1}}),
+    ),
+):
+    solver = control_plane_model_to_solver_json(control_plane_envelope(bundle))
+    targets = (
+        solver.get("enterprise", {})
+        .get("esp", {})
+        .get("site", {})
+        .get("site-b", {})
+        .get("runtimeTargets")
+    )
+    if targets != {"router-a": {}}:
+        fail(f"{label} bundle envelope did not reach the solver: {solver!r}")
+        check5b_fails += 1
+
+try:
+    control_plane_envelope(released({"version": 1}))
+except Exception as exc:  # noqa: BLE001 - the gate must fail closed
+    if "GAMP-MODEL-BOUNDARY-VIOLATION" not in str(exc):
+        fail(f"bundle without control-plane data raised the wrong diagnostic: {exc}")
+        check5b_fails += 1
 else:
-    if not has_host_module:
-        warn("  NOTE: renderer.hostModule not found in flake.nix (may have moved)")
-    elif not (has_cpm_struct or has_cpm_json_path):
-        fail("  flake.nix hostModule does not accept cpm struct — may accept raw paths")
+    fail("bundle without control-plane data was accepted")
+    check5b_fails += 1
+
+if check5b_fails == 0:
+    print("  PASS: both producer envelopes project identically; empty data fails closed")
 
 # ═══════════════════════════════════════════════════════════════════════
 # CHECK 6: Entrypoints consume the canonical realization bundle

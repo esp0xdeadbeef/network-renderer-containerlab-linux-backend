@@ -21,9 +21,7 @@ def load_solver(path: Path) -> Dict[str, Any]:
     # realization bundle. A raw CPM payload is rejected by the canonical gate;
     # the envelope inside the bundle is what the renderer projects.
     if isinstance(parsed, dict) and isinstance(parsed.get("network"), dict):
-        return control_plane_model_to_solver_json(
-            {"control_plane_model": control_plane_envelope(parsed)}
-        )
+        return control_plane_model_to_solver_json(control_plane_envelope(parsed))
 
     if is_direct_cpm(parsed):
         control_plane_envelope(parsed)  # raises the boundary diagnostic

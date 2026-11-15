@@ -141,13 +141,13 @@ let
           cp "$renderer_inventory_json" "$work_dir/renderer-inventory.json"
           cp "$renderer_inventory_json" "$artifact_dir/inventory.json"
         else
-          echo "Renderer inventory JSON not found, will rely on canonical fallback (endpointInventory): $renderer_inventory_json" >&2
+          echo "Renderer inventory JSON not found; the renderer cannot derive deployment placement without it: $renderer_inventory_json" >&2
         fi
         cp "$bootstrap_json" "$work_dir/canonical-bundle.json"
         cp "$bootstrap_json" "$artifact_dir/canonical-bundle.json"
         # The route-materialization artifact consumes the control-plane envelope
         # carried by the bundle, not a separately supplied CPM payload.
-        jq -S 'if (.network.data | has("control_plane_model")) then .network.data else {control_plane_model: .network.data} end' \
+        jq -S 'if (.network.data | has("control_plane_model")) then {control_plane_model: .network.data.control_plane_model} else {control_plane_model: .network.data} end' \
           "$bootstrap_json" > "$work_dir/control-plane-envelope.json"
 
         phase="render"
