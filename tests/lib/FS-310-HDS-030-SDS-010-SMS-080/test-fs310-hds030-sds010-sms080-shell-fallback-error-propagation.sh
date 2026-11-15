@@ -67,11 +67,12 @@ RULES = [
         r"sysctl",
         r'"\|\| true"',   # multi-line sysctl continuation
     ]),
-    ("DEPLOYMENT_LIFECYCLE", "Container/process lifecycle — deployment only, not behavioral", [
+    ("DEPLOYMENT_LIFECYCLE", "Container/network/process lifecycle — deployment only, not behavioral", [
         r"pkill",
         r"containerlab destroy",
         r"docker inspect",
         r"docker ps",
+        r"docker network rm",
         r"ip -br link",
         r"pgrep.*zebra",
         r"kill.*cat.*pid",
