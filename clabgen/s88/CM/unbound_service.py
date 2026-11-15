@@ -174,7 +174,7 @@ def render_unbound_dns_service(
     requester_actions: List[tuple[str, str]] = []
     for policy in authority["requesterPolicies"]:
         action = policy.get("action")
-        if action != "refuse_non_local":
+        if action not in {"refuse_non_local", "allow"}:
             _fail("CPM emitted an unsupported requester action")
         for value in _string_list(policy.get("sourcePrefixes", [])):
             requester_actions.append((_prefix(value), action))

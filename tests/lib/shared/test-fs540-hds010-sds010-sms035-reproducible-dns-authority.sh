@@ -183,14 +183,13 @@ terminal_addresses = {
     for key in ("addr4", "addr6")
     if terminal_interfaces[0].get(key)
 }
-# FS-540-HDS-010-SDS-010-SMS-020: "Emit topology-derived IPv4 and IPv6 listener
-# endpoints for the resolver provider from the exit-side terminal attachment of
-# each selected access-to-core relation. An ownership loopback is not a
-# substitute." FS-540-HDS-010-SDS-010-SMS-035 repeats the prohibition: a renderer
-# (or an upstream stage) that substitutes a node loopback for the emitted
-# relation endpoint is a construction defect. The binding therefore carries the
-# terminal attachment endpoints, and the listener/forwarder must agree with
-# them per family.
+# FS-525 D1 binds the answering identity to the node and makes it invariant
+# across the access relations it serves; D6 lets an ownership-loopback address
+# satisfy D1 when the model assigns it as the service identity. D2 is explicit
+# that a per-relation or point-to-point attachment endpoint is path provenance
+# and shall not become the listener or forwarder address. This fixture's
+# resolver service identity is its loopback, so the binding carries that
+# node-stable identity -- never the terminal attachment transport address.
 loopback = core["loopback"]
 loopback_addresses = {
     ip_interface(loopback[key]).ip
@@ -200,18 +199,28 @@ loopback_addresses = {
 binding_addresses = {
     ip_address(address) for address in core_endpoint_binding["addresses"]
 }
-assert binding_addresses == terminal_addresses, (
-    "service endpoint binding must carry the emitted terminal attachment "
-    f"endpoints, got {sorted(str(a) for a in binding_addresses)}"
+assert binding_addresses == loopback_addresses, (
+    "service endpoint binding must carry the node-stable resolver service "
+    f"identity, got {sorted(str(a) for a in binding_addresses)}"
 )
-assert binding_addresses != loopback_addresses, (
-    "fixture no longer distinguishes the resolver loopback from its terminal "
-    "attachment address"
+assert binding_addresses != terminal_addresses, (
+    "FS-525 D2: the per-relation terminal attachment endpoint must not become "
+    "the resolver listener address"
 )
-assert {ip_address(address) for address in named_core["addresses"]} == terminal_addresses, (
+assert {ip_address(address) for address in named_core["addresses"]} == binding_addresses, (
     "requester forwarder must match the provider listener per family"
 )
 for address in core_endpoint_binding["addresses"]:
+    parsed = ip_address(address)
+    prefix = 128 if parsed.version == 6 else 32
+    family = "ip -6" if parsed.version == 6 else "ip"
+    fragment = f"{family} addr replace {parsed}/{prefix} dev {terminal_ifname}"
+    # The service identity is modeled on the node, and the container runtime
+    # does not preconfigure node loopbacks on `lo`; the resolver therefore
+    # materializes D1 on the modeled terminal attachment so it is reachable
+    # through the requester lane. The transport endpoint itself is not D1.
+    assert fragment in core_script
+for address in terminal_addresses:
     parsed = ip_address(address)
     prefix = 128 if parsed.version == 6 else 32
     family = "ip -6" if parsed.version == 6 else "ip"
@@ -241,9 +250,16 @@ assert 'forward-zone:\n  name: "."' in recursive_config
 for address in named_core["addresses"]:
     assert f'forward-addr: "{ip_address(address)}"' in recursive_config
 for policy in recursive_dns["requesterPolicies"]:
-    assert policy["action"] == "refuse_non_local"
+    # FS-540-SDS-035: a forwarding-capable requester of a shared namespace is
+    # authorized with `allow`; `refuse_non_local` is for a local-data-only
+    # source. Render whichever action the canonical record emits.
+    assert policy["action"] in {"allow", "refuse_non_local"}
     for prefix in policy["sourcePrefixes"]:
-        assert f'access-control: "{ip_network(prefix, strict=False)}" refuse_non_local' in recursive_config
+        assert (
+            f'access-control: "{ip_network(prefix, strict=False)}" {policy["action"]}'
+            in recursive_config
+        )
+assert "allow" in {policy["action"] for policy in recursive_dns["requesterPolicies"]}
 
 local_dns = local["services"]["dns"]
 assert 'local-zone: "." refuse' in local_config
@@ -346,6 +362,11 @@ def rejected(target, code):
 leaking = copy.deepcopy(local)
 leaking["services"]["dns"]["localOnlyPolicy"]["recursion"] = True
 rejected(leaking, "DNS_LOCAL_ONLY_AUTHORITY_LEAK")
+
+recursive_local_allow = copy.deepcopy(local)
+for policy in recursive_local_allow["services"]["dns"]["requesterPolicies"]:
+    policy["action"] = "allow"
+rejected(recursive_local_allow, "DNS_LOCAL_ONLY_AUTHORITY_LEAK")
 
 divergent = copy.deepcopy(recursive)
 divergent["services"]["dns"]["forwarders"] = ["seeded-mismatch"]

@@ -309,7 +309,7 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
 
     requester_policies = _dict_list(dns.get("requesterPolicies", []))
     valid_requester_policies = all(
-        policy.get("action") == "refuse_non_local"
+        policy.get("action") in {"refuse_non_local", "allow"}
         and isinstance(policy.get("requesterService"), str)
         and bool(policy["requesterService"])
         and isinstance(policy.get("relationId"), str)
@@ -321,7 +321,17 @@ def normalize_dns_authority(dns: Dict[str, Any]) -> Dict[str, Any]:
     if not valid_requester_policies:
         _fail(
             "DNS_LOCAL_ONLY_AUTHORITY_LEAK",
-            "a provider requester policy is not source-scoped refuse_non_local",
+            "a provider requester policy is not a source-scoped allow or refuse_non_local record",
+        )
+    # FS-560-HDS-010-SDS-020-SMS-020 / FS-540-SDS-035: a local-only authority
+    # keeps its terminal root refusal, so a recursive `allow` source action is
+    # a leak; only a forwarding-capable requester may carry `allow`.
+    if recursion_mode == "local-only" and any(
+        policy.get("action") == "allow" for policy in requester_policies
+    ):
+        _fail(
+            "DNS_LOCAL_ONLY_AUTHORITY_LEAK",
+            "a local-only resolver grants a recursive allow to a requester",
         )
 
     local_only_policy = dns.get("localOnlyPolicy")

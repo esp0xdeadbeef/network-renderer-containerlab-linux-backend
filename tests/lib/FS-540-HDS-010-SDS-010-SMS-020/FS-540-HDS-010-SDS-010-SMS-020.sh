@@ -171,9 +171,14 @@ import re
 import sys
 
 text = open(sys.argv[1], encoding="utf-8").read()
+# The rendered exec script is a YAML double-quoted scalar, so PyYAML folds long
+# lines with `\` + newline and escapes the preserved fold space as `\ `. Undo
+# that folding before extracting the forwarders, otherwise an address that
+# lands on a continuation line is invisible to the regex.
+text = re.sub(r"\\\r?\n[ ]*", "", text).replace("\\ ", " ").replace('\\"', '"')
 rendered = {
     ipaddress.ip_address(match)
-    for match in re.findall(r"forward-addr:\s*\\?\"?([0-9a-fA-F:.]+)", text)
+    for match in re.findall(r'forward-addr:\s*"([0-9a-fA-F:.]+)"', text)
 }
 expected = {ipaddress.ip_address(value) for value in sys.argv[2:]}
 missing = expected - rendered
