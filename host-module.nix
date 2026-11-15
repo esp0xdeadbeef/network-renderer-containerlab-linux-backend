@@ -4,6 +4,8 @@
 , clabDeploymentHost ? null
 , clabRendererInputJsonPath ? null
 , clabRendererInventoryJsonPath ? null
+, clabCanonicalBundleIdentity ? null
+, clabCanonicalBindingIdentity ? null
 , containerlabLinuxRendererInput ? {}
 , containerlabLinuxRendererSelf  ? null
 , containerlabLinuxGenerateClabConfig ? null
@@ -33,6 +35,14 @@ let
   rendererRepo = if containerlabLinuxRendererSelf == null then null else containerlabLinuxRendererSelf;
   generateClabConfig =
     if containerlabLinuxGenerateClabConfig == null then null else containerlabLinuxGenerateClabConfig;
+
+  # CLI arguments for the rendered-host provenance record. "-" means "not
+  # provided" (the host is rendered outside the canonical gate), so the record
+  # never carries an empty string that looks like a real identity.
+  canonicalBundleIdentityArg =
+    if clabCanonicalBundleIdentity == null then "-" else clabCanonicalBundleIdentity;
+  canonicalBindingIdentityArg =
+    if clabCanonicalBindingIdentity == null then "-" else clabCanonicalBindingIdentity;
 
   # Renderer requires: renderer repo + released canonical bundle + renderer
   # inventory JSON. No compiler-chain repos, intent, inventory, or raw CPM.
@@ -180,19 +190,29 @@ let
             "$work_dir/vm-bridges-generated.nix" >/dev/null
 
         phase="artifact-bundle"
-        python3 - "$work_dir" "$artifact_dir/rendered-host.json" <<'PY'
+        python3 - "$work_dir" "$artifact_dir/rendered-host.json" \
+          "${canonicalBundleIdentityArg}" \
+          "${canonicalBindingIdentityArg}" <<'PY'
         import json
         import sys
         from pathlib import Path
 
         work_dir = Path(sys.argv[1])
         target = Path(sys.argv[2])
+
+
+        def identity(value):
+            return None if value in ("", "-") else value
+
+
         payload = {
             "renderer": "network-renderer-containerlab-linux-backend",
             "artifactKind": "containerlab-rendered-host",
             "topology": str(work_dir / "fabric.clab.yml"),
             "bridgeModule": str(work_dir / "vm-bridges-generated.nix"),
             "networkArtifacts": str(work_dir / "network-artifacts"),
+            "canonicalBundleIdentity": identity(sys.argv[3]),
+            "canonicalBindingIdentity": identity(sys.argv[4]),
         }
         target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
         PY

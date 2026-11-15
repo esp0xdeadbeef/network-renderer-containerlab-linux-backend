@@ -296,6 +296,170 @@ if check5b_fails == 0:
     print("  PASS: both producer envelopes project identically; empty data fails closed")
 
 # ═══════════════════════════════════════════════════════════════════════
+# CHECK 5c: the renderer's input gate runs on realization-model + schema
+# FS-310-HDS-040-SDS-010-SMS-100 and the network-realization-schema README
+# put every renderer downstream of the realization model and its published
+# contract. Prove the containerlab path carries both repos and that the
+# schema-bound release stamp is enforced at the renderer boundary.
+# ═══════════════════════════════════════════════════════════════════════
+print("\n=== Check 5c: containerlab gate uses realization-model + schema ===")
+
+check5c_fails = 0
+if "network-realization-model.lib.validateRendererInput" not in flake_content:
+    fail("flake.nix canonical gate does not run network-realization-model.lib.validateRendererInput")
+    check5c_fails += 1
+
+import json  # noqa: E402
+import subprocess  # noqa: E402
+
+lock = json.loads((repo / "flake.lock").read_text())
+if "network-realization-model" not in lock["nodes"]["root"]["inputs"]:
+    fail("flake.lock has no network-realization-model input")
+    check5c_fails += 1
+realization_node = lock["nodes"].get("network-realization-model", {})
+if "network-realization-schema" not in realization_node.get("inputs", {}):
+    fail("the containerlab path does not carry network-realization-schema through the realization model")
+    check5c_fails += 1
+
+fixture = r'''
+  let
+    repoRoot = builtins.getEnv "REPO_ROOT";
+    flake = builtins.getFlake ("path:" + repoRoot);
+    system = builtins.currentSystem;
+    realization = flake.inputs.network-realization-model;
+    schema = realization.inputs.network-realization-schema;
+    cpm = {
+      kind = "network-control-plane-artifact";
+      artifactIdentity = "sms102-schema-gate";
+      artifactDigest = builtins.hashString "sha256" "sms102-schema-gate";
+      control_plane_model = {
+        data.example.site.runtimeTargets.core-1 = {
+          role = "core";
+          interfaces = { };
+          forwarding = { };
+        };
+        meta.source = "sms102-schema-gate";
+      };
+    };
+    bundle = realization.lib.realize {
+      input = cpm;
+      requestScope = { kind = "complete-artifact"; identity = "sms102-schema-gate"; };
+      rootLockIdentity = "sms102-schema-gate";
+      producerRevision = realization.rev or "local";
+    };
+    validate = value: flake.libBySystem.${system}.renderer.canonical.validateInput { bundle = value; };
+    mutated = bundle // {
+      network = bundle.network // {
+        data = bundle.network.data // { meta = (bundle.network.data.meta or {}) // { source = "mutated"; }; };
+      };
+    };
+    wrongSchema = bundle // {
+      validation = bundle.validation // { schemaSetIdentity = builtins.hashString "sha256" "other-schema"; };
+    };
+    noValidation = builtins.removeAttrs bundle [ "validation" ];
+  in
+'''
+
+# The released schema set is the one the containerlab input graph carries.
+identity_expr = fixture + "{ released = bundle.validation.schemaSetIdentity; pinned = schema.lib.schemaSetIdentity; }"
+proc = subprocess.run(
+    ["nix", "eval", "--impure", "--json", "--expr", identity_expr],
+    cwd=str(repo),
+    capture_output=True,
+    text=True,
+    env={**os.environ, "REPO_ROOT": str(repo.resolve())},
+)
+if proc.returncode != 0:
+    fail(f"could not read the release/containerlab schema identities: {(proc.stderr or '').strip()[-400:]}")
+    check5c_fails += 1
+else:
+    identities = json.loads(proc.stdout)
+    if identities["released"] != identities["pinned"]:
+        fail("the bundle was released under a different schema set than the containerlab input graph carries")
+        check5c_fails += 1
+
+cases = {
+    "released bundle": (fixture + "validate bundle", True, None),
+    "mutated network data": (fixture + "validate mutated", False, "NR_ARTIFACT_DIGEST_MISMATCH"),
+    "missing release stamp": (fixture + "validate noValidation", False, "NR_RENDERER_BUNDLE_UNVALIDATED"),
+    "wrong schema set": (fixture + "validate wrongSchema", False, "NR_RENDERER_BUNDLE_UNVALIDATED"),
+}
+
+for label, (expr, expect_ok, diagnostic) in cases.items():
+    proc = subprocess.run(
+        ["nix", "eval", "--impure", "--json", "--expr", expr],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        env={**os.environ, "REPO_ROOT": str(repo.resolve())},
+    )
+    output = (proc.stderr or "") + (proc.stdout or "")
+    if expect_ok:
+        if proc.returncode != 0:
+            fail(f"released bundle was rejected by the renderer gate: {output.strip()[-400:]}")
+            check5c_fails += 1
+    elif proc.returncode == 0:
+        fail(f"{label} was accepted by the renderer gate")
+        check5c_fails += 1
+    elif diagnostic not in output:
+        fail(f"{label} failed with the wrong diagnostic (expected {diagnostic}): {output.strip()[-400:]}")
+        check5c_fails += 1
+
+if check5c_fails == 0:
+    print("  PASS: gate runs on realization-model + schema, stamps agree, mutation and forged stamps fail closed")
+
+# ═══════════════════════════════════════════════════════════════════════
+# CHECK 5d: target mechanics come from the model, not from the renderer
+# FS-410/FS-540: the control plane publishes `clampMssInterfaces` for
+# interfaces whose modeled MTU cannot carry full-size segments. The renderer
+# clamps the NAT-authorized WAN and exactly that published set; it must not
+# invent clamps for interfaces the model did not name, and must not drop a
+# clamp the model did name.
+# ═══════════════════════════════════════════════════════════════════════
+print("\n=== Check 5d: MSS clamp set comes from clampMssInterfaces ===")
+
+from clabgen.s88.CM.firewall_wan import render as render_wan_firewall  # noqa: E402
+from clabgen.s88.EM.base import _wan_firewall_cm_input  # noqa: E402
+
+check5d_fails = 0
+node = {
+    "interfaces": {
+        "wan": {"runtimeIfName": "wan", "sourceKind": "wan"},
+        "tunnel": {"runtimeIfName": "gre0", "sourceKind": "p2p", "mtu": 1400},
+    },
+    "natIntent": {"wanInterfaces": ["wan"]},
+    "clampMssInterfaces": ["gre0"],
+}
+cm_input = _wan_firewall_cm_input(node, {"wan": "wan", "tunnel": "gre0"})
+if cm_input.get("clamp_interfaces") != ["gre0"]:
+    fail(f"clampMssInterfaces did not reach the CM input: {cm_input.get('clamp_interfaces')!r}")
+    check5d_fails += 1
+commands = render_wan_firewall(cm_input)
+clamped = {
+    command.split('oifname "')[1].split('"')[0]
+    for command in commands
+    if "maxseg size set rt mtu" in command
+}
+if clamped != {"wan", "gre0"}:
+    fail(f"clamped interfaces are {sorted(clamped)}, expected the WAN and the published low-MTU set")
+    check5d_fails += 1
+
+node_without_clamp = {k: v for k, v in node.items() if k != "clampMssInterfaces"}
+cm_without_clamp = _wan_firewall_cm_input(node_without_clamp, {"wan": "wan", "tunnel": "gre0"})
+commands_without_clamp = render_wan_firewall(cm_without_clamp)
+clamped_without = {
+    command.split('oifname "')[1].split('"')[0]
+    for command in commands_without_clamp
+    if "maxseg size set rt mtu" in command
+}
+if clamped_without != {"wan"}:
+    fail(f"renderer invented clamps without the model field: {sorted(clamped_without)}")
+    check5d_fails += 1
+
+if check5d_fails == 0:
+    print("  PASS: WAN clamp from NAT intent, extra clamps only from the published set")
+
+# ═══════════════════════════════════════════════════════════════════════
 # CHECK 6: Entrypoints consume the canonical realization bundle
 # FS-310-HDS-040-SDS-010-SMS-100: CPM output is upstream authority for
 # network-realization-model; renderers receive one validated canonical

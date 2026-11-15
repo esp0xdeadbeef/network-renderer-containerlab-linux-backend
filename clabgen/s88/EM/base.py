@@ -156,12 +156,26 @@ def _wan_firewall_cm_input(
             name_map,
             "natIntent.masqueradeInterfaces",
         )
-    if not wan_interfaces and not masquerade:
+
+    # FS-410/FS-540: the control plane publishes the low-MTU interfaces that
+    # cannot carry full-size segments. The renderer clamps exactly this set in
+    # addition to the NAT-authorized WAN interfaces; it must not guess.
+    clamp_interfaces = translate_names(
+        _list_strings(node_data.get("clampMssInterfaces")),
+        name_map,
+        "clampMssInterfaces",
+    )
+    clamp_interfaces = [
+        iface for iface in clamp_interfaces if iface not in wan_interfaces
+    ]
+
+    if not wan_interfaces and not masquerade and not clamp_interfaces:
         return {}
 
     return {
         "wan_interfaces": wan_interfaces,
         "masquerade": masquerade,
+        "clamp_interfaces": clamp_interfaces,
     }
 
 
