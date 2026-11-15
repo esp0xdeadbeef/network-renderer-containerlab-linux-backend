@@ -130,6 +130,22 @@ let
         fi
         write_status running "$phase" ""
 
+        # A run interrupted mid-deploy leaves its lab network behind, and the
+        # fresh topology overwrites the file that names it. Destroy the previous
+        # topology BEFORE rendering so its containers and network go away.
+        previous_topology="$work_dir/fabric.clab.yml"
+        if [[ -f "$previous_topology" ]]; then
+          phase="cleanup-previous"
+          write_status running "$phase" ""
+          flock /run/s-router-clab-render-live.lock bash -c "
+            set -euo pipefail
+            mkdir -p /run/s-router-clab
+            timeout --foreground '$cleanup_timeout_seconds' \
+              containerlab destroy --topo '$previous_topology' --cleanup --yes || true
+            docker ps -aq --filter 'name=^clab-fabric-' | xargs -r docker rm -f
+          "
+        fi
+
         # Validate the released canonical bundle (produced upstream by the
         # realization model).
         [[ -f "$bootstrap_json" ]] || {
