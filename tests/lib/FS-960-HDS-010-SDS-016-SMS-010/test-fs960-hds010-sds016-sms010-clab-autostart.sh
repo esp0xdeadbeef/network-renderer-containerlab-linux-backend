@@ -716,6 +716,7 @@ if grep -q 'CLAB_DEPLOY_MAX_WORKERS' "${host_module}" &&
    grep -q 'diagnostic.clab-host-prerequisite-not-writable' "${host_module}" &&
    grep -q 'docker network rm' "${host_module}" &&
    grep -q 'containerlab destroy --topo' "${host_module}" &&
+   grep -q 'rm -rf "$artifact_dir"' "${host_module}" &&
    grep -Fq '[[ -L /etc/hosts || ! -w /etc/hosts ]]' "${host_module}"; then
   # Stale-runtime cleanup must run before the deploy, after the old containers
   # are gone (docker refuses to remove a network with attached endpoints), and
