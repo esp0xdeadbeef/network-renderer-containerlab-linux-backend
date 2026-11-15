@@ -118,7 +118,12 @@ let
         }
         trap on_failure ERR
 
-        mkdir -p "$work_dir" "$artifact_dir"
+        # The artifact directory is a contract surface: an artifact from the
+        # previous run must not survive into this one (e.g. a control-plane
+        # copy published by an older renderer revision).
+        mkdir -p "$work_dir"
+        rm -rf "$artifact_dir"
+        mkdir -p "$artifact_dir"
 
         if [[ ! -e /etc/hosts ]]; then
           echo "diagnostic.clab-host-prerequisite-missing: /etc/hosts must be materialized before Containerlab cleanup or reconfiguration" >&2
