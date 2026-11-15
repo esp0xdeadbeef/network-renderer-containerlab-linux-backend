@@ -503,6 +503,12 @@ let
           bash '$work_dir/ensure-clab-tooling-image.sh'
           timeout --foreground '$cleanup_timeout_seconds' containerlab destroy --all --cleanup --yes || true
           docker ps -aq --filter 'name=^clab-fabric-' | xargs -r docker rm -f
+          # A crashed or already-destroyed lab leaves its docker network
+          # behind; the next deploy cannot create the 'clab' network while an
+          # orphan with the same subnet still exists.
+          docker network ls --format '{{.Name}}' | grep -E '^clab($|-)' | while read -r net; do
+            docker network rm \"\$net\" >/dev/null 2>&1 || true
+          done || true
           bash '$work_dir/setup-bridge-links.sh'
           deploy_log='$work_dir/containerlab-deploy.log'
           CLAB_HOST_TOPOLOGY='$work_dir/fabric.clab.yml' \
