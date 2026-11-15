@@ -2,7 +2,7 @@
 , lib
 , pkgs
 , clabDeploymentHost ? null
-, clabCpmJsonPath ? null
+, clabRendererInputJsonPath ? null
 , clabRendererInventoryJsonPath ? null
 , containerlabLinuxRendererInput ? {}
 , containerlabLinuxRendererSelf  ? null
@@ -19,11 +19,12 @@ let
     if clabDeploymentHost != null then clabDeploymentHost
     else throw "host-module: missing required input: clabDeploymentHost";
 
-  # Pre-built CPM artifacts (produced upstream by the compiler pipeline).
-  # The renderer must NOT import intent.nix or inventory-clab.nix directly.
-  cpmJsonPath =
-    if clabCpmJsonPath != null then clabCpmJsonPath
-    else throw "host-module: missing required input: clabCpmJsonPath";
+  # The released canonical realization bundle (produced upstream by the
+  # realization model). The renderer must NOT import intent.nix,
+  # inventory-clab.nix, or a raw CPM payload directly.
+  rendererInputJsonPath =
+    if clabRendererInputJsonPath != null then clabRendererInputJsonPath
+    else throw "host-module: missing required input: clabRendererInputJsonPath";
 
   rendererInventoryJsonPath =
     if clabRendererInventoryJsonPath != null then clabRendererInventoryJsonPath
@@ -33,12 +34,12 @@ let
   generateClabConfig =
     if containerlabLinuxGenerateClabConfig == null then null else containerlabLinuxGenerateClabConfig;
 
-  # Renderer requires: renderer repo + pre-built CPM JSON + renderer inventory JSON.
-  # No compiler-chain repos or intent/inventory files are needed.
+  # Renderer requires: renderer repo + released canonical bundle + renderer
+  # inventory JSON. No compiler-chain repos, intent, inventory, or raw CPM.
   hasInputs =
     rendererRepo != null
     && generateClabConfig != null
-    && cpmJsonPath != null
+    && rendererInputJsonPath != null
     && rendererInventoryJsonPath != null;
 
   s-router-clab-render-live =
@@ -73,7 +74,7 @@ let
         service_name="s-router-clab-render-live"
         phase="render-start"
 
-        cpm_json="${cpmJsonPath}"
+        bootstrap_json="${rendererInputJsonPath}"
         renderer_inventory_json="${rendererInventoryJsonPath}"
         deployment_host="${deploymentHost}"
         deploy_timeout_seconds="''${CLAB_DEPLOY_TIMEOUT_SECONDS:-900}"
@@ -129,9 +130,10 @@ let
         fi
         write_status running "$phase" ""
 
-        # Validate pre-built CPM inputs (produced upstream by the compiler).
-        [[ -f "$cpm_json" ]] || {
-          echo "CPM JSON not found: $cpm_json" >&2
+        # Validate the released canonical bundle (produced upstream by the
+        # realization model).
+        [[ -f "$bootstrap_json" ]] || {
+          echo "canonical realization bundle not found: $bootstrap_json" >&2
           exit 1
         }
         if [[ -f "$renderer_inventory_json" ]]; then
@@ -139,18 +141,20 @@ let
           cp "$renderer_inventory_json" "$work_dir/renderer-inventory.json"
           cp "$renderer_inventory_json" "$artifact_dir/inventory.json"
         else
-          echo "Renderer inventory JSON not found, will rely on CPM fallback (endpointInventory): $renderer_inventory_json" >&2
+          echo "Renderer inventory JSON not found, will rely on canonical fallback (endpointInventory): $renderer_inventory_json" >&2
         fi
-        cp "$cpm_json" "$work_dir/cpm.json"
-        cp "$cpm_json" "$artifact_dir/control-plane.json"
-        jq -S '.forwardingOut // {}' "$cpm_json" > "$artifact_dir/forwarding.json"
-        jq -S '.compilerOut // {}' "$cpm_json" > "$artifact_dir/compiler.json"
+        cp "$bootstrap_json" "$work_dir/canonical-bundle.json"
+        cp "$bootstrap_json" "$artifact_dir/canonical-bundle.json"
+        # The route-materialization artifact consumes the control-plane envelope
+        # carried by the bundle, not a separately supplied CPM payload.
+        jq -S 'if (.network.data | has("control_plane_model")) then .network.data else {control_plane_model: .network.data} end' \
+          "$bootstrap_json" > "$work_dir/control-plane-envelope.json"
 
         phase="render"
         CLABGEN_RENDERER_INVENTORY_JSON="$renderer_inventory_json" \
         CLABGEN_DEPLOYMENT_HOST="$deployment_host" \
           ${generateClabConfig}/bin/generate-clab-config \
-            "$cpm_json" \
+            "$bootstrap_json" \
             "$work_dir/fabric.clab.yml" \
             "$work_dir/vm-bridges-generated.nix" >/dev/null
 
@@ -173,7 +177,7 @@ let
         PY
 
         PYTHONPATH="$renderer_repo" python3 -m clabgen.s88.CM.route_materialization_artifact \
-          "$cpm_json" \
+          "$work_dir/control-plane-envelope.json" \
           "$deployment_host" \
           "$artifact_dir/clab-route-materialization.json"
 

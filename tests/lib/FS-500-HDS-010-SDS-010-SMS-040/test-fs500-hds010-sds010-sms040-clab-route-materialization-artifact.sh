@@ -212,19 +212,23 @@ assert "10.250.0.0/24" not in all_text, payload
 assert all(route["source"] == "control-plane-model" for route in routes), routes
 
 host_module = (repo / "host-module.nix").read_text()
-control_plane_copy = 'cp "$cpm_json" "$artifact_dir/control-plane.json"'
-forwarding_artifact = 'jq -S \'.forwardingOut // {}\' "$cpm_json" > "$artifact_dir/forwarding.json"'
-compiler_artifact = 'jq -S \'.compilerOut // {}\' "$cpm_json" > "$artifact_dir/compiler.json"'
-cpm_copy = 'cp "$cpm_json" "$work_dir/cpm.json"'
+bundle_work_copy = 'cp "$bootstrap_json" "$work_dir/canonical-bundle.json"'
+bundle_artifact_copy = 'cp "$bootstrap_json" "$artifact_dir/canonical-bundle.json"'
+envelope_projection = 'control-plane-envelope.json'
 inventory_copy = 'cp "$renderer_inventory_json" "$artifact_dir/inventory.json"'
 route_artifact = "clabgen.s88.CM.route_materialization_artifact"
-assert control_plane_copy in host_module, "host module must publish current CPM as control-plane artifact"
-assert forwarding_artifact in host_module, "host module must publish CPM forwardingOut as forwarding artifact"
-assert compiler_artifact in host_module, "host module must publish CPM compilerOut as compiler artifact"
-assert cpm_copy in host_module, "host module must publish current CPM as cpm.json"
+# FS-310-HDS-040-SDS-010-SMS-100: the host publishes the released canonical
+# bundle. A raw CPM payload (and its compiler/forwarding internals) is not a
+# renderer artifact and must not be copied or republished.
+assert bundle_work_copy in host_module, "host module must materialize the released canonical bundle"
+assert bundle_artifact_copy in host_module, "host module must publish the released canonical bundle artifact"
+assert envelope_projection in host_module, "host module must derive the control-plane envelope from the bundle"
+assert 'cp "$cpm_json"' not in host_module, "host module must not publish a raw CPM payload"
+assert ".forwardingOut" not in host_module, "CPM forwarding internals are not renderer artifacts"
+assert ".compilerOut" not in host_module, "CPM compiler internals are not renderer artifacts"
 assert inventory_copy in host_module, "host module must publish current renderer inventory artifact"
-assert host_module.index(control_plane_copy) < host_module.index(route_artifact), host_module
-assert host_module.index(forwarding_artifact) < host_module.index(route_artifact), host_module
+assert host_module.index(bundle_artifact_copy) < host_module.index(route_artifact), host_module
+assert host_module.index(envelope_projection) < host_module.index(route_artifact), host_module
 PY
 
 echo "PASS FS-500-HDS-010-SDS-010-SMS-040 clab-route-materialization-artifact"

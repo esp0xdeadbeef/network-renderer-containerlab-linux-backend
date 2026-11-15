@@ -42,37 +42,36 @@
           }
         );
 
-      legacyHostModule =
+      clabHostModule =
         rendererInput:
         let
-          # Accept cpm (Nix CPM structure) and produce cpmJsonPath.
+          # FS-310-HDS-040-SDS-010-SMS-100: the render-live generator consumes
+          # one released canonical realization bundle. A raw CPM payload is
+          # upstream authority for the realization model, not a renderer input.
           # All string values passed as separate _module.args keys to avoid
           # NixOS attrset corruption (store paths and empty strings get
           # extracted and replace the whole attrset).
-          cpmJsonPath =
-            if rendererInput ? cpmJsonPath then
-              rendererInput.cpmJsonPath
-            else if rendererInput ? cpm then
-              builtins.toFile "cpm-${rendererInput.hostName or "clab"}.json" (builtins.toJSON rendererInput.cpm)
+          rendererInputJsonPath =
+            if rendererInput ? rendererInputJsonPath then
+              rendererInput.rendererInputJsonPath
             else
-              "";
+              throw "containerlab linux host module requires the released canonical bundle path (rendererInputJsonPath)";
           deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
           rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or null;
         in
         { lib, pkgs, ... }:
         {
           _module.args.clabDeploymentHost = deploymentHost;
-          _module.args.clabCpmJsonPath = cpmJsonPath;
+          _module.args.clabRendererInputJsonPath = rendererInputJsonPath;
           _module.args.clabRendererInventoryJsonPath = rendererInventoryJsonPath;
           _module.args.containerlabLinuxRendererSelf = self.outPath;
           _module.args.containerlabLinuxGenerateClabConfig =
             self.packages.${pkgs.system}.generate-clab-config;
           # Keep containerlabLinuxRendererInput for non-string fields (bridgeControl etc)
           _module.args.containerlabLinuxRendererInput = builtins.removeAttrs rendererInput [
-            "cpmJsonPath"
+            "rendererInputJsonPath"
             "deploymentHost"
             "rendererInventoryJsonPath"
-            "cpm"
             "controlPlane"
           ];
 
@@ -111,10 +110,12 @@
             "platformBinding"
           ];
         in
-        legacyHostModule (
+        clabHostModule (
           forwarded
           // {
-            cpm = validated.controlPlaneEnvelope;
+            rendererInputJsonPath = builtins.toFile
+              "clab-canonical-bundle-${rendererInput.hostName or "clab"}.json"
+              (builtins.toJSON bundle);
             canonicalBundleIdentity = validated.bundleIdentity;
             canonicalBindingIdentity = validated.bindingIdentity;
           }
@@ -122,7 +123,7 @@
 
       rendererLib = {
         renderer = {
-          hostModule = legacyHostModule;
+          hostModule = canonicalHostModule;
           canonical = {
             hostModule = canonicalHostModule;
             validateInput = canonicalInput;

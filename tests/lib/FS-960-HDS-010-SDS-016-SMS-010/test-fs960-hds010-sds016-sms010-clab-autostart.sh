@@ -737,7 +737,7 @@ let
       (source + "/host-module.nix")
       ({ pkgs, ... }: {
         _module.args.clabDeploymentHost = "s-router-clab";
-        _module.args.clabCpmJsonPath = builtins.toFile "cpm.json" "{}";
+        _module.args.clabRendererInputJsonPath = builtins.toFile "canonical-bundle.json" "{}";
         _module.args.clabRendererInventoryJsonPath = builtins.toFile "inventory.json" "{}";
         _module.args.containerlabLinuxRendererSelf = source;
         _module.args.containerlabLinuxGenerateClabConfig = pkgs.writeShellScriptBin "generate-clab-config" "exit 0";
@@ -774,7 +774,7 @@ let
       (source + "/host-module.nix")
       ({ pkgs, lib, ... }: {
         _module.args.clabDeploymentHost = "s-router-clab";
-        _module.args.clabCpmJsonPath = builtins.toFile "cpm.json" "{}";
+        _module.args.clabRendererInputJsonPath = builtins.toFile "canonical-bundle.json" "{}";
         _module.args.clabRendererInventoryJsonPath = builtins.toFile "inventory.json" "{}";
         _module.args.containerlabLinuxRendererSelf = source;
         _module.args.containerlabLinuxGenerateClabConfig = pkgs.writeShellScriptBin "generate-clab-config" "exit 0";
@@ -813,7 +813,7 @@ let
       (source + "/host-module.nix")
       ({ pkgs, lib, ... }: {
         _module.args.clabDeploymentHost = "s-router-clab";
-        _module.args.clabCpmJsonPath = builtins.toFile "cpm.json" "{}";
+        _module.args.clabRendererInputJsonPath = builtins.toFile "canonical-bundle.json" "{}";
         _module.args.clabRendererInventoryJsonPath = builtins.toFile "inventory.json" "{}";
         _module.args.containerlabLinuxRendererSelf = source;
         _module.args.containerlabLinuxGenerateClabConfig = pkgs.writeShellScriptBin "generate-clab-config" "exit 0";
