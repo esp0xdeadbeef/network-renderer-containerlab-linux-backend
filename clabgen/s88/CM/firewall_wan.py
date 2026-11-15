@@ -5,17 +5,17 @@ from typing import Dict, Any, List
 
 def _render_base_filter(wan_if: str) -> List[str]:
     # CPM_GAP FS-310-HDS-010-SDS-010-SMS-130/170:
-    # These base filter rules are hardcoded without CPM firewall intent authority.
-    # CPM should provide wanFirewallPolicy (anti-spoofing, MSS clamping, input policy).
-    # Until CPM emits these fields, the renderer keeps the lab-necessary rules
-    # but scopes table operations to avoid destroying other renderers' rules.
+    # The input policy and anti-spoof base rules are hardcoded without CPM
+    # firewall intent authority. CPM should provide wanFirewallPolicy
+    # (anti-spoofing, management allow, input policy).
+    # MSS clamping is NOT part of this gap: WAN clamp authority comes from the
+    # NAT intent, and low-MTU interfaces come from the target's
+    # clampMssInterfaces record (see render()).
     return [
         # Scoped table management: add table (idempotent), then flush its
         # contents. Replaces old `nft flush ruleset` which destroyed all rules.
         "nft add table inet filter",
         "nft flush table inet filter",
-        "nft add table inet mangle",
-        "nft flush table inet mangle",
         "nft 'add chain inet filter input { type filter hook input priority 0 ; policy drop ; }'",
         "nft 'add chain inet filter forward { type filter hook forward priority 0 ; policy accept ; }'",
         "nft 'add chain inet filter output { type filter hook output priority 0 ; policy accept ; }'",
@@ -30,16 +30,44 @@ def _render_base_filter(wan_if: str) -> List[str]:
         "nft add rule inet filter forward ct state invalid drop",
         f'nft add rule inet filter forward iifname "{wan_if}" ip saddr {{ 10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16 }} drop',
         f'nft add rule inet filter forward iifname "{wan_if}" ip6 saddr fc00::/7 drop',
-        "nft add table inet mangle",
-        "nft 'add chain inet mangle forward { type filter hook forward priority mangle ; policy accept ; }'",
-        f'nft add rule inet mangle forward oifname "{wan_if}" tcp flags syn tcp option maxseg size set rt mtu',
     ]
+
+
+def _mangle_commands(clamp_interfaces: List[str]) -> List[str]:
+    """Clamp TCP MSS on the given egress interfaces (one mangle table)."""
+    if not clamp_interfaces:
+        return []
+    commands = [
+        "nft add table inet mangle",
+        "nft flush table inet mangle",
+        "nft 'add chain inet mangle forward { type filter hook forward priority mangle ; policy accept ; }'",
+    ]
+    for interface_name in clamp_interfaces:
+        commands.append(
+            f'nft add rule inet mangle forward oifname "{interface_name}" '
+            "tcp flags syn tcp option maxseg size set rt mtu"
+        )
+    return commands
 
 
 def render(input_data: Dict[str, Any]) -> List[str]:
     wan_interfaces = input_data.get("wan_interfaces", [])
     if not isinstance(wan_interfaces, list):
         return []
+
+    clamp_interfaces = input_data.get("clamp_interfaces", [])
+    if not isinstance(clamp_interfaces, list):
+        clamp_interfaces = []
+    clamp_interfaces = [
+        interface_name
+        for interface_name in clamp_interfaces
+        if isinstance(interface_name, str) and interface_name
+    ]
+    clamp_interfaces = [
+        interface_name
+        for interface_name in clamp_interfaces
+        if interface_name not in wan_interfaces
+    ]
 
     masquerade = input_data.get("masquerade", {})
     if not isinstance(masquerade, dict):
@@ -115,6 +143,7 @@ def render(input_data: Dict[str, Any]) -> List[str]:
                     f'nft add rule ip6 nat postrouting ip6 saddr {{ {srcset6} }} oifname "{oif}" masquerade'
                 )
 
+        cmds.extend(_mangle_commands(clamp_interfaces))
         return cmds
 
     for wan_if in wan_interfaces:
@@ -131,9 +160,12 @@ def render(input_data: Dict[str, Any]) -> List[str]:
                     f'nft add rule inet filter input iifname != "{wan_if}" tcp dport 22 accept',
                     f'nft add rule inet filter forward iifname "{wan_if}" ip saddr {{ 10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16 }} drop',
                     f'nft add rule inet filter forward iifname "{wan_if}" ip6 saddr fc00::/7 drop',
-                    f'nft add rule inet mangle forward oifname "{wan_if}" tcp flags syn tcp option maxseg size set rt mtu',
                 ]
             )
+
+    # WAN clamp authority comes from the NAT intent; low-MTU interfaces come
+    # from the target's clampMssInterfaces record. Both are emitted once.
+    cmds.extend(_mangle_commands(wan_interfaces + clamp_interfaces))
 
     # NAT is inventory-driven and independent from which interfaces are treated as WAN for filtering.
     if oifnames and enable_nat4 and saddr4:

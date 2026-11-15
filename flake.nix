@@ -58,12 +58,16 @@
               throw "containerlab linux host module requires the released canonical bundle path (rendererInputJsonPath)";
           deploymentHost = rendererInput.deploymentHost or rendererInput.hostName or "s-router-clab";
           rendererInventoryJsonPath = rendererInput.rendererInventoryJsonPath or null;
+          canonicalBundleIdentity = rendererInput.canonicalBundleIdentity or null;
+          canonicalBindingIdentity = rendererInput.canonicalBindingIdentity or null;
         in
         { lib, pkgs, ... }:
         {
           _module.args.clabDeploymentHost = deploymentHost;
           _module.args.clabRendererInputJsonPath = rendererInputJsonPath;
           _module.args.clabRendererInventoryJsonPath = rendererInventoryJsonPath;
+          _module.args.clabCanonicalBundleIdentity = canonicalBundleIdentity;
+          _module.args.clabCanonicalBindingIdentity = canonicalBindingIdentity;
           _module.args.containerlabLinuxRendererSelf = self.outPath;
           _module.args.containerlabLinuxGenerateClabConfig =
             self.packages.${pkgs.system}.generate-clab-config;
@@ -72,6 +76,8 @@
             "rendererInputJsonPath"
             "deploymentHost"
             "rendererInventoryJsonPath"
+            "canonicalBundleIdentity"
+            "canonicalBindingIdentity"
             "controlPlane"
           ];
 
