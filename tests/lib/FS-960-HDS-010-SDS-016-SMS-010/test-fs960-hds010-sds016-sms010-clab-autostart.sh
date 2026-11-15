@@ -714,8 +714,20 @@ if grep -q 'CLAB_DEPLOY_MAX_WORKERS' "${host_module}" &&
    grep -q 'containerlab deploy emitted ERRO lines; refusing readiness marker' "${host_module}" &&
    grep -q 'diagnostic.clab-host-prerequisite-missing' "${host_module}" &&
    grep -q 'diagnostic.clab-host-prerequisite-not-writable' "${host_module}" &&
+   grep -q 'docker network rm' "${host_module}" &&
    grep -Fq '[[ -L /etc/hosts || ! -w /etc/hosts ]]' "${host_module}"; then
-  echo "PASS test11: host autostart deploy is bounded and refuses ERRO readiness"
+  # Stale-runtime cleanup must run before the deploy, after the old containers
+  # are gone (docker refuses to remove a network with attached endpoints).
+  cleanup_line=$(grep -n "docker ps -aq --filter 'name=^clab-fabric-'" "${host_module}" | head -1 | cut -d: -f1)
+  network_line=$(grep -n 'docker network rm' "${host_module}" | head -1 | cut -d: -f1)
+  deploy_line=$(grep -n "bash '\$work_dir/deploy-containerlab-on-host.sh'" "${host_module}" | head -1 | cut -d: -f1)
+  if [[ -n "${cleanup_line}" && -n "${network_line}" && -n "${deploy_line}" ]] &&
+     (( cleanup_line < network_line && network_line < deploy_line )); then
+    echo "PASS test11: host autostart deploy is bounded and refuses ERRO readiness"
+  else
+    echo "FAIL test11: stale clab network cleanup is not ordered before deploy" >&2
+    failures=$((failures + 1))
+  fi
 else
   echo "FAIL test11: host autostart deploy can race or accept Containerlab ERRO output" >&2
   failures=$((failures + 1))
