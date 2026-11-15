@@ -59,7 +59,20 @@ def control_plane_envelope(bundle: Any) -> Dict[str, Any]:
     network = bundle.get("network")
     if not isinstance(network, dict) or not isinstance(network.get("data"), dict):
         raise _redacted("bundle does not carry network data")
-    return network["data"]
+    data = network["data"]
+    # Two producer shapes reach a renderer: the semantic model itself
+    # (`{data: <enterprise map>, ...}`) and the control-plane envelope the real
+    # pipeline carries (`{control_plane_model: <model>, ...}`). Return ONE
+    # envelope shape so callers never wrap it a second time.
+    control_plane_model = data.get("control_plane_model")
+    envelope = (
+        data
+        if isinstance(control_plane_model, dict)
+        else {"control_plane_model": data}
+    )
+    if not isinstance(envelope["control_plane_model"].get("data"), dict):
+        raise _redacted("bundle does not carry control-plane model data")
+    return envelope
 
 
 __all__ = [
