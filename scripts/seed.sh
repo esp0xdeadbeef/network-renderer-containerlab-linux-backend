@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# seed.sh — Seed CPM JSON test fixtures for the CLAB renderer.
+# seed.sh — Seed upstream CPM JSON fixtures for the CLAB renderer tests.
+# The fixtures are upstream artifacts only: the tests and pipeline scripts
+# release them into validated canonical realization bundles before rendering
+# (FS-310-HDS-040-SDS-010-SMS-100).
 #
 # Usage:
 #   scripts/seed.sh [--intent INTENT_PATH] [--inventory INVENTORY_PATH] [--name FIXTURE_NAME]

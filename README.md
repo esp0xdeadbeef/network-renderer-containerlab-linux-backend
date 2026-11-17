@@ -77,8 +77,9 @@ platform-binding input explicit.
 
 ## Allowed
 
-- Render Containerlab topology files from explicit realized nodes, links,
-  interfaces, services, and host bridge attachments.
+- Render Containerlab topology files from the realized nodes, links,
+  interfaces, services, and host bridge attachments carried by the validated
+  canonical bundle.
 - Emit helper artifacts required to start the generated lab backend.
 - Preserve canonical routing mode and service data without reinterpretation.
 - Accept harness-scoped fake-provider or PPPoE-like lab-emulation artifacts
@@ -149,10 +150,13 @@ cache, clears stale Containerlab state for the rendered lab, materializes host
 bridges and explicit VLAN/NAT bridge attachments, deploys Containerlab, and
 checks that rendered fabric containers have non-loopback interfaces.
 
-For historical diagnostic use, pin this flake and invoke the superseded app
-with locked CPM and renderer-inventory artifacts. `--dry-run` renders artifacts
-and the bridge plan without touching Docker, Linux links, or Containerlab, but
-does not turn that direct-entry path into the controlled renderer boundary.
+The historical direct-CPM entrypoint was removed, not retained as a parallel
+path: `generate-clab-config`, `run-clab-generator.sh`, `start-vm.sh` and
+`deploy-clab` all require the released canonical bundle, and a raw
+`control_plane_model` payload fails closed with
+`GAMP-MODEL-BOUNDARY-VIOLATION` (`run-clab-generator.sh` exits 4; bundle
+validation failures exit 5). `--dry-run` still renders artifacts and the bridge
+plan without touching Docker, Linux links, or Containerlab.
 
 ## Tests
 

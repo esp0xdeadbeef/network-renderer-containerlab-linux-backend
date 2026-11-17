@@ -2,15 +2,19 @@
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 set -euo pipefail
 
-# CMC: FS-310 — renderer consumes ONLY CPM output, never intent/inventory
-# start-vm.sh accepts a pre-built CPM JSON file.
+# FS-310-HDS-040-SDS-010-SMS-100: the renderer consumes only a validated
+# canonical realization bundle. start-vm.sh accepts a pre-built upstream CPM
+# JSON, releases it into that bundle through network-realization-model, and
+# renders from the bundle; the raw payload never reaches the renderer.
 # emulationSubnets: accepted as env var from the calling environment (not read from raw inventory).
-# Renderer inventory: extracted from CPM endpointInventory (not re-imported from inventory-clab.nix).
+# Renderer inventory: supplied explicitly via CLABGEN_RENDERER_INVENTORY_JSON
+# (never read out of a CPM payload field).
 
 cpm_json="${1:-}"
 if [[ -z "${cpm_json}" || ! -f "${cpm_json}" ]]; then
   echo "Usage: $0 <path-to-cpm-output.json>" >&2
-  echo "  Pre-build the CPM JSON externally:" >&2
+  echo "  Pre-build the upstream CPM JSON externally (start-vm.sh releases it into" >&2
+  echo "  a canonical bundle before rendering):" >&2
   echo "    nix run path:network-control-plane-model#compile-and-build-control-plane-model -- \\" >&2
   echo "      --input intent.nix --inventory inventory-clab.nix \\" >&2
   echo "      --emulation-subnets '\"\${EMULATION_SUBNETS:-[]}\"' > cpm.json" >&2
