@@ -1,3 +1,12 @@
+"""Project the canonical network envelope onto the solver model.
+
+The input is the `network.data` map carried by a validated canonical
+realization bundle (FS-310-HDS-040-SDS-010-SMS-100). The renderer's gate in
+`clabgen/canonical_bundle.py` has already rejected a raw control-plane payload;
+this module only translates the admitted envelope into the internal solver
+shape and adds no meaning of its own.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict

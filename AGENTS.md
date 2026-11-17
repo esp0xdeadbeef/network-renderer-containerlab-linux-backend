@@ -11,7 +11,8 @@ The workflows live in `.github/workflows/`.
 It has two jobs:
 
 - `flake-check` evaluates the flake.
-- `test suite` runs `./run-all-tests.sh` after installing `rg`, `sops` and `yq`.
+- `test suite` runs `./run-all-tests.sh` after installing `rg`, `jq`, `sops`
+  and `yq` (the runner image ships none of them).
 
 `flake-lock-update.yml`, where present, bumps `flake.lock` nightly and pushes
 only when the flake still checks.

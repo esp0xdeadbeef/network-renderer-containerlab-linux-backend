@@ -48,10 +48,10 @@ REGISTRY: Dict[str, Dict[str, Dict[str, Any]]] = {
         "inet fw": {
             "source": "platform-registry",
             "description": (
-                "CPM-derived policy firewall table. Carries forwarding-intent rules "
-                "translated from CPM forwardingIntent.rules entries. Table name 'fw' is a "
-                "Containerlab platform convention for the firewall table populated from "
-                "explicit CPM policy input."
+                "Policy firewall table carrying the forwarding-intent rules in the "
+                "canonical bundle. Table name 'fw' is a Containerlab platform "
+                "convention for the firewall table populated from the bundle's "
+                "explicit policy input."
             ),
             "used_by": ["cpm_firewall_rules.py", "policy_firewall.py"],
         },
