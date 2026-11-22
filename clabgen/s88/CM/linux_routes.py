@@ -81,6 +81,37 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List
             continue
 
         routes = _route_lists(iface)
+        has_policy_table = isinstance(iface.get("policyRoutingAllocation"), dict) and isinstance(
+            iface["policyRoutingAllocation"].get("tableId"), int
+        )
+
+        def _also_in_main(route_dst: str, family: int) -> bool:
+            """Keep the main copy unless another interface also carries it.
+
+            A destination provided by ONE interface has an unambiguous main
+            route and stays there: FS-370-HDS-010-SDS-010-SMS-110 requires the
+            selector's access routes in main. A destination provided by SEVERAL
+            interfaces -- each already installing it into its own policy table --
+            is ambiguous in main, because `ip route replace` keys on
+            (table, destination) and the last writer wins. Measured on
+            `single-wan`: 10.19.0.3/32 appeared in main via ens3, ens4 and ens5,
+            and FS-310-HDS-020-SDS-010-SMS-060 rejected the site.
+            """
+            if not has_policy_table:
+                return True
+            providers = 0
+            for other_name in sorted(_dict(node.get("interfaces"))):
+                other = node["interfaces"][other_name]
+                if not isinstance(other, dict):
+                    continue
+                for other_route in _route_lists(other)[f"ipv{family}"]:
+                    if other_route.get("policyOnly") is True:
+                        continue
+                    if _normalize_prefix(_dst(other_route)) != route_dst:
+                        continue
+                    providers += 1
+                    break
+            return providers < 2
 
         for route in routes["ipv4"]:
             if route.get("policyOnly") is True:
@@ -92,6 +123,8 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List
                 continue
 
             dst = _normalize_prefix(dst)
+            if not _also_in_main(dst, 4):
+                continue
             if route.get("proto") == "connected":
                 continue
             if dst in connected4:
@@ -119,6 +152,8 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List
                 continue
 
             dst = _normalize_prefix(dst)
+            if not _also_in_main(dst, 6):
+                continue
             if route.get("proto") == "connected":
                 continue
             if dst in connected6:

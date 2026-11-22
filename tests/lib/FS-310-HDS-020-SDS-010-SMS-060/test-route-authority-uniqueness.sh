@@ -65,22 +65,76 @@ fi
 # command. Node context comes from the YAML node key (four-space indent); a
 # route line is any `ip route replace` / `ip -6 route replace`.
 routes="${tmp_dir}/routes.txt"
-awk '
-  /^    [A-Za-z0-9_.-]+:[[:space:]]*$/ { node = $0; sub(/^ +/, "", node); sub(/:.*/, "", node); next }
-  /ip (-6 )?route (replace|add) / {
-    line = $0
-    while (match(line, /ip (-6 )?route (replace|add) /)) {
-      rest = substr(line, RSTART + RLENGTH)
-      sub(/["\047].*$/, "", rest)
-      table = "main"
-      if (match(rest, /table [0-9]+/)) { table = substr(rest, RSTART + 6, RLENGTH - 6) }
-      dst = rest
-      sub(/ .*/, "", dst)
-      print node "|" table "|" dst "|" rest
-      line = substr(line, RSTART + RLENGTH)
-    }
-  }
-' "${topology}" >"${routes}"
+# Extract `<node>|<table>|<destination>|<rest>` with a BOUNDED scan.
+#
+# The previous version used an awk `while (match(line, ...))` loop. On the
+# `single-wan` topology that loop never terminated in practice: it produced a
+# 24 GB routes.txt from a 352 KB fabric.clab.yml, so the case could not finish
+# (measured 2026-11-22: still running after 45 minutes, 24,837,275,648 bytes
+# written, /tmp tmps filling). A harness that cannot finish is not a check, and
+# a runaway file in tmpfs also takes the rest of the host down with it.
+#
+# This scanner has a hard line cap and advances by at least one character per
+# step, so it cannot loop.
+python3 - "${topology}" "${routes}" <<'PYEOF'
+import re
+import sys
+
+topology_path, out_path = sys.argv[1], sys.argv[2]
+LINE_CAP = 200000
+route_re = re.compile(r"ip (-6 )?route (replace|add) ")
+
+
+def logical_lines(path):
+    """Yield logical YAML lines with the generator's escapes resolved.
+
+    fabric.clab.yml folds long command strings: a physical line ends with a
+    trailing backslash and the next continues it, and embedded newlines appear
+    as the two characters `\\n`. Parsing physical lines (as the previous awk
+    did) splits one command into fragments and invents duplicate authorities.
+    """
+    pending = ""
+    with open(path, "r", errors="replace") as handle:
+        for raw in handle:
+            text = raw.rstrip("\n")
+            if pending:
+                text = pending + text
+                pending = ""
+            if text.endswith("\\"):
+                pending = text[:-1]
+                continue
+            text = text.replace("\\n", "\n").replace('\\"', '"').replace("\\ ", " ")
+            yield from text.split("\n")
+    if pending:
+        yield pending
+
+
+node = None
+written = 0
+with open(out_path, "w") as out:
+    for line in logical_lines(topology_path):
+        node_match = re.match(r"^    ([A-Za-z0-9_.-]+):\s*$", line)
+        if node_match:
+            node = node_match.group(1)
+            continue
+        for match in route_re.finditer(line):
+            rest = line[match.end():]
+            rest = re.split(r"[\"']", rest, maxsplit=1)[0]
+            table = "main"
+            table_match = re.search(r"table [0-9]+", rest)
+            if table_match:
+                table = table_match.group(0)[len("table "):]
+                rest = rest[table_match.end():].lstrip()
+            dst = rest.split(" ", 1)[0]
+            if not dst or dst == "table" or dst.startswith("\\"):
+                continue
+            out.write(f"{node}|{table}|{dst}|{rest}\n")
+            written += 1
+            if written > LINE_CAP:
+                sys.exit(
+                    f"harness error: more than {LINE_CAP} route primitives; refusing to continue"
+                )
+PYEOF
 
 route_count="$(wc -l <"${routes}" | tr -d ' ')"
 if [[ "${route_count}" == "0" ]]; then
@@ -92,6 +146,11 @@ fi
 duplicates="$(awk -F'|' '
   { key = $1 "|" $2 "|" $3
     rest = $4
+    # Compare what the kernel installs, not how the YAML wrapped it: collapse
+    # padding whitespace and drop a trailing stderr redirect.
+    gsub(/[[:space:]]+/, " ", rest)
+    sub(/ 2>\/dev\/null/, "", rest)
+    gsub(/^ +| +$/, "", rest)
     if (!(key in seen)) { seen[key] = rest; next }
     if (seen[key] != rest) { dup[key] = seen[key] "  ||  " rest }
   }
