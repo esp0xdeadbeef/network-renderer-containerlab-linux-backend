@@ -102,10 +102,9 @@ def _dedupe_table_routes(rendered: Dict[str, Any]) -> Dict[str, Any]:
     A node's exec list is assembled from several renderers, and more than one
     can name the same (table, destination) through a different member surface.
     `ip route replace` keys on that tuple, so the surviving route depends on
-    write order -- measured on `single-wan`, `downstream-selector` table 1003:
-
-      ip route replace table 1003 10.20.10.0/24 via 10.10.0.13 dev ens5 onlink
-      sh -c '... ip route replace table 1003 10.20.10.0/24 via 10.10.0.4 dev ens8 ...'
+    write order -- measured on `single-wan`, `downstream-selector`: one table
+    received two commands for the same destination through two member
+    interfaces.
 
     The first occurrence for a (family, table, destination) wins; later copies
     are dropped with a diagnostic. Rules and main-table routes are untouched.

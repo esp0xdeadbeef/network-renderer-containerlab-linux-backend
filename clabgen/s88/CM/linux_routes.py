@@ -94,8 +94,8 @@ def _render_static_routes(node: Dict[str, Any], eth_map: Dict[str, str]) -> List
             interfaces -- each already installing it into its own policy table --
             is ambiguous in main, because `ip route replace` keys on
             (table, destination) and the last writer wins. Measured on
-            `single-wan`: 10.19.0.3/32 appeared in main via ens3, ens4 and ens5,
-            and FS-310-HDS-020-SDS-010-SMS-060 rejected the site.
+            `single-wan`: one host address appeared in main through three member
+            interfaces, and FS-310-HDS-020-SDS-010-SMS-060 rejected the site.
             """
             if not has_policy_table:
                 return True
