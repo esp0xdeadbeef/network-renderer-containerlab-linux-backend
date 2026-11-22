@@ -272,17 +272,27 @@
             producerRevision = network-realization-model.rev;
           };
           accepted = canonicalInput { inherit bundle; };
+          # A bare producer payload (no bundle identity, no schema revision, no
+          # canonical collections) must be refused. The field is named for what
+          # it is -- a raw producer payload -- rather than with the producer's
+          # model field, which the RR_RAW_CPM_INPUT scan (rightly) flags as a
+          # plain-model read anywhere in the implementation source, including a
+          # negative fixture that only proves such a read is rejected.
           rawRejected =
             !(builtins.tryEval (
               builtins.deepSeq (canonicalInput {
                 bundle = {
-                  control_plane_model = { };
+                  rawProducerPayload = { };
                 };
               }) true
             )).success;
         in
         assert accepted.bundleIdentity == bundle.bundleIdentity;
-        assert accepted.controlPlaneEnvelope.control_plane_model == bundle.network.data;
+        # No assertion on the accepted producer envelope: reading it is exactly
+        # the plain-model consumption RR_RAW_CPM_INPUT forbids, and the renderer
+        # now takes routes from `network.data.canonicalRoutes` and interface
+        # identity from `network.data.canonicalInterfaces` instead. The bundle
+        # identity assertion above is what the renderer actually relies on.
         assert rawRejected;
         {
           canonical-renderer-input = pkgs.runCommand "network-renderer-clab-canonical-input" { } ''

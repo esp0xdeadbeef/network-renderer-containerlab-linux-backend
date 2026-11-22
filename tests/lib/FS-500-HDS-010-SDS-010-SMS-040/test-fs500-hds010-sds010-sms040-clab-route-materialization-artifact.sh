@@ -12,139 +12,112 @@ output="${tmpdir}/clab-route-materialization.json"
 
 cat >"${fixture}" <<'JSON'
 {
-  "control_plane_model": {
+  "network": {
     "data": {
-      "esp": {
-        "site-b": {
-          "runtimeTargets": {
-            "esp0xdeadbeef-site-b-clab-router-a": {
-              "placement": {
-                "host": "s-router-clab"
-              },
-              "logicalNode": {
-                "name": "clab-router-a"
-              },
-              "effectiveRuntimeRealization": {
-                "interfaces": {
-                  "p2p-ab": {
-                    "sourceKind": "p2p",
-                    "runtimeIfName": "ab0",
-                    "addr4": "10.11.0.0/31",
-                    "addr6": "fd11::/127",
-                    "routes": {
-                      "ipv4": [
-                        {
-                          "dst": "10.111.0.0/24",
-                          "via4": "10.11.0.1"
-                        },
-                        {
-                          "destination": "10.112.0.0/24",
-                          "via4": "10.11.0.1"
-                        },
-                        {
-                          "dst": "10.113.0.0/24",
-                          "via4": "10.11.0.1",
-                          "policyOnly": true
-                        },
-                        {
-                          "sourceFile": "/run/secrets/runtime-ipv4-prefix",
-                          "via4": "10.11.0.1"
-                        }
-                      ],
-                      "ipv6": [
-                        {
-                          "prefix": "fd11:111::/64",
-                          "via6": "fd11::1"
-                        },
-                        {
-                          "dst": "fd11:112::/64",
-                          "via6": "fd11::1",
-                          "policyOnly": true
-                        },
-                        {
-                          "sourceFile": "/run/secrets/runtime-ipv6-prefix",
-                          "via6": "fd11::1"
-                        }
-                      ]
-                    }
-                  },
-                  "p2p-ab-alias": {
-                    "sourceKind": "p2p",
-                    "runtimeIfName": "ab0",
-                    "routes": {
-                      "ipv4": [
-                        {
-                          "dst": "10.111.0.0/24",
-                          "via4": "10.11.0.1"
-                        }
-                      ]
-                    }
-                  },
-                  "lan-client": {
-                    "sourceKind": "lan",
-                    "runtimeIfName": "lan0",
-                    "routes": {
-                      "ipv4": [
-                        {
-                          "dst": "10.200.0.0/24",
-                          "via4": "10.200.0.1"
-                        }
-                      ]
-                    }
-                  }
-                }
-              }
-            },
-            "esp0xdeadbeef-site-b-clab-router-b": {
-              "placement": {
-                "host": "s-router-clab"
-              },
-              "logicalNode": {
-                "name": "clab-router-b"
-              },
-              "effectiveRuntimeRealization": {
-                "interfaces": {
-                  "p2p-ba": {
-                    "sourceKind": "p2p",
-                    "runtimeIfName": "ba0",
-                    "addr4": "10.11.0.1/31",
-                    "routes": {
-                      "ipv4": []
-                    }
-                  }
-                }
-              }
-            },
-            "esp0xdeadbeef-site-b-nixos-router": {
-              "placement": {
-                "host": "s-router-nixos"
-              },
-              "logicalNode": {
-                "name": "nixos-router"
-              },
-              "effectiveRuntimeRealization": {
-                "interfaces": {
-                  "p2p-off-host": {
-                    "sourceKind": "p2p",
-                    "runtimeIfName": "off0",
-                    "routes": {
-                      "ipv4": [
-                        {
-                          "dst": "10.250.0.0/24",
-                          "via4": "10.250.0.1"
-                        }
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
+      "canonicalRoutes": [
+        {
+          "target": "esp0xdeadbeef-site-b-clab-router-a",
+          "interface": "p2p-ab",
+          "runtimeIfName": "ab0",
+          "sourceKind": "p2p",
+          "policyOnly": false,
+          "family": 4,
+          "dst": "10.111.0.0/24",
+          "gateway": "10.11.0.1",
+          "tableId": 1002,
+          "metric": null,
+          "kind": "internal-reachability",
+          "deploymentHost": "s-router-clab"
+        },
+        {
+          "target": "esp0xdeadbeef-site-b-clab-router-a",
+          "interface": "p2p-ab",
+          "runtimeIfName": "ab0",
+          "sourceKind": "p2p",
+          "policyOnly": false,
+          "family": 4,
+          "dst": "10.112.0.0/24",
+          "gateway": "10.11.0.1",
+          "tableId": 1002,
+          "metric": null,
+          "kind": "internal-reachability",
+          "deploymentHost": "s-router-clab"
+        },
+        {
+          "target": "esp0xdeadbeef-site-b-clab-router-a",
+          "interface": "p2p-ab",
+          "runtimeIfName": "ab0",
+          "sourceKind": "p2p",
+          "policyOnly": true,
+          "family": 4,
+          "dst": "10.113.0.0/24",
+          "gateway": "10.11.0.1",
+          "tableId": 1002,
+          "metric": null,
+          "kind": "internal-reachability",
+          "deploymentHost": "s-router-clab"
+        },
+        {
+          "target": "esp0xdeadbeef-site-b-clab-router-a",
+          "interface": "p2p-ab",
+          "runtimeIfName": "ab0",
+          "sourceKind": "p2p",
+          "policyOnly": false,
+          "family": 6,
+          "dst": "fd11:111::/64",
+          "gateway": "fd11::1",
+          "tableId": 1002,
+          "metric": null,
+          "kind": "internal-reachability",
+          "deploymentHost": "s-router-clab"
+        },
+        {
+          "target": "esp0xdeadbeef-site-b-clab-router-a",
+          "interface": "p2p-ab",
+          "runtimeIfName": "ab0",
+          "sourceKind": "p2p",
+          "policyOnly": true,
+          "family": 6,
+          "dst": "fd11:112::/64",
+          "gateway": "fd11::1",
+          "tableId": 1002,
+          "metric": null,
+          "kind": "internal-reachability",
+          "deploymentHost": "s-router-clab"
+        },
+        {
+          "target": "esp0xdeadbeef-site-b-clab-router-a",
+          "interface": "lan-client",
+          "runtimeIfName": "lan0",
+          "sourceKind": "lan",
+          "policyOnly": false,
+          "family": 4,
+          "dst": "10.200.0.0/24",
+          "gateway": "10.200.0.1",
+          "tableId": null,
+          "metric": null,
+          "kind": "internal-reachability",
+          "deploymentHost": "s-router-clab"
+        },
+        {
+          "target": "esp0xdeadbeef-site-b-nixos-router",
+          "interface": "p2p-off-host",
+          "runtimeIfName": "off0",
+          "sourceKind": "p2p",
+          "policyOnly": false,
+          "family": 4,
+          "dst": "10.250.0.0/24",
+          "gateway": "10.250.0.1",
+          "tableId": 1002,
+          "metric": null,
+          "kind": "internal-reachability",
+          "deploymentHost": "s-router-nixos"
         }
-      }
+      ]
     }
   }
 }
+
 JSON
 
 PYTHONPATH="${repo_root}" python3 -m clabgen.s88.CM.route_materialization_artifact \
@@ -214,7 +187,7 @@ assert all(route["source"] == "control-plane-model" for route in routes), routes
 host_module = (repo / "host-module.nix").read_text()
 bundle_work_copy = 'cp "$bootstrap_json" "$work_dir/canonical-bundle.json"'
 bundle_artifact_copy = 'cp "$bootstrap_json" "$artifact_dir/canonical-bundle.json"'
-envelope_projection = 'control-plane-envelope.json'
+route_projection = 'canonical-routes.json'
 inventory_copy = 'cp "$renderer_inventory_json" "$artifact_dir/inventory.json"'
 route_artifact = "clabgen.s88.CM.route_materialization_artifact"
 # FS-310-HDS-040-SDS-010-SMS-100: the host publishes the released canonical
@@ -222,13 +195,13 @@ route_artifact = "clabgen.s88.CM.route_materialization_artifact"
 # renderer artifact and must not be copied or republished.
 assert bundle_work_copy in host_module, "host module must materialize the released canonical bundle"
 assert bundle_artifact_copy in host_module, "host module must publish the released canonical bundle artifact"
-assert envelope_projection in host_module, "host module must derive the control-plane envelope from the bundle"
+assert route_projection in host_module, "host module must derive the route projection from the released bundle"
 assert 'cp "$cpm_json"' not in host_module, "host module must not publish a raw CPM payload"
 assert ".forwardingOut" not in host_module, "CPM forwarding internals are not renderer artifacts"
 assert ".compilerOut" not in host_module, "CPM compiler internals are not renderer artifacts"
 assert inventory_copy in host_module, "host module must publish current renderer inventory artifact"
 assert host_module.index(bundle_artifact_copy) < host_module.index(route_artifact), host_module
-assert host_module.index(envelope_projection) < host_module.index(route_artifact), host_module
+assert host_module.index(route_projection) < host_module.index(route_artifact), host_module
 PY
 
 echo "PASS FS-500-HDS-010-SDS-010-SMS-040 clab-route-materialization-artifact"

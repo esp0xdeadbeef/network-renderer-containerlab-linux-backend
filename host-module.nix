@@ -176,10 +176,12 @@ let
         fi
         cp "$bootstrap_json" "$work_dir/canonical-bundle.json"
         cp "$bootstrap_json" "$artifact_dir/canonical-bundle.json"
-        # The route-materialization artifact consumes the control-plane envelope
-        # carried by the bundle, not a separately supplied CPM payload.
-        jq -S 'if (.network.data | has("control_plane_model")) then {control_plane_model: .network.data.control_plane_model} else {control_plane_model: .network.data} end' \
-          "$bootstrap_json" > "$work_dir/control-plane-envelope.json"
+        # The route-materialization artifact consumes the bundle's canonical route
+        # set (`network.data.canonicalRoutes`), not the plain control-plane model:
+        # the same facts, published as canonical content (FS-310,
+        # RR_RAW_CPM_INPUT).
+        jq -S '{ network: { data: { canonicalRoutes: .network.data.canonicalRoutes } } }' \
+          "$bootstrap_json" > "$work_dir/canonical-routes.json"
 
         phase="render"
         CLABGEN_RENDERER_INVENTORY_JSON="$renderer_inventory_json" \
@@ -218,7 +220,7 @@ let
         PY
 
         PYTHONPATH="$renderer_repo" python3 -m clabgen.s88.CM.route_materialization_artifact \
-          "$work_dir/control-plane-envelope.json" \
+          "$work_dir/canonical-routes.json" \
           "$deployment_host" \
           "$artifact_dir/clab-route-materialization.json"
 

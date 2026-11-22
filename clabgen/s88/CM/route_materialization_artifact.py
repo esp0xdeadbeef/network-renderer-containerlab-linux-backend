@@ -26,26 +26,31 @@ def _placement_host(runtime_target: Dict[str, Any]) -> str | None:
     return None
 
 
-def _iter_runtime_targets(control_plane: Dict[str, Any]) -> Iterable[tuple[str, Dict[str, Any]]]:
-    data = _dict(_dict(control_plane).get("control_plane_model")).get("data")
-    for enterprise in _dict(data).values():
-        for site in _dict(enterprise).values():
-            for target_name, runtime_target in _dict(_dict(site).get("runtimeTargets")).items():
-                yield str(target_name), _dict(runtime_target)
+def _load_routes(control_plane: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The canonical route set the bundle publishes.
+
+    `network.data.canonicalRoutes` is the producer's flat, deduplicated route
+    set (target, interface, family, destination, gateway, table, metric, kind).
+    Reading it keeps this artifact off the plain control-plane model: the bundle
+    is the input, and the canonical collection is the semantic content
+    (FS-310, RR_RAW_CPM_INPUT).
+    """
+    network = _dict(control_plane.get("network"))
+    data = _dict(network.get("data"))
+    routes = data.get("canonicalRoutes")
+    if not isinstance(routes, list):
+        raise ValueError(
+            "FS-310: the bundle carries no canonicalRoutes; the renderer must not "
+            "reconstruct routes from the control-plane model"
+        )
+    return [_dict(entry) for entry in routes]
 
 
-def _target_in_scope(runtime_target: Dict[str, Any], deployment_host: str) -> bool:
+def _target_in_scope(entry: Dict[str, Any], deployment_host: str) -> bool:
     if not deployment_host:
         return True
-    return _placement_host(runtime_target) == deployment_host
-
-
-def _route_dst(route: Dict[str, Any]) -> str | None:
-    for key in ("dst", "destination", "prefix"):
-        value = route.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return None
+    placement = entry.get("deploymentHost")
+    return placement in (None, deployment_host)
 
 
 def _route_record(
@@ -71,40 +76,38 @@ def _route_record(
 def materialized_routes(control_plane: Dict[str, Any], deployment_host: str) -> List[Dict[str, Any]]:
     routes: List[Dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
-    for target_name, runtime_target in _iter_runtime_targets(control_plane):
-        if not _target_in_scope(runtime_target, deployment_host):
+    for entry in _load_routes(control_plane):
+        if not _target_in_scope(entry, deployment_host):
             continue
-        interfaces = _dict(_dict(runtime_target.get("effectiveRuntimeRealization")).get("interfaces"))
-        for ifkey, iface_value in sorted(interfaces.items()):
-            iface = _dict(iface_value)
-            if iface.get("sourceKind") != "p2p":
-                continue
-            ifname = iface.get("runtimeIfName") or iface.get("renderedIfName") or ifkey
-            if not isinstance(ifname, str) or not ifname.strip():
-                ifname = str(ifkey)
-            route_lists = _dict(iface.get("routes"))
-            for route_value in _list(route_lists.get("ipv4")):
-                route = _dict(route_value)
-                if route.get("policyOnly") is True:
-                    continue
-                dst = _route_dst(route)
-                via = route.get("via4")
-                if isinstance(dst, str) and isinstance(via, str) and via.strip():
-                    route_key = (target_name, ifname, "ipv4", dst, via.strip())
-                    if route_key not in seen:
-                        seen.add(route_key)
-                        routes.append(_route_record(target_name, str(ifkey), ifname, "ipv4", dst, "via4", via.strip()))
-            for route_value in _list(route_lists.get("ipv6")):
-                route = _dict(route_value)
-                if route.get("policyOnly") is True:
-                    continue
-                dst = _route_dst(route)
-                via = route.get("via6")
-                if isinstance(dst, str) and isinstance(via, str) and via.strip():
-                    route_key = (target_name, ifname, "ipv6", dst, via.strip())
-                    if route_key not in seen:
-                        seen.add(route_key)
-                        routes.append(_route_record(target_name, str(ifkey), ifname, "ipv6", dst, "via6", via.strip()))
+        if entry.get("sourceKind") != "p2p":
+            continue
+        if entry.get("policyOnly") is True:
+            continue
+        family = "ipv6" if entry.get("family") == 6 else "ipv4"
+        via_key = "via6" if family == "ipv6" else "via4"
+        dst = entry.get("dst")
+        via = entry.get("gateway")
+        if not isinstance(dst, str) or not isinstance(via, str) or not via.strip():
+            continue
+        target_name = entry.get("target")
+        ifkey = entry.get("interface")
+        if not isinstance(target_name, str) or not target_name:
+            raise ValueError(
+                "FS-310: canonicalRoutes entry has no target; the renderer must "
+                "not invent a runtime target"
+            )
+        if not isinstance(ifkey, str) or not ifkey:
+            raise ValueError(
+                "FS-310: canonicalRoutes entry has no interface; the renderer "
+                "must not invent a route carrier"
+            )
+        ifname_value = entry.get("runtimeIfName")
+        ifname = ifname_value if isinstance(ifname_value, str) and ifname_value else ifkey
+        route_key = (target_name, ifname, family, dst, via.strip())
+        if route_key in seen:
+            continue
+        seen.add(route_key)
+        routes.append(_route_record(target_name, ifkey, ifname, family, dst, via_key, via.strip()))
     return routes
 
 
