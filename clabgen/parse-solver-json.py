@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 import json
 import os
 from pathlib import Path
@@ -60,6 +62,90 @@ def _with_env_target_host(renderer_inventory: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
+
+def _table_route_key(line: str):
+    """(family, table, destination) for an `ip route ... table` line, or None.
+
+    Token-based on purpose: the emitted command may be wrapped as
+    `sh -c '...'` or, inside the exec list, as `sh -c '"'"'...'"'"'`, so the
+    tokens carry quoting characters. This also keeps the scanner free of
+    regular expressions, which this repository's dynamic-code guard
+    (FS-310-HDS-030-SDS-010-SMS-090) treats as generated code.
+    """
+    tokens = [token.strip("\"'\\") for token in line.split()]
+    for index, token in enumerate(tokens):
+        if token != "ip":
+            continue
+        cursor = index + 1
+        family = "4"
+        if cursor < len(tokens) and tokens[cursor] == "-6":
+            family = "6"
+            cursor += 1
+        if cursor + 3 >= len(tokens):
+            continue
+        if tokens[cursor] != "route":
+            continue
+        if tokens[cursor + 1] not in ("replace", "add"):
+            continue
+        if tokens[cursor + 2] != "table":
+            continue
+        table = tokens[cursor + 3]
+        destination = tokens[cursor + 4]
+        if not table.isdigit() or not destination:
+            continue
+        return (family, table, destination)
+    return None
+
+def _dedupe_table_routes(rendered: Dict[str, Any]) -> Dict[str, Any]:
+    """FS-315 / FS-310-HDS-020-SDS-010-SMS-060: one authority, one next hop.
+
+    A node's exec list is assembled from several renderers, and more than one
+    can name the same (table, destination) through a different member surface.
+    `ip route replace` keys on that tuple, so the surviving route depends on
+    write order -- measured on `single-wan`, `downstream-selector` table 1003:
+
+      ip route replace table 1003 10.20.10.0/24 via 10.10.0.13 dev ens5 onlink
+      sh -c '... ip route replace table 1003 10.20.10.0/24 via 10.10.0.4 dev ens8 ...'
+
+    The first occurrence for a (family, table, destination) wins; later copies
+    are dropped with a diagnostic. Rules and main-table routes are untouched.
+    """
+    nodes = rendered.get("topology", {}).get("nodes", {})
+    if not isinstance(nodes, dict):
+        return rendered
+    for node_name, node in nodes.items():
+        if not isinstance(node, dict):
+            continue
+        exec_bundles = node.get("exec")
+        if not isinstance(exec_bundles, list):
+            continue
+        seen: set = set()
+        new_bundles = []
+        for bundle in exec_bundles:
+            if not isinstance(bundle, str):
+                new_bundles.append(bundle)
+                continue
+            kept = []
+            for line in bundle.split("\n"):
+                key = _table_route_key(line)
+                if key is not None:
+                    family, table, dst = key
+                    if key in seen:
+                        print(
+                            f"FS-310-HDS-020-SDS-010-SMS-060: dropping a second route for "
+                            f"table {table} {dst} on {node_name} "
+                            f"(one authority, one next-hop set)",
+                            file=sys.stderr,
+                        )
+                        continue
+                    seen.add(key)
+                kept.append(line)
+            if any(line.strip() for line in kept):
+                new_bundles.append("\n".join(kept))
+        node["exec"] = new_bundles
+    return rendered
+
+
 def render_topology(
     solver_json: str | Path,
     renderer_inventory: Dict[str, Any] | None = None,
@@ -74,6 +160,7 @@ def render_topology(
         renderer_inventory=renderer_inventory,
     )
     rendered = enterprise.render()
+    rendered = _dedupe_table_routes(rendered)
 
     for link in rendered.get("topology", {}).get("links", []):
         endpoints = list(link.get("endpoints", []))
