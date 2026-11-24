@@ -6,7 +6,7 @@
 # field consumption, entrypoints require CPM JSON, flake.nix hostModule
 # accepts cpm struct not raw paths).
 #
-# SMS-102 is the CLAB per-renderer child spec of SMS-100.
+# FS-310-HDS-040-SDS-010-SMS-102 is the CLAB per-renderer child spec of FS-310-HDS-040-SDS-010-SMS-100.
 # Two active seeded negative cases required per SMS §Seeded Negative Requirement.
 set -euo pipefail
 
@@ -245,55 +245,79 @@ if has_host_module and has_bundle_input and not accepts_raw_cpm:
 # The SMT fixtures carry the semantic model, the real pipeline carries a
 # control-plane envelope; wrapping either one twice drops `.data`.
 # ═══════════════════════════════════════════════════════════════════════
-print("\n=== Check 5b: canonical envelope unwraps both producer shapes ===")
+print("\n=== Check 5b: the solver maps canonical collections and refuses the raw artifact ===")
 
 from clabgen.canonical_bundle import control_plane_envelope  # noqa: E402
 from clabgen.cpm_solver import control_plane_model_to_solver_json  # noqa: E402
 
-enterprise = {"esp": {"site-b": {"runtimeTargets": {"router-a": {}}}}}
+site_b = {
+    "runtimeTargets": {"router-a": {}},
+    "forwardingSemantics": {"nodes": {}},
+    "transit": {},
+}
+canonical = {
+    "canonicalSites": {"byEnterprise": {"esp": {"site-b": site_b}}},
+    "canonicalInterfaces": [],
+    "canonicalRoutes": [],
+    "canonicalRuntimeTargets": {"targets": []},
+    "canonicalForwarding": {},
+}
 
 
-def released(network_data):
+def released(payload):
+    """The renderer-input view: canonical collections + stamps, NO 'network' key.
+
+    This is what network-realization-model.lib.validateRendererInput(...)
+    .rendererInput serialises. The old shape here was a released bundle carrying
+    `network.data`, which the row now refuses -- the check that accepted it was
+    asserting the bypass.
+    """
     return {
         "kind": "network-realization-bundle",
         "bundleIdentity": "bundle-x",
         "validation": {"valid": True, "artifactIdentity": "bundle-x"},
-        "network": {"data": network_data},
+        **payload,
     }
 
 
 check5b_fails = 0
-for label, bundle in (
-    ("semantic-model", released({"data": enterprise, "version": 1})),
-    (
-        "control-plane-envelope",
-        released({"control_plane_model": {"data": enterprise, "version": 1}}),
-    ),
-):
-    solver = control_plane_model_to_solver_json(control_plane_envelope(bundle))
-    targets = (
-        solver.get("enterprise", {})
-        .get("esp", {})
-        .get("site", {})
-        .get("site-b", {})
-        .get("runtimeTargets")
-    )
-    if targets != {"router-a": {}}:
-        fail(f"{label} bundle envelope did not reach the solver: {solver!r}")
-        check5b_fails += 1
 
+solver = control_plane_model_to_solver_json(control_plane_envelope(released({"canonical": canonical})))
+targets = (
+    solver.get("enterprise", {})
+    .get("esp", {})
+    .get("site", {})
+    .get("site-b", {})
+    .get("runtimeTargets")
+)
+if targets != {"router-a": {}}:
+    fail(f"canonical bundle did not reach the solver: {solver!r}")
+    check5b_fails += 1
+
+# The raw producer artifact must be refused, not rendered.
+try:
+    control_plane_envelope(released({"network": {"data": {"data": {}}}}))
+except Exception as exc:  # noqa: BLE001 - the gate must fail closed
+    if "GAMP-MODEL-BOUNDARY-VIOLATION" not in str(exc):
+        fail(f"bundle carrying 'network' raised the wrong diagnostic: {exc}")
+        check5b_fails += 1
+else:
+    fail("bundle carrying 'network' was accepted as renderer input")
+    check5b_fails += 1
+
+# A bundle with neither is not renderable either.
 try:
     control_plane_envelope(released({"version": 1}))
 except Exception as exc:  # noqa: BLE001 - the gate must fail closed
     if "GAMP-MODEL-BOUNDARY-VIOLATION" not in str(exc):
-        fail(f"bundle without control-plane data raised the wrong diagnostic: {exc}")
+        fail(f"bundle without canonical collections raised the wrong diagnostic: {exc}")
         check5b_fails += 1
 else:
-    fail("bundle without control-plane data was accepted")
+    fail("bundle without canonical collections was accepted")
     check5b_fails += 1
 
 if check5b_fails == 0:
-    print("  PASS: both producer envelopes project identically; empty data fails closed")
+    print("  PASS: canonical collections reach the solver; 'network' and empty inputs fail closed")
 
 # ═══════════════════════════════════════════════════════════════════════
 # CHECK 5c: the renderer's input gate runs on realization-model + schema
@@ -546,7 +570,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 def _ingest_cpm_data(cpm: Dict[str, Any]) -> str:
-    """Inject CPM data with silent error swallowing — SMS-102 negative."""
+    """Inject CPM data with silent error swallowing — FS-310-HDS-040-SDS-010-SMS-102 negative."""
     try:
         node_data = cpm["control_plane_model"]["data"]["esp"]["clab"]
         return node_data.get("runtimeTargets", {})
@@ -583,7 +607,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 def _render_emulation_artifacts(site: Dict[str, Any]) -> list[str]:
-    """Consume upstreamEmulation side-channel field — SMS-102 negative."""
+    """Consume upstreamEmulation side-channel field — FS-310-HDS-040-SDS-010-SMS-102 negative."""
     emulation = site.get("upstreamEmulation")
     if not isinstance(emulation, dict):
         return []
@@ -595,7 +619,7 @@ def _render_emulation_artifacts(site: Dict[str, Any]) -> list[str]:
     return result
 
 def _render_provider_artifacts(site: Dict[str, Any]) -> list[str]:
-    """Consume providerAccess side-channel field — SMS-102 negative."""
+    """Consume providerAccess side-channel field — FS-310-HDS-040-SDS-010-SMS-102 negative."""
     provider = site.get("providerAccess")
     if not isinstance(provider, dict):
         return []

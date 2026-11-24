@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 # GAMP-ID: FS-380-HDS-020-SDS-010-SMS-050
 # GAMP-SCOPE: software-module-test
+# GAMP-EXECUTION: live
+#
+# LIVE because it renders the ACTIVE lab: it reads network-labs/current-lab,
+# and its own first assertion is that current-lab is selected to this row. On a
+# checkout whose lab selection is something else it cannot run -- it printed
+# `SKIP FS-380 ... current-lab selected SMT:FS-540-...`, and the matrix runner
+# correctly treats a SKIP as a failure, because a skip that reads as green is
+# how a suite claims coverage it does not have. Declaring the dependency is
+# what makes the exclusion honest and keeps `run-one.sh` able to insist on a
+# verdict for everything that does not declare it.
 set -euo pipefail
 
 repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)}"
@@ -143,7 +153,7 @@ require_policy_line() {
 require_line "ip route replace table 1001 10.1.124.0/24 nexthop via 10.1.255.6 dev p1 onlink nexthop via 10.1.255.8 dev p2 onlink"
 require_line "ip route replace table 1002 0.0.0.0/0 via 10.1.255.4 dev p0 onlink"
 require_line "ip route replace table 1003 0.0.0.0/0 via 10.1.255.4 dev p0 onlink"
-# SMS-050: source-scoped rules when CPM provides source prefixes (current),
+# FS-380-HDS-020-SDS-010-SMS-050: source-scoped rules when CPM provides source prefixes (current),
 #           bare iif rules when source prefixes are unavailable (legacy).
 # Either format is acceptable; grep -E covers both.
 grep -qE "sh -c 'ip rule add (from [0-9a-fA-F.:]+/[0-9]+ )?iif p0 priority 1001 table 1001 2>/dev/null \|\| true'" <<<"${upstream_node_flat}" \

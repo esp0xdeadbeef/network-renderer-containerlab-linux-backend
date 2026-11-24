@@ -6,7 +6,7 @@
 # `except Exception: pass` error hiders, no unclassified `or ""` in
 # Python production code.
 #
-# SMS-112 is the CLAB per-renderer child spec of SMS-110 (fail-closed).
+# FS-310-HDS-030-SDS-010-SMS-112 is the CLAB per-renderer child spec of FS-310-HDS-030-SDS-010-SMS-110 (fail-closed).
 # Covers fix in commit 9852609: `or null` instead of `or ""`.
 # Two active seeded negative cases required per SMS §Seeded Negative Requirement.
 set -euo pipefail
@@ -44,7 +44,7 @@ KNOWN_GAPS = {
     ("clabgen/s88/enterprise/site_loader.py", 154, "or \"\" — upstreamSelectorNodeName defaults to empty string"),
 }
 
-# Pre-existing silent error hiders (also tracked in SMS-102 KNOWN_GAPS)
+# Pre-existing silent error hiders (also tracked in FS-310-HDS-030-SDS-010-SMS-102 KNOWN_GAPS)
 SILENT_HIDER_KNOWN_GAPS = {
     ("clabgen/s88/CM/linux_route_values.py", 61, "except Exception: pass — silent pass on int(prefix) failure"),
 }

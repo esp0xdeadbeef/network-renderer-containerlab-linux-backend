@@ -353,7 +353,7 @@ def classify_primitives(primitives, cpm_auth, solver_json):
     for entry in primitives.get("tables", []):
         tbl = entry["table"]
         fam = entry["family"]
-        # ip nat and ip6 nat are platform-registry primitives (SMS-050 registered)
+        # ip nat and ip6 nat are platform-registry primitives (FS-310-HDS-020-SDS-010-SMS-050 registered)
         if tbl in ("nat",) and fam in ("ip", "ip6"):
             report.append(f"    OK: {fam} {tbl} (source: platform-registry, nftables standard nat table)")
         else:

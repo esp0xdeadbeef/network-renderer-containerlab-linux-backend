@@ -178,7 +178,7 @@ if seeded_file.exists():
 # ── Positive check: verify POLICY_NFT_RULE has HAT verification path ──
 policy_lines = classified.get("POLICY_NFT_RULE", [])
 if policy_lines:
-    print(f"\n  SMS-080 NOTE: {len(policy_lines)} POLICY_NFT_RULE lines require")
+    print(f"\n  FS-310-HDS-030-SDS-010-SMS-080 NOTE: {len(policy_lines)} POLICY_NFT_RULE lines require")
     print(f"  HAT nft counter verification. HAT live evidence confirms forward")
     print(f"  path counters active (see GAMP/HAT/2026-06-11-live-validation.md).")
 

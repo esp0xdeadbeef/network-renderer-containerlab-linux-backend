@@ -6,7 +6,7 @@
 # JSON emission. Validates the Dockerfile, build.sh, and VM runner together.
 # Non-destructive: read-only grep checks on source files.
 #
-# SMS-020 Acceptance Predicates:
+# FS-780-HDS-010-SDS-010-SMS-020 Acceptance Predicates:
 #  1. Docker wait/readiness in VM runner (run-in-vm.sh)
 #  2. FRR tooling base image pinned by digest
 #  3. FRR binaries present (staticd, bgpd, zebra)

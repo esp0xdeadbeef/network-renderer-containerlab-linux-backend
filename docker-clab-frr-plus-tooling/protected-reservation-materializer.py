@@ -5,7 +5,7 @@ GAMP-ID: FS-560-HDS-010-SDS-010-SMS-050
 GAMP-SCOPE: software-module-construction
 
 Owning implementation artifact for protected reservation name materialization
-(SMS-050).  Consumes the schema-valid canonical publication record via the
+(FS-560-HDS-010-SDS-010-SMS-050).  Consumes the schema-valid canonical publication record via the
 --dns-* arguments and materializes platform-native A, AAAA, and PTR local data
 for Unbound at runtime.
 
@@ -247,7 +247,7 @@ def materialize_dns_lines(
                 record_addresses.append(str(v6))
         require(record_addresses)
 
-        # SMS-050 predicate 007: address-set publication allows distinct
+        # FS-560-HDS-010-SDS-010-SMS-050 predicate 007: address-set publication allows distinct
         # reservation identities to contribute unique addresses to one
         # hostname. Identical name/address pairs are deduplicated, while one
         # address bound to multiple names is an ownership conflict.

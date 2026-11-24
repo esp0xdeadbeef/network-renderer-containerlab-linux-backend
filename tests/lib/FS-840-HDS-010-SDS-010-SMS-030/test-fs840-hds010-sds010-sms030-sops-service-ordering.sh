@@ -13,7 +13,7 @@
 #   SN1 — construct a host-module fragment where s-router-clab-render-live
 #          has NO sops-nix.service in after; verify scanner detects the gap
 #   SN2 — construct a fragment with oneshot sops decrypt service; verify
-#          scanner detects the SMS-070 violation
+#          scanner detects the FS-840-HDS-010-SDS-010-SMS-070 violation
 set -euo pipefail
 
 repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)}"
@@ -109,7 +109,7 @@ injected_file2="${tmp_dir}/injected-clab-oneshot.nix"
 cat > "${injected_file2}" <<'NIX'
 { pkgs, ... }:
 {
-  # VIOLATION: oneshot service that decrypts secrets — prohibited by SMS-070
+  # VIOLATION: oneshot service that decrypts secrets — prohibited by FS-840-HDS-010-SDS-010-SMS-070
   systemd.services.clab-pppoe-secrets = {
     wantedBy = [ "multi-user.target" ];
     serviceConfig.Type = "oneshot";

@@ -6,11 +6,11 @@
 # seeded negatives per SMS §Seeded Negative Requirements.
 #
 # SMS predicates verified:
-#   - SMS-060: Access node nftables forward accept rules
-#   - SMS-070: Core forward chain policy drop + explicit tenant accept
-#   - SMS-080: Upstream-selector default route single-nexthop onlink
-#   - SMS-090: Core return-path subnet routes
-#   - SMS-100: No default-route ip rule catch-alls on shared interfaces
+#   - FS-370-HDS-010-SDS-010-SMS-060: Access node nftables forward accept rules
+#   - FS-370-HDS-010-SDS-010-SMS-070: Core forward chain policy drop + explicit tenant accept
+#   - FS-370-HDS-010-SDS-010-SMS-080: Upstream-selector default route single-nexthop onlink
+#   - FS-370-HDS-010-SDS-010-SMS-090: Core return-path subnet routes
+#   - FS-370-HDS-010-SDS-010-SMS-100: No default-route ip rule catch-alls on shared interfaces
 set -euo pipefail
 
 repo_root="${SMS_TEST_REPO_ROOT:-$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)}"
@@ -66,7 +66,7 @@ def expect_diagnostic(description, expected, fn):
 # FIXTURES
 # ═══════════════════════════════════════════════════════════════════════
 
-# ── Access Node Fixture (SMS-060) ──
+# ── Access Node Fixture (FS-370-HDS-010-SDS-010-SMS-060) ──
 # Access node with tenant-client → selector p2p forwarding rule.
 access_eth_map = {
     "tenant-client": "client0",
@@ -130,7 +130,7 @@ access_node = {
     },
 }
 
-# ── Core Node Fixture (SMS-070, SMS-090) ──
+# ── Core Node Fixture (FS-370-HDS-010-SDS-010-SMS-070, FS-370-HDS-010-SDS-010-SMS-090) ──
 # Core node with upstream-selector transport → WAN egress forwarding,
 # and return-path routes for tenant subnets.
 core_eth_map = {
@@ -182,7 +182,7 @@ core_node = {
     },
 }
 
-# ── Upstream-Selector Fixture (SMS-080, SMS-100) ──
+# ── Upstream-Selector Fixture (FS-370-HDS-010-SDS-010-SMS-080, FS-370-HDS-010-SDS-010-SMS-100) ──
 # Selector with policy-facing and core-facing interfaces.
 selector_eth_map = {
     "policy-facing": "ens19",
@@ -276,9 +276,9 @@ selector_node = {
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# CHECK 1: Access node nftables forward accept rules (SMS-060)
+# CHECK 1: Access node nftables forward accept rules (FS-370-HDS-010-SDS-010-SMS-060)
 # ═══════════════════════════════════════════════════════════════════════
-print("=== Check 1: Access node nftables forward accept rules (SMS-060) ===")
+print("=== Check 1: Access node nftables forward accept rules (FS-370-HDS-010-SDS-010-SMS-060) ===")
 
 # Build firewall input from forwardingIntent rules via the real EM path
 from clabgen.s88.EM.base import _firewall_cm_input
@@ -330,9 +330,9 @@ expect_diagnostic(
 )
 
 # ═══════════════════════════════════════════════════════════════════════
-# CHECK 2: Core forward chain + tenant accept rules (SMS-070)
+# CHECK 2: Core forward chain + tenant accept rules (FS-370-HDS-010-SDS-010-SMS-070)
 # ═══════════════════════════════════════════════════════════════════════
-print("\n=== Check 2: Core forward chain + tenant accept rules (SMS-070) ===")
+print("\n=== Check 2: Core forward chain + tenant accept rules (FS-370-HDS-010-SDS-010-SMS-070) ===")
 
 core_fw_input = _firewall_cm_input(core_node, core_eth_map)
 core_fw_rules_input = {
@@ -381,9 +381,9 @@ expect_diagnostic(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# CHECK 3: Upstream-selector default route single-nexthop (SMS-080)
+# CHECK 3: Upstream-selector default route single-nexthop (FS-370-HDS-010-SDS-010-SMS-080)
 # ═══════════════════════════════════════════════════════════════════════
-print("\n=== Check 3: Upstream-selector default route (SMS-080) ===")
+print("\n=== Check 3: Upstream-selector default route (FS-370-HDS-010-SDS-010-SMS-080) ===")
 
 selector_defaults = _render_default_routes(selector_node, selector_eth_map)
 selector_static = _render_static_routes(selector_node, selector_eth_map)
@@ -412,9 +412,9 @@ check("Selector default route has reachable core transport address",
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# CHECK 4: Core return-path routes (SMS-090)
+# CHECK 4: Core return-path routes (FS-370-HDS-010-SDS-010-SMS-090)
 # ═══════════════════════════════════════════════════════════════════════
-print("\n=== Check 4: Core return-path routes (SMS-090) ===")
+print("\n=== Check 4: Core return-path routes (FS-370-HDS-010-SDS-010-SMS-090) ===")
 
 core_defaults = _render_default_routes(core_node, core_eth_map)
 core_static = _render_static_routes(core_node, core_eth_map)
@@ -439,10 +439,10 @@ check("Core nftables reverse forward rule exists (wan→us for tenant)",
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# CHECK 5: Shared interface policy routing (SMS-100)
+# CHECK 5: Shared interface policy routing (FS-370-HDS-010-SDS-010-SMS-100)
 #   — No default-route ip rule catch-alls
 # ═══════════════════════════════════════════════════════════════════════
-print("\n=== Check 5: Shared interface policy routing (SMS-100) ===")
+print("\n=== Check 5: Shared interface policy routing (FS-370-HDS-010-SDS-010-SMS-100) ===")
 
 selector_policy_cmds = render_policy_routes(selector_node, selector_eth_map)
 selector_policy_text = "\n".join(selector_policy_cmds)

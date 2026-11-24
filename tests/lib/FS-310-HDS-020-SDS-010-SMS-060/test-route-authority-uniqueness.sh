@@ -36,7 +36,7 @@ render_log="${tmp_dir}/render.log"
 render_rc=0
 render_clab_example single-wan "${tmp_dir}" >"${render_log}" 2>&1 || render_rc=$?
 
-# This renderer already implements SMS-060: it refuses a destination that
+# This renderer already implements FS-310-HDS-020-SDS-010-SMS-060: it refuses a destination that
 # reaches it with more than one next hop and no multipath authority, naming this
 # trace id. When that happens the site cannot be realized at all, so it is a
 # FAILURE of the property under test -- reported here with the renderer own
@@ -44,7 +44,7 @@ render_clab_example single-wan "${tmp_dir}" >"${render_log}" 2>&1 || render_rc=$
 if grep -q "conflicting-next-hop" "${render_log}"; then
   printf 'FAIL %s: the bundle presents one route authority with several next hops; this renderer correctly refused it\n' "${trace_id}" >&2
   grep "conflicting-next-hop" "${render_log}" | sed "s/^/  /" >&2
-  printf '  SMS-060: different next-hop sets for one authority shall fail unless an explicit multipath contract names the member set.\n' >&2
+  printf '  FS-310-HDS-020-SDS-010-SMS-060: different next-hop sets for one authority shall fail unless an explicit multipath contract names the member set.\n' >&2
   exit 1
 fi
 
@@ -160,7 +160,7 @@ duplicates="$(awk -F'|' '
 if [[ -n "${duplicates}" ]]; then
   printf 'FAIL %s: one route authority is emitted twice with different next hops\n' "${trace_id}" >&2
   while IFS= read -r line; do printf '  %s\n' "${line}" >&2; done <<<"${duplicates}"
-  printf '  SMS-060: one authority, one next-hop set; "ip route replace" keys on (table, destination).\n' >&2
+  printf '  FS-310-HDS-020-SDS-010-SMS-060: one authority, one next-hop set; "ip route replace" keys on (table, destination).\n' >&2
   exit 1
 fi
 

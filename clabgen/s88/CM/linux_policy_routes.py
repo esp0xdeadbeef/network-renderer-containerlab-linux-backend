@@ -638,7 +638,7 @@ def _add_connected_subnet_route(
     connected subnet of the downstream interface itself is not a policyOnly
     route — it is a kernel scope-link route. Without an explicit table route,
     return traffic for a peer on that link falls through to the default route,
-    which may loop back to the upstream node (SMS-101).
+    which may loop back to the upstream node (FS-310-HDS-040-SDS-010-SMS-101).
     """
     cidr = iface.get(field)
     if not isinstance(cidr, str) or not cidr:
@@ -715,7 +715,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
 
     # Phase 2: render policy tables and generic iif rules (order-independent).
     # Skip generic iif rules for access-uplink interfaces — their return-path
-    # routing is handled by Phase 4 cross-rules (SMS-101).
+    # routing is handled by Phase 4 cross-rules (FS-310-HDS-040-SDS-010-SMS-101).
     for _slot, table_id, priority, main_suppress_priority, lane_ifnames, shared_ifnames, routes4, routes6 in lanes:
         # Find whether this lane is an access-uplink (US-facing) interface
         is_uplink = False
@@ -830,7 +830,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
     # access-node lanes like guest, client, trusted) process second and
     # have lower rule priority numbers, giving their rules HIGHER
     # precedence at evaluation time.
-    # SMS-100: "Ensure lower-priority-number lanes do not capture
+    # FS-310-HDS-040-SDS-010-SMS-100: "Ensure lower-priority-number lanes do not capture
     # higher-priority-number lane traffic."
     claimed4: Set[Tuple[str, str]] = set()  # (dst, src_eth)
     claimed6: Set[Tuple[str, str]] = set()
@@ -993,7 +993,7 @@ def render(node: Dict[str, Any], eth_map: Dict[str, str]) -> List[str]:
                 # policyOnly routes (which are via-remote). Without this,
                 # return traffic destined for a peer on the downstream link
                 # hits the upstream table's default route, which may loop
-                # back to the upstream node (SMS-101).
+                # back to the upstream node (FS-310-HDS-040-SDS-010-SMS-101).
                 _add_connected_subnet_route(cmds, ip_cmd="ip", table_id=us_table,
                     iface=ds_iface, eth=ds_eth, field="addr4")
                 _add_connected_subnet_route(cmds, ip_cmd="ip -6", table_id=us_table,

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # GAMP-ID: FS-310-HDS-010-SDS-010-SMS-020
 # Construction test: CLAB Renderer Target Capability Limitation
-# Proves: SMS-020 Module Responsibilities (target capability consumption,
+# Proves: FS-310-HDS-010-SDS-010-SMS-020 Module Responsibilities (target capability consumption,
 # policy-authority separation, limitation-record boundary enforcement)
 # with two active seeded negatives per SMS §Seeded Negative Requirement.
 #

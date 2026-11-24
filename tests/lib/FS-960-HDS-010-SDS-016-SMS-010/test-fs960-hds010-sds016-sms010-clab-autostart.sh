@@ -7,7 +7,7 @@
 # Isolates write_status + verify-containerlab-deploy.sh via fake docker binary.
 # Non-destructive: no real Docker, no real Containerlab.
 #
-# SMS-010 Acceptance Predicates:
+# FS-960-HDS-010-SDS-016-SMS-010 Acceptance Predicates:
 #  1. Locked-source: validate CPM inputs exist (not mutable local path)
 #  2. All containers running+healthy → readiness marker with result=success
 #  3. One container exited → readiness marker NOT success, diagnostic emitted
@@ -559,7 +559,7 @@ fi
 
 # ===========================================================================
 # Test 8 (seeded negative): deploy-clab rejects .nix input as not-locked
-# The SMS-010 spec requires the module to reject mutable Nix sources.
+# The FS-960-HDS-010-SDS-016-SMS-010 spec requires the module to reject mutable Nix sources.
 # deploy-clab enforces: the canonical bundle input must not end in .nix
 # ===========================================================================
 test8_dir="${tmp_dir}/test8"
@@ -622,7 +622,7 @@ fi
 
 # ===========================================================================
 # Test 10: Automatic recovery — after fixing broken state, readiness succeeds
-# This is the SMS-010 seeded negative "after correcting source" scenario.
+# This is the FS-960-HDS-010-SDS-016-SMS-010 seeded negative "after correcting source" scenario.
 # First: no containers (fails), then: containers present (succeeds).
 # ===========================================================================
 test10_dir="${tmp_dir}/test10"

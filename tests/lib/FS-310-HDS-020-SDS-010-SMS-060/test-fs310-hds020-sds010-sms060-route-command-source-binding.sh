@@ -9,7 +9,7 @@
 #   3. Seeded negatives for source scan
 #   4. Emitted command scan: route commands in rendered exec arrays
 #
-# SMS-060 requires: all route commands (ip route, ip rule, sysctl net.ipv4.*)
+# FS-310-HDS-020-SDS-010-SMS-060 requires: all route commands (ip route, ip rule, sysctl net.ipv4.*)
 # trace to explicit CPM/inventory/model source bindings and are NOT
 # hardcoded as policy/route/NAT/DNS authority.
 set -euo pipefail
@@ -32,7 +32,7 @@ from clabgen.s88.enterprise.site_loader import load_sites
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. BUILD MOCK SOLVER JSON (same minimal setup as SMS-040)
+# 1. BUILD MOCK SOLVER JSON (same minimal setup as FS-310-HDS-020-SDS-010-SMS-040)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def make_solver_json():
@@ -180,8 +180,8 @@ SCAN_EXCLUDE_FILES = {
 }
 
 # Filter out known seeded negative values (cross-test contamination guard).
-# Seeded negatives from sibling tests (evil_source_table from SMS-050,
-# ip nat_evil from SMS-070) use "evil" in their names. Exclude lines
+# Seeded negatives from sibling tests (evil_source_table from FS-310-HDS-020-SDS-010-SMS-050,
+# ip nat_evil from FS-310-HDS-020-SDS-010-SMS-070) use "evil" in their names. Exclude lines
 # containing these markers so they don't cause false matches.
 KNOWN_SEEDED_NEGATIVES = {"evil_source_table", "evil_table", "nat_evil"}
 
@@ -494,7 +494,7 @@ if rp_filter_cmds:
     print(f"  as the first exec command for every node, without CPM gating.")
     print(f"  This sysctl writes to net.ipv4.conf.*.rp_filter without")
     print(f"  CPM source binding. (rp_filter is a kernel-level forwarding")
-    print(f"  knob; the SMS-060 gap is that it's not gated by any CPM field.)")
+    print(f"  knob; the FS-310-HDS-020-SDS-010-SMS-060 gap is that it's not gated by any CPM field.)")
 else:
     print(f"  No rp_filter commands emitted.")
 
@@ -515,9 +515,9 @@ if addr_values_in_cmds:
 else:
     print(f"\n  ip addr commands: no CPM address matches found")
 
-# ── 6f. Overall SMS-060 verdict ──────────────────────────────────────────
+# ── 6f. Overall FS-310-HDS-020-SDS-010-SMS-060 verdict ──────────────────────────────────────────
 
-print(f"\n--- SMS-060 verdict ---")
+print(f"\n--- FS-310-HDS-020-SDS-010-SMS-060 verdict ---")
 print(f"  Total route-command source locations: {total_sources}")
 print(f"  CPM/Platform-traced:  {all_bound}")
 print(f"  Dead code:            {all_dead}")
@@ -535,7 +535,7 @@ if all_unbound > 0:
 # The test provides evidence for acceptance comparison.
 # However, for CI purposes we treat UNBOUND items as a soft failure:
 if all_unbound > 0:
-    print(f"\n  SMS-060 has unbound route-command sources. This is a documented gap.")
+    print(f"\n  FS-310-HDS-020-SDS-010-SMS-060 has unbound route-command sources. This is a documented gap.")
     # sys.exit(1)  # Uncomment when gap is resolved
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -545,10 +545,10 @@ if all_unbound > 0:
 print(f"\n--- Seeded negative: source code ---")
 
 # Use an isolated temp file to avoid race conditions with sibling tests
-# (SMS-050 also writes to clabgen/__init__.py under parallel HAT load).
+# (FS-310-HDS-020-SDS-010-SMS-050 also writes to clabgen/__init__.py under parallel HAT load).
 seeded_dir = Path(tempfile.mkdtemp(prefix="sms060-seeded-"))
 seeded_file = seeded_dir / "seeded_sysctl.py"
-seeded_comment = "# sysctl -w net.ipv4.tcp_fastopen=3  # SEEDED NEGATIVE SMS-060\n"
+seeded_comment = "# sysctl -w net.ipv4.tcp_fastopen=3  # SEEDED NEGATIVE FS-310-HDS-020-SDS-010-SMS-060\n"
 seeded_file.write_text(seeded_comment)
 
 try:
@@ -630,7 +630,7 @@ PY
 #   b) Output is identical regardless of input order (input-order independence)
 #   c) Both provenance identities are retained (same route count)
 #
-# SMS-060 predicate: "Inject the same canonical route twice with identical
+# FS-310-HDS-020-SDS-010-SMS-060 predicate: "Inject the same canonical route twice with identical
 # next-hop semantics and opposite input order; require one byte-stable emitted
 # route and retained provenance for both inputs."
 
@@ -767,7 +767,7 @@ fi
 #   a) Diagnostic message on stderr
 #   b) Zero route output for the conflicting destination
 #
-# SMS-060 predicate: "change only the second next hop; require a
+# FS-310-HDS-020-SDS-010-SMS-060 predicate: "change only the second next hop; require a
 # conflicting-next-hop diagnostic and zero route output rather than ECMP
 # or first/last-entry selection."
 
@@ -888,7 +888,7 @@ for cmd in node_data.get("exec", []):
 
     # Check for diagnostic on stderr
     if "FS-310-HDS-020-SDS-010-SMS-060" not in stderr_output:
-        print(f"  FAIL: no SMS-060 diagnostic on stderr")
+        print(f"  FAIL: no FS-310-HDS-020-SDS-010-SMS-060 diagnostic on stderr")
         print(f"  stderr: {stderr_output[:500]}")
         sys.exit(1)
 
@@ -939,7 +939,7 @@ fi
 # Verify the source scan detects a hardcoded "ip route add 10.0.0.0/8 via
 # 192.168.1.1" without CPM route-authority or egress/return behavior binding.
 #
-# SMS-060 predicate: "Inject a hardcoded route command ip route add
+# FS-310-HDS-020-SDS-010-SMS-060 predicate: "Inject a hardcoded route command ip route add
 # 10.0.0.0/8 via 192.168.1.1 into renderer source without CPM
 # route-authority or egress/return behavior binding, and verify the
 # construction scan reports an unbound route primitive with diagnostic."

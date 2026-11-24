@@ -167,7 +167,7 @@ if ! grep -q 'vm-host-firewall.nix' "${repo_root}/vm.nix"; then
   exit 1
 fi
 if ! grep -q 'FS-310-HDS-020-SDS-010-SMS-200' "${repo_root}/vm-host-firewall.nix"; then
-  echo "  FAIL: vm-host-firewall.nix does not carry the SMS-200 trace"
+  echo "  FAIL: vm-host-firewall.nix does not carry the FS-310-HDS-020-SDS-010-SMS-200 trace"
   exit 1
 fi
 echo "  PASS: vm.nix host-firewall decision traces to vm-host-firewall.nix authority resolver"
@@ -201,7 +201,7 @@ if ! grep -q 'FS-310-HDS-020-SDS-010-SMS-200' <<<"${missing_err}" \
   echo "${missing_err}" | tail -5
   exit 1
 fi
-echo "  PASS: silent source rejected with diagnostic naming containerlab.hostFirewall + SMS-200"
+echo "  PASS: silent source rejected with diagnostic naming containerlab.hostFirewall + FS-310-HDS-020-SDS-010-SMS-200"
 
 # Malformed authority record (no boolean enable) must also fail closed.
 set +e
@@ -266,7 +266,7 @@ try:
     mod._host_firewall_authority({"containerlab": {"hostFirewall": {"enable": "no"}}})
 except ValueError as e:
     assert "FS-310-HDS-020-SDS-010-SMS-200" in str(e), e
-    print("  PASS: malformed containerlab.hostFirewall rejected with SMS-200 diagnostic")
+    print("  PASS: malformed containerlab.hostFirewall rejected with FS-310-HDS-020-SDS-010-SMS-200 diagnostic")
 else:
     print("  FAIL: malformed hostFirewall record accepted by generator")
     sys.exit(1)

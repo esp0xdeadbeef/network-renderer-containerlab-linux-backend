@@ -64,7 +64,26 @@ with open(os.environ["INVENTORY_JSON"], encoding="utf-8") as handle:
     inventory = json.load(handle)
 inventory.setdefault("containerlab", {})["targetHost"] = "s-router-clab"
 
-solver = control_plane_model_to_solver_json({"control_plane_model": cpm})
+from clabgen.canonical_bundle import control_plane_envelope  # noqa: E402
+from clabgen.testing.canonical_fixture import canonical_bundle_path  # noqa: E402
+
+# FS-310-HDS-040-SDS-010-SMS-100/-102: the solver takes CANONICAL collections
+# from one released bundle. It used to take the producer envelope, and the two
+# call sites below still passed {"control_plane_model": ...} -- which is the plain
+# artifact, not a bundle. After the boundary was enforced they raised
+# "canonical.canonicalSites must be an object", and that was the evidence the
+# refactor had reached the renderer without reaching its tests.
+#
+# The fixture CPM is released by network-realization-model itself (never a
+# fabricated stamp): tests/lib/canonical-bundle.sh -> emit_canonical_bundle.
+_bundle_path = canonical_bundle_path(
+    Path(os.environ.get("REPO_ROOT", os.environ.get("SMS_TEST_REPO_ROOT", "."))).resolve(),
+    cpm,
+    "fs540-clab",
+)
+with open(_bundle_path, encoding="utf-8") as _handle:
+    _bundle = json.load(_handle)
+solver = control_plane_model_to_solver_json(control_plane_envelope(_bundle))
 with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as handle:
     json.dump(solver, handle)
     handle.flush()

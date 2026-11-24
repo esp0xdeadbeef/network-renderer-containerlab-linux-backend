@@ -458,7 +458,7 @@ print()
 # ── Seeded negative for source code scan ──
 print("--- Seeded negative for source code scan ---")
 # Use an isolated temp file to avoid race conditions with sibling tests
-# (SMS-060 also writes to clabgen/__init__.py under parallel HAT load).
+# (FS-310-HDS-020-SDS-010-SMS-060 also writes to clabgen/__init__.py under parallel HAT load).
 seeded_dir = Path(tempfile.mkdtemp(prefix="sms050-seeded-"))
 seeded_file = seeded_dir / "seeded_nftables.py"
 evil_comment = "# nft add table inet evil_source_table"

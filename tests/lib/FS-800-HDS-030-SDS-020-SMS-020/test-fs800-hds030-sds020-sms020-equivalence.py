@@ -116,7 +116,7 @@ nixos_expr = """\
       modules = [ module.config ];
     };
   in
-    # SMS-020 requires the exact DHCPv6 reply rule as well as the PD client
+    # FS-800-HDS-030-SDS-020-SMS-020 requires the exact DHCPv6 reply rule as well as the PD client
     # config, so the reference artifact carries both: the rendered client config
     # and the rendered firewall ruleset. Comparing only the config file (as the
     # test did) made the firewall feature unobservable on the reference side.
@@ -146,7 +146,7 @@ try:
         render("test-core", {"services": {"pppoe": {"client": mutant_client}}}, {"provider-handoff": "eth1"})
     )
 except ValueError:
-    # SMS-020 requires incomplete realization facts to be rejected rather than
+    # FS-800-HDS-030-SDS-020-SMS-020 requires incomplete realization facts to be rejected rather than
     # derived; a fail-closed rejection is the correct non-equivalent outcome.
     mutant_clab = None
 

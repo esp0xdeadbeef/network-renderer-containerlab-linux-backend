@@ -41,7 +41,7 @@ emit_canonical_bundle() {
 
 # CLI: canonical-bundle.sh <cpm.json> <bundle.json> [scope]
 # Used by focused renderer tests (Python) that build a CPM fixture themselves:
-# SMS-100 permits a schema-valid canonical fixture, and the release stamp is
+# FS-310-HDS-040-SDS-010-SMS-100 permits a schema-valid canonical fixture, and the release stamp is
 # produced by network-realization-model, never fabricated by the test.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   [[ $# -ge 2 ]] || { echo "usage: $0 <cpm.json> <bundle.json> [scope]" >&2; exit 2; }

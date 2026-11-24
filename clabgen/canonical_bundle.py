@@ -36,7 +36,7 @@ def is_direct_cpm(payload: Any) -> bool:
 
 
 def control_plane_envelope(bundle: Any) -> Dict[str, Any]:
-    """Return the canonical control-plane envelope carried by a released bundle."""
+    """Return the bundle's CANONICAL collections, which are all a renderer may map."""
     if is_direct_cpm(bundle):
         raise _redacted(
             "renderer input is a raw control-plane-model payload; renderers consume "
@@ -56,43 +56,35 @@ def control_plane_envelope(bundle: Any) -> Dict[str, Any]:
         raise _redacted("bundle lacks a bundle identity")
     if validation.get("artifactIdentity") != identity:
         raise _redacted("released identity does not match the supplied bundle content")
-    # FS-310-HDS-040-SDS-010-SMS-102 (CLAB renderer canonical-only consumption):
-    # the renderer may map the canonical collections and nothing else. A released
-    # bundle still CARRIES the producer artifact at `network.data` -- identity and
-    # coverage are computed over it -- and this renderer used to read it, building
-    # its own solver model from `control_plane_model.data.<enterprise>.<site>`.
-    # That is the boundary violation, so the gate refuses the artifact outright
-    # rather than letting a renderer that has not been repaired render anything.
+    # FS-310-HDS-040-SDS-010-SMS-102: what a renderer may map is the bundle's
+    # CANONICAL section, and nothing else. Two inputs reach this gate:
     #
-    # Fail fast, and say what to map instead: a payload carrying `network` cannot
-    # be rendered by this backend until `cpm_solver` reads `canonical.*`.
-    if "network" in bundle:
+    #   * `validateRendererInput(...).rendererInput` -- the serialised renderer
+    #     view: `canonical` + stamps, deliberately WITHOUT a `network` key;
+    #   * a released bundle that still carries `network` (the raw producer
+    #     artifact). Identity and coverage are computed over it, but a renderer
+    #     that reads it is building a parallel network model from
+    #     `control_plane_model.data`, which is the violation this row forbids.
+    #
+    # So: `network` present -> refuse; `canonical` present -> hand back the
+    # canonical collections.
+    # A RELEASED bundle legitimately carries `network` -- realize() computes the
+    # bundle identity and coverage over the producer artifact. Having it is not a
+    # violation; MAPPING it is. So a bundle with `canonical` is accepted here and
+    # only `canonical` is returned; a payload whose only network content is
+    # `network` (no canonical collections) is refused below, because a renderer
+    # reading that would be building a parallel model from
+    # control_plane_model.data.
+    canonical = bundle.get("canonical")
+    if not isinstance(canonical, dict):
         raise _redacted(
-            "FS-310-HDS-040-SDS-010-SMS-102: the renderer input carries 'network' (the "
-            "plain control-plane artifact). The CLAB backend may map only the bundle's "
-            "'canonical' collections; building the solver model from "
-            "control_plane_model.data is the violation this row forbids. Serialise "
-            "validateRendererInput.rendererInput (canonical collections + stamps, no "
-            "'network' key) and map canonical.canonicalSites / canonicalRuntimeTargets / "
-            "canonicalInterfaces / canonicalRoutes"
+            "FS-310-HDS-040-SDS-010-SMS-102: renderer input carries no 'canonical' "
+            "collections, so this backend has nothing it is allowed to map. A released "
+            "bundle carries them (network-realization-model realize() -> canonicalFor); "
+            "a payload that carries only 'network' is the raw producer artifact, and "
+            "mapping it is the boundary violation this row forbids"
         )
-    network = bundle.get("network")
-    if not isinstance(network, dict) or not isinstance(network.get("data"), dict):
-        raise _redacted("bundle does not carry network data")
-    data = network["data"]
-    # Two producer shapes reach a renderer: the semantic model itself
-    # (`{data: <enterprise map>, ...}`) and the control-plane envelope the real
-    # pipeline carries (`{control_plane_model: <model>, ...}`). Return ONE
-    # envelope shape so callers never wrap it a second time.
-    control_plane_model = data.get("control_plane_model")
-    envelope = (
-        data
-        if isinstance(control_plane_model, dict)
-        else {"control_plane_model": data}
-    )
-    if not isinstance(envelope["control_plane_model"].get("data"), dict):
-        raise _redacted("bundle does not carry control-plane model data")
-    return envelope
+    return canonical
 
 
 __all__ = [

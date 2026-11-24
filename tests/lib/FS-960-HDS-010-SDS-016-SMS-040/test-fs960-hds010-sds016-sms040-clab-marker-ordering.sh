@@ -7,7 +7,7 @@
 # consumption and premature container start.
 # Non-destructive: no real Docker, no real Containerlab, no live host.
 #
-# SMS-040 Acceptance Predicates:
+# FS-960-HDS-010-SDS-016-SMS-040 Acceptance Predicates:
 #  1. fabric.clab.yml consumption gated on render-live complete-success marker
 #  2. Docker container startup gated on network-artifacts readiness
 #  3. Seeded negative: HAT consumes fabric before render-live complete → REJECT
@@ -24,7 +24,7 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 failures=0
 
 # ---------------------------------------------------------------------------
-# SMS-040 marker artifact ordering check function.
+# FS-960-HDS-010-SDS-016-SMS-040 marker artifact ordering check function.
 # This mirrors the ordering logic from the HAT readiness pipeline:
 #   - fabric.clab.yml must not be consumed before render-live complete-success
 #   - Docker containers must not be started before network-artifacts readiness

@@ -5,7 +5,7 @@
 # Isolates wait_for_docker diagnostics and fail() patterns.
 # Non-destructive: uses fake binaries, no real Docker or Containerlab.
 #
-# Failure classes tested (SDS-016 / SMS-060):
+# Failure classes tested (FS-960-HDS-010-SDS-016-SMS-060 / FS-960-HDS-010-SDS-016-SMS-060):
 #  - privilege_failure: docker permission denied, sudo password required
 #  - missing_artifacts: missing CPM JSON, missing renderer inventory, missing cache evidence
 #  - deployment_failure: no running fabric containers, no non-loopback interface

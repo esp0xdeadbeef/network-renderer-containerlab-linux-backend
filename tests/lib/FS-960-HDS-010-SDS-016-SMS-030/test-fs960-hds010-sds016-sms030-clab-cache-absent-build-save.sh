@@ -5,7 +5,7 @@
 # Isolates docker-clab-frr-plus-tooling/build.sh via fake docker binary.
 # Non-destructive: no real Docker, no real image build.
 #
-# Acceptance predicates from SMS-030:
+# Acceptance predicates from FS-960-HDS-010-SDS-016-SMS-030:
 #  1. Cache-absent path builds the Docker image (imageBuilt=true)
 #  2. Cache-absent path saves the cache artifact (cacheSaved=true)
 #  3. Cache-absent path reports cachePresentAtStart=false

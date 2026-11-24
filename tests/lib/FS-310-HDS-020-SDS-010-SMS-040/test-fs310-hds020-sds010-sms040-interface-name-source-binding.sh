@@ -113,7 +113,7 @@ def make_solver_json():
 PLATFORM_ALLOWED = {
     "eth0",  # CLAB management/console interface (platform convention)
     "ppp0",  # Linux PPPoE session interface (platform convention, default runtimeInterface)
-    "ppp1",  # Linux PPPoE session interface (platform-dynamic, SMS-040 L27-29)
+    "ppp1",  # Linux PPPoE session interface (platform-dynamic, FS-310-HDS-020-SDS-010-SMS-040 L27-29)
 }
 
 # Pattern for names generated deterministically from CPM/metadata:
@@ -127,7 +127,7 @@ GENERATED_PATTERNS = [
 ]
 
 # Interface-name-like patterns to scan for in source code.
-# Covers all forms the SMS-040 spec lists: eth*, ens*, enp*, if-*, wg*, nebula*,
+# Covers all forms the FS-310-HDS-020-SDS-010-SMS-040 spec lists: eth*, ens*, enp*, if-*, wg*, nebula*,
 # bridge names, VLAN names, and generic patterns.
 # Uses explicit word boundaries that treat _ as a boundary (like a non-word
 # character) so that names like "eth999_src" are correctly captured.
@@ -505,7 +505,7 @@ with tempfile.TemporaryDirectory(prefix="sms040-source-negative-", dir="/tmp") a
     original = target_file.read_text()
 
     # Inject a hardcoded interface name as a source literal. Full-line comments
-    # are documentation and are intentionally excluded from the SMS-040 scan.
+    # are documentation and are intentionally excluded from the FS-310-HDS-020-SDS-010-SMS-040 scan.
     seeded_source = '\nSEEDED_TEST_INTERFACE_NAME = "eth999_src"\n'
     assert seeded_source not in original, "test precondition: seeded source should not already exist"
     target_file.write_text(original + seeded_source)

@@ -1,10 +1,20 @@
-"""Project the canonical network envelope onto the solver model.
+"""Project the canonical collections onto the solver model.
 
-The input is the `network.data` map carried by a validated canonical
-realization bundle (FS-310-HDS-040-SDS-010-SMS-100). The renderer's gate in
-`clabgen/canonical_bundle.py` has already rejected a raw control-plane payload;
-this module only translates the admitted envelope into the internal solver
-shape and adds no meaning of its own.
+FS-310-HDS-040-SDS-010-SMS-100 / -102: a renderer receives network semantics
+only as one validated canonical bundle's `canonical` collections. This module
+used to read `control_plane_model.data` -- the plain producer artifact -- and
+build a parallel network model from it, which is precisely the boundary
+violation the row forbids; `clabgen/canonical_bundle.py` now refuses such a
+payload outright.
+
+The site shape the solver needs (`runtimeTargets`, `forwardingSemantics`,
+`transit`, ...) is exactly what `canonical.canonicalSites.byEnterprise.
+<enterprise>.<site>` carries: the canonical site record IS the site object the
+control-plane model published, projected by network-realization-model's
+`canonicalFor`. So this module maps that collection and keeps its canonical
+path; it adds no meaning of its own.
+
+No address material is produced here beyond what the canonical records name.
 """
 
 from __future__ import annotations
@@ -15,22 +25,28 @@ from clabgen.cpm_runtime import add_runtime_target
 from clabgen.cpm_transit import add_transit_links
 
 
-def control_plane_model_to_solver_json(root: Dict[str, Any]) -> Dict[str, Any]:
-    cpm = root.get("control_plane_model")
-    if not isinstance(cpm, dict):
-        raise ValueError("'control_plane_model' must be an object")
+def control_plane_model_to_solver_json(canonical: Dict[str, Any]) -> Dict[str, Any]:
+    """Project a bundle's `canonical` collections onto the solver model."""
+    if not isinstance(canonical, dict):
+        raise ValueError("canonical collections must be an object")
 
-    data = cpm.get("data")
-    if not isinstance(data, dict):
-        raise ValueError("'control_plane_model.data' must be an object")
+    sites = canonical.get("canonicalSites")
+    if not isinstance(sites, dict):
+        raise ValueError("canonical.canonicalSites must be an object")
+
+    by_enterprise = sites.get("byEnterprise")
+    if not isinstance(by_enterprise, dict):
+        raise ValueError("canonical.canonicalSites.byEnterprise must be an object")
 
     enterprise_out: Dict[str, Any] = {}
 
-    for enterprise, sites_obj in data.items():
+    for enterprise, sites_obj in by_enterprise.items():
         if not isinstance(enterprise, str) or not enterprise:
             continue
         if not isinstance(sites_obj, dict):
-            raise ValueError(f"control_plane_model.data.{enterprise} must be an object")
+            raise ValueError(
+                f"canonical.canonicalSites.byEnterprise.{enterprise} must be an object"
+            )
 
         site_out: Dict[str, Any] = {}
         for site_name, site_obj in sites_obj.items():
@@ -38,7 +54,8 @@ def control_plane_model_to_solver_json(root: Dict[str, Any]) -> Dict[str, Any]:
                 continue
             if not isinstance(site_obj, dict):
                 raise ValueError(
-                    f"control_plane_model.data.{enterprise}.{site_name} must be an object"
+                    "canonical.canonicalSites.byEnterprise."
+                    f"{enterprise}.{site_name} must be an object"
                 )
             site_out[site_name] = cpm_site_to_solver_site(site_obj)
 
@@ -47,8 +64,7 @@ def control_plane_model_to_solver_json(root: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "enterprise": enterprise_out,
         "meta": {
-            "control_plane_model": cpm.get("meta", {}),
-            "control_plane_model_version": cpm.get("version"),
+            "canonicalCollections": sorted(canonical.keys()),
         },
     }
 
@@ -56,7 +72,7 @@ def control_plane_model_to_solver_json(root: Dict[str, Any]) -> Dict[str, Any]:
 def cpm_site_to_solver_site(site: Dict[str, Any]) -> Dict[str, Any]:
     runtime_targets = site.get("runtimeTargets")
     if not isinstance(runtime_targets, dict):
-        raise ValueError("control_plane_model site must include runtimeTargets object")
+        raise ValueError("canonical site record must include runtimeTargets object")
 
     nodes: Dict[str, Any] = {}
     links: Dict[str, Any] = {}
