@@ -56,6 +56,26 @@ def control_plane_envelope(bundle: Any) -> Dict[str, Any]:
         raise _redacted("bundle lacks a bundle identity")
     if validation.get("artifactIdentity") != identity:
         raise _redacted("released identity does not match the supplied bundle content")
+    # FS-310-HDS-040-SDS-010-SMS-102 (CLAB renderer canonical-only consumption):
+    # the renderer may map the canonical collections and nothing else. A released
+    # bundle still CARRIES the producer artifact at `network.data` -- identity and
+    # coverage are computed over it -- and this renderer used to read it, building
+    # its own solver model from `control_plane_model.data.<enterprise>.<site>`.
+    # That is the boundary violation, so the gate refuses the artifact outright
+    # rather than letting a renderer that has not been repaired render anything.
+    #
+    # Fail fast, and say what to map instead: a payload carrying `network` cannot
+    # be rendered by this backend until `cpm_solver` reads `canonical.*`.
+    if "network" in bundle:
+        raise _redacted(
+            "FS-310-HDS-040-SDS-010-SMS-102: the renderer input carries 'network' (the "
+            "plain control-plane artifact). The CLAB backend may map only the bundle's "
+            "'canonical' collections; building the solver model from "
+            "control_plane_model.data is the violation this row forbids. Serialise "
+            "validateRendererInput.rendererInput (canonical collections + stamps, no "
+            "'network' key) and map canonical.canonicalSites / canonicalRuntimeTargets / "
+            "canonicalInterfaces / canonicalRoutes"
+        )
     network = bundle.get("network")
     if not isinstance(network, dict) or not isinstance(network.get("data"), dict):
         raise _redacted("bundle does not carry network data")
