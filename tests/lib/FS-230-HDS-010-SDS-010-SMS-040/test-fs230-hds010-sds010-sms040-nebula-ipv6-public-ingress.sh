@@ -227,8 +227,11 @@ PY
   cat "${tmp_dir}/runtime-nft-statements"
 } >"${tmp_dir}/runtime-nft-batch.nft"
 
+# nft is the authority on the rendered batch; the namespace it runs in is a
+# property of the host, so the helper picks one (unprivileged userns, else root
+# netns). See tests/lib/nft-netns-check.sh.
 nix shell --inputs-from "${repo_root}" nixpkgs#nftables nixpkgs#util-linux --command \
-  unshare -Urn nft -c -f "${tmp_dir}/runtime-nft-batch.nft"
+  bash "${repo_root}/tests/lib/nft-netns-check.sh" "${tmp_dir}/runtime-nft-batch.nft"
 
 helper="${repo_root}/docker-clab-frr-plus-tooling/protected-ipv6-materializer.py"
 
