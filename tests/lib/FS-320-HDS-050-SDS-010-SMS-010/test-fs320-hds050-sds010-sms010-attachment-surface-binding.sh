@@ -3,7 +3,7 @@
 # GAMP-SCOPE: software-module-test
 #
 # CLAB renderer construction test for the attachment surface binding module
-# (SMS-010). Expected state: FAILING. The surface record and binding do not
+# FS-320-HDS-050-SDS-010-SMS-010. Expected state: FAILING. The surface record and binding do not
 # exist in this renderer yet; the test names the required behaviour so a
 # solution can be proven against it.
 #
