@@ -68,7 +68,11 @@ REPO_ROOT="${repo_root}" nix eval --impure --json --expr '
       identityPreserved = validated.bundleIdentity == bundle.bundleIdentity;
       inherit rawCpmRejected unvalidatedMutationRejected;
     };
-    controlPlane = validated.controlPlaneEnvelope;
+    # The producer artifact the test itself built, NOT `validated.controlPlaneEnvelope`:
+    # that attribute is deliberately withdrawn and throws (FS-310-HDS-040-SDS-010-SMS-100).
+    # Reading the plain control-plane model back out of a validation result is the exact
+    # consumption the row forbids, and the fixture already has the artifact in scope.
+    controlPlane = cpm;
     inherit inventory;
   }
 ' >"${tmp_dir}/canonical-input.json"

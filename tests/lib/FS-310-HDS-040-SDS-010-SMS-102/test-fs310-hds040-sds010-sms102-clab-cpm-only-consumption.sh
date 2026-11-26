@@ -371,7 +371,13 @@ fixture = r'''
       rootLockIdentity = "sms102-schema-gate";
       producerRevision = realization.rev or "local";
     };
-    validate = value: flake.libBySystem.${system}.renderer.canonical.validateInput { bundle = value; };
+    # `.bundleIdentity`, not the whole result: `validateRendererInput` deliberately keeps
+    # `semanticModel` / `controlPlaneEnvelope` / `semanticArtifact` as attributes that
+    # THROW (FS-310-HDS-040-SDS-010-SMS-100), so serialising the entire attrset -- which
+    # `nix eval --json` does -- forces them and the released bundle is reported as
+    # rejected with a message about the plain control-plane model. Measured here: Check 5c
+    # failed with exactly that, and the gate itself was fine.
+    validate = value: (flake.libBySystem.${system}.renderer.canonical.validateInput { bundle = value; }).bundleIdentity;
     mutated = bundle // {
       network = bundle.network // {
         data = bundle.network.data // { meta = (bundle.network.data.meta or {}) // { source = "mutated"; }; };
