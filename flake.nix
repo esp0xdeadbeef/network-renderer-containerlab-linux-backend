@@ -4,17 +4,22 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    # FOUR INPUTS REMOVED: network-control-plane-model, network-labs, network-compiler
-    # and network-forwarding-model.
+    # These two are READ BY TESTS, not by the outputs:
     #
-    # None of them was referenced anywhere in this repository -- not in flake.nix's
-    # outputs and not in any other .nix file. They were declared only to constrain the
-    # transitive graph with `follows`, so each one added a complete dependency graph to
-    # this lock that nothing read: extra nixpkgs copies, extra sources to fetch, extra
-    # evaluation on every command. network-labs alone is the largest graph in the fleet.
+    #   tests/lib/.../*.sh  -> flake.inputs.network-control-plane-model.lib.<system>.compileAndBuild
+    #                          flake.inputs.network-labs.outPath + "/GAMP/SMT/<trace>"
     #
-    # `nix flake lock` regenerates, and the lint in this fleet (no absolute revs, no dead
-    # inputs) fails if they come back.
+    # They were removed as "unused" in 1bc306c, which is true of the outputs and false of
+    # the suite: 14 test sites read them, and every one of those cases failed with
+    #   error: attribute 'network-control-plane-model' missing
+    # (measured on this repository's CI run 45952823354: FS-230-…-040, FS-270-…-020,
+    # FS-540-…-020/045, FS-780-…-010, FS-960-…-010). A test that pins the producer and the
+    # lab tree through the flake is the fleet's convention; the input is what makes the
+    # suite hermetic against a developer's sibling checkouts.
+    network-control-plane-model.url = "github:esp0xdeadbeef/network-control-plane-model";
+    network-control-plane-model.inputs.nixpkgs.follows = "nixpkgs";
+
+    network-labs.url = "github:esp0xdeadbeef/network-labs";
 
     network-realization-model.url = "github:esp0xdeadbeef/network-realization-model";
     network-realization-model.inputs.nixpkgs.follows = "nixpkgs";
