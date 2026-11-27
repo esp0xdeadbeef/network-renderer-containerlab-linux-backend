@@ -93,5 +93,5 @@ echo "[*] Starting VM via nixos-shell (preserving custom options)..."
 (
   cd "${VM_WORK_DIR}"
   CLAB_VM_BRIDGES_FILE="${BRIDGES_FILE}" \
-    nix run --extra-experimental-features 'nix-command flakes' nixpkgs#nixos-shell -- "${VM_NIX}"
+    nix run --inputs-from "${repo_root}" --extra-experimental-features 'nix-command flakes' nixpkgs#nixos-shell -- "${VM_NIX}"
 )
