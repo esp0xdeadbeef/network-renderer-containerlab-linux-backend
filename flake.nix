@@ -4,16 +4,17 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    network-control-plane-model.url = "github:esp0xdeadbeef/network-control-plane-model";
-    network-control-plane-model.inputs.nixpkgs.follows = "nixpkgs";
-
-    network-labs.url = "github:esp0xdeadbeef/network-labs";
-
-    network-compiler.url = "github:esp0xdeadbeef/network-compiler";
-    network-forwarding-model.url = "github:esp0xdeadbeef/network-forwarding-model";
-
-    network-compiler.inputs.nixpkgs.follows = "nixpkgs";
-    network-forwarding-model.inputs.nixpkgs.follows = "nixpkgs";
+    # FOUR INPUTS REMOVED: network-control-plane-model, network-labs, network-compiler
+    # and network-forwarding-model.
+    #
+    # None of them was referenced anywhere in this repository -- not in flake.nix's
+    # outputs and not in any other .nix file. They were declared only to constrain the
+    # transitive graph with `follows`, so each one added a complete dependency graph to
+    # this lock that nothing read: extra nixpkgs copies, extra sources to fetch, extra
+    # evaluation on every command. network-labs alone is the largest graph in the fleet.
+    #
+    # `nix flake lock` regenerates, and the lint in this fleet (no absolute revs, no dead
+    # inputs) fails if they come back.
 
     network-realization-model.url = "github:esp0xdeadbeef/network-realization-model";
     network-realization-model.inputs.nixpkgs.follows = "nixpkgs";
