@@ -67,8 +67,8 @@ resolve_input_path() {
 
   archive_json="$(mktemp)"
   archive_stderr="$(mktemp)"
-  if ! nix flake archive --json "path:${repo_root}" >"${archive_json}" 2>"${archive_stderr}"; then
-    echo "tests: failed to evaluate flake inputs via nix flake archive" >&2
+  if ! flake-archive-offline --json "path:${repo_root}" >"${archive_json}" 2>"${archive_stderr}"; then
+    echo "tests: failed to evaluate flake inputs via flake-archive-offline" >&2
     echo "tests: expected GitHub access to network inputs from the flake" >&2
     if [[ -s "${archive_stderr}" ]]; then
       cat "${archive_stderr}" >&2
@@ -78,7 +78,7 @@ resolve_input_path() {
   fi
 
   if [[ ! -s "${archive_json}" ]]; then
-    echo "tests: nix flake archive produced no output; cannot resolve ${input_name}" >&2
+    echo "tests: flake-archive-offline produced no output; cannot resolve ${input_name}" >&2
     if [[ -s "${archive_stderr}" ]]; then
       cat "${archive_stderr}" >&2
     fi

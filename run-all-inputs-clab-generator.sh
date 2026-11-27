@@ -28,7 +28,7 @@ resolve_input_path() {
   local archive_json
   archive_json="$(mktemp)"
 
-  nix flake archive --json "path:${repo_root}" > "${archive_json}"
+  flake-archive-offline --json "path:${repo_root}" > "${archive_json}"
 
   INPUT_NAME="${input_name}" ARCHIVE_JSON="${archive_json}" nix eval --impure --raw --expr '
     let
